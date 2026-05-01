@@ -1,0 +1,29 @@
+@{
+    var role = ViewBag.Role as string;
+}
+
+<h2>@role Login</h2>
+
+<form method="post">
+    <input type="hidden" name="role" value="@role" />
+
+    <div>
+        <label>Email</label>
+        <input name="email" />
+    </div>
+
+    <div>
+        <label>Password</label>
+        <input type="password" name="password" />
+    </div>
+
+    <button type="submit">Login</button>
+</form>
+
+@if (role == "Customer" || role == "Seller")
+{
+    <p>
+        Don't have an account?
+        <a href="/Auth/Register?role=@role">Sign Up</a>
+    </p>
+}

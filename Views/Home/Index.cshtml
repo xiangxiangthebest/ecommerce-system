@@ -1,0 +1,36 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<div style="text-align:center; margin-top:80px;">
+    <h1>Welcome to Ecommerce System</h1>
+    <p>Select your role to continue</p>
+
+    <div style="margin-top:40px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
+        
+        <a class="role-btn" href="/Auth/Login?role=Customer">Customer</a>
+        <a class="role-btn" href="/Auth/Login?role=Seller">Seller</a>
+        <a class="role-btn" href="/Auth/Login?role=CustomerService">Customer Service</a>
+        <a class="role-btn" href="/Auth/Login?role=Admin">Admin</a>
+
+    </div>
+</div>
+
+<style>
+    .role-btn {
+        padding: 15px 25px;
+        background-color: #2d6cdf;
+        color: white;
+        text-decoration: none;
+        border-radius: 10px;
+        font-size: 18px;
+        transition: 0.3s;
+        min-width: 180px;
+        display: inline-block;
+    }
+
+    .role-btn:hover {
+        background-color: #1b4fb3;
+        transform: scale(1.05);
+    }
+</style>
