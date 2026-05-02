@@ -1,29 +1,78 @@
 @{
+    Layout = "_AuthLayout";
     var role = ViewBag.Role as string;
 }
 
-<h2>@role Login</h2>
+<link rel="stylesheet" href="~/css/auth.css" />
 
-<form method="post">
-    <input type="hidden" name="role" value="@role" />
+<div class="auth-container">
 
-    <div>
-        <label>Email</label>
-        <input name="email" />
+    <div class="auth-card">
+
+        <div class="auth-top">
+            <div class="auth-badge">@role Portal</div>
+
+            <h1>Login</h1>
+
+            <p>
+                Sign in to continue accessing your dashboard and services.
+            </p>
+        </div>
+
+        @if (ViewBag.Error != null)
+        {
+            <div class="error-message">
+                @ViewBag.Error
+            </div>
+        }
+
+        <form method="post" class="auth-form">
+
+            <input type="hidden" name="role" value="@role" />
+
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email"
+                       name="email"
+                       placeholder="Enter your email"
+                       required />
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password"
+                       name="password"
+                       placeholder="Enter your password"
+                       required />
+            </div>
+
+            <button type="submit" class="auth-btn">
+                Login
+            </button>
+
+        </form>
+
+        @if (role == "Customer" || role == "Seller")
+        {
+            <div class="auth-bottom">
+                <span>Don't have an account?</span>
+
+                @if (role == "Customer")
+                {
+                    <a href="/Auth/RegisterCustomer">
+                        Sign Up
+                    </a>
+                }
+
+                @if (role == "Seller")
+                {
+                    <a href="/Auth/RegisterSeller">
+                        Sign Up
+                    </a>
+                }
+            </div>
+        }
+
     </div>
-
-    <div>
-        <label>Password</label>
-        <input type="password" name="password" />
-    </div>
-
-    <button type="submit">Login</button>
-</form>
-
-@if (role == "Customer" || role == "Seller")
-{
-    <p>
-        Don't have an account?
-        <a href="/Auth/Register?role=@role">Sign Up</a>
-    </p>
-}
+    
+</div>

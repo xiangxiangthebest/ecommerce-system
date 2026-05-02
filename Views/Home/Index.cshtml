@@ -1,36 +1,74 @@
 ﻿@{
-    ViewData["Title"] = "Home";
+    Layout = "_AuthLayout";
 }
 
-<div style="text-align:center; margin-top:80px;">
-    <h1>Welcome to Ecommerce System</h1>
-    <p>Select your role to continue</p>
+<link rel="stylesheet" href="~/css/home.css" />
 
-    <div style="margin-top:40px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
-        
-        <a class="role-btn" href="/Auth/Login?role=Customer">Customer</a>
-        <a class="role-btn" href="/Auth/Login?role=Seller">Seller</a>
-        <a class="role-btn" href="/Auth/Login?role=CustomerService">Customer Service</a>
-        <a class="role-btn" href="/Auth/Login?role=Admin">Admin</a>
+<div class="home-wrapper">
+    
+    <main class="home-main">
 
-    </div>
+        <div class="home-hero">
+            <div class="hero-tag">
+                <span class="hero-tag-line"></span>
+                Commerce Platform
+            </div>
+            <h1>Welcome.<br />Who are <span>you today?</span></h1>
+            <p>Pick your role below to sign in and access your tailored workspace.</p>
+        </div>
+
+        <nav class="role-grid" aria-label="Role selection">
+
+            <a class="role-card" href="/Auth/Login?role=Customer">
+                <div class="role-num">01</div>
+                <div>
+                    <div class="role-label">Customer</div>
+                    <div class="role-desc">Shop, place orders &amp; track your deliveries</div>
+                </div>
+                <div class="card-footer">
+                    <span class="card-cta">Sign In</span>
+                    <span class="card-arrow">↗</span>
+                </div>
+            </a>
+
+            <a class="role-card" href="/Auth/Login?role=Seller">
+                <div class="role-num">02</div>
+                <div>
+                    <div class="role-label">Seller</div>
+                    <div class="role-desc">Manage listings, inventory &amp; fulfilment</div>
+                </div>
+                <div class="card-footer">
+                    <span class="card-cta">Sign In</span>
+                    <span class="card-arrow">↗</span>
+                </div>
+            </a>
+
+            <a class="role-card" href="/Auth/Login?role=CustomerService">
+                <div class="role-num">03</div>
+                <div>
+                    <div class="role-label">Customer Service</div>
+                    <div class="role-desc">Handle inquiries, disputes &amp; support tickets</div>
+                </div>
+                <div class="card-footer">
+                    <span class="card-cta">Sign In</span>
+                    <span class="card-arrow">↗</span>
+                </div>
+            </a>
+
+            <a class="role-card" href="/Auth/Login?role=Admin">
+                <div class="role-num">04</div>
+                <div>
+                    <div class="role-label">Admin</div>
+                    <div class="role-desc">Platform oversight, users &amp; configuration</div>
+                </div>
+                <div class="card-footer">
+                    <span class="card-cta">Sign In</span>
+                    <span class="card-arrow">↗</span>
+                </div>
+            </a>
+
+        </nav>
+
+    </main>
+
 </div>
-
-<style>
-    .role-btn {
-        padding: 15px 25px;
-        background-color: #2d6cdf;
-        color: white;
-        text-decoration: none;
-        border-radius: 10px;
-        font-size: 18px;
-        transition: 0.3s;
-        min-width: 180px;
-        display: inline-block;
-    }
-
-    .role-btn:hover {
-        background-color: #1b4fb3;
-        transform: scale(1.05);
-    }
-</style>

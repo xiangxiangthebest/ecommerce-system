@@ -1,15 +1,14 @@
 using EcommerceSystem.Data;
+using EcommerceSystem.DTOs;
 using EcommerceSystem.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using EcommerceSystem.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-namespace AuthController
+namespace EcommerceSystem.Controllers
 {
-            
     public class AuthController : Controller
     {
         private readonly AppDbContext _context;
@@ -19,33 +18,39 @@ namespace AuthController
             _context = context;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> Register(User model)
+        // =========================
+        // LOGIN PAGE
+        // =========================
+
+        [HttpGet]
+        public IActionResult Login(string role)
         {
-            model.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.PasswordHash);
+            ViewBag.Role = role;
 
-            _context.Users.Add(model);
-
-            await _context.SaveChangesAsync();
-
-            return RedirectToAction("Login");
-        }
-
-        public IActionResult Login()
-        {
             return View();
         }
 
+        // =========================
+        // LOGIN PROCESS
+        // =========================
+
         [HttpPost]
-        public async Task<IActionResult> Login(LoginDto dto)
+        public async Task<IActionResult> Login(LoginDto dto, string role)
         {
+            ViewBag.Role = role;
+
             var user = await _context.Users
-                .Include(x => x.Role)
                 .FirstOrDefaultAsync(x => x.Email == dto.Email);
 
             if (user == null)
             {
-                ViewBag.Error = "User not found";
+                ViewBag.Error = "Account does not exist";
+                return View();
+            }
+
+            if (user.Role != role)
+            {
+                ViewBag.Error = $"This account is not a {role}";
                 return View();
             }
 
@@ -61,28 +66,135 @@ namespace AuthController
             {
                 new Claim(ClaimTypes.Name, user.FullName),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role.RoleName)
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
-            var identity = new ClaimsIdentity(
-                claims,
-                CookieAuthenticationDefaults.AuthenticationScheme);
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
             var principal = new ClaimsPrincipal(identity);
 
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
             return RedirectToAction("Index", "Home");
         }
+
+        // =========================
+        // CUSTOMER REGISTER PAGE
+        // =========================
+
+        [HttpGet]
+        public IActionResult RegisterCustomer()
+        {
+            return View();
+        }
+
+        // =========================
+        // CUSTOMER REGISTER PROCESS
+        // =========================
+
+        [HttpPost]
+        public async Task<IActionResult> RegisterCustomer(RegisterCustomerDto dto)
+        {
+            bool emailExists = await _context.Users
+                .AnyAsync(x => x.Email == dto.Email);
+
+            if (emailExists)
+            {
+                ViewBag.Error = "Email already exists";
+                return View(dto);
+            }
+
+            if (dto.Password != dto.ConfirmPassword)
+            {
+                ViewBag.Error = "Passwords do not match";
+                return View(dto);
+            }
+
+            var user = new User
+            {
+                FullName = dto.FullName,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                Role = "Customer"
+            };
+
+            _context.Users.Add(user);
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("Login", new { role = "Customer" });
+        }
+
+        // =========================
+        // SELLER REGISTER PAGE
+        // =========================
+
+        [HttpGet]
+        public IActionResult RegisterSeller()
+        {
+            return View();
+        }
+
+        // =========================
+        // SELLER REGISTER PROCESS
+        // =========================
+
+        [HttpPost]
+        public async Task<IActionResult> RegisterSeller(RegisterSellerDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Error = "Please fill in all required fields";
+                return View(dto);
+            }
+
+            bool emailExists = await _context.Users
+                .AnyAsync(x => x.Email == dto.Email);
+
+            if (emailExists)
+            {
+                ViewBag.Error = "Email already exists";
+                return View(dto);
+            }
+
+            if (dto.Password != dto.ConfirmPassword)
+            {
+                ViewBag.Error = "Passwords do not match";
+                return View(dto);
+            }
+
+            var user = new User
+            {
+                FullName = dto.FullName,
+                NRICNumber = dto.NRICNumber,
+                State = dto.State,
+                PostalCode = dto.PostalCode,
+                DetailAddress = dto.DetailAddress,
+                TIN = dto.TIN,
+                ShopName = dto.ShopName,
+                PickupAddress = dto.PickupAddress,
+                Email = dto.Email,
+                PhoneNumber = dto.PhoneNumber,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                Role = "Seller"
+            };
+
+            _context.Users.Add(user);
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("Login", new { role = "Seller" });
+        }
+
+        // =========================
+        // LOGOUT
+        // =========================
 
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync();
 
-            return RedirectToAction("Login");
+            return RedirectToAction("Login", new { role = "Customer" });
         }
     }
-    
 }

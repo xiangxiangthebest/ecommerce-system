@@ -1,0 +1,388 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Mulish:wght@300;400;500;600&display=swap');
+
+:root {
+    --bg:           #f4f6ff;
+    --white:        #ffffff;
+    --accent:       #5b4fcf;
+    --accent-hover: #4739b0;
+    --accent-light: #eeecff;
+    --ink:          #1e1b4b;
+    --ink-mid:      #5b587d;
+    --ink-soft:     #9a98b6;
+    --border:       #e5e3f7;
+    --success:      #22c55e;
+    --shadow:       0 20px 60px rgba(91, 79, 207, 0.12);
+    --radius:       18px;
+}
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg);
+    font-family: 'Mulish', sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+}
+
+/* ── Card ── */
+.seller-card {
+    width: 100%;
+    max-width: 600px;
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 44px 44px 40px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    animation: fadeUp 0.55s ease both;
+}
+
+/* ── Badge ── */
+.auth-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 100px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+}
+
+/* ── Top ── */
+.auth-top {
+    margin-bottom: 28px;
+}
+
+.auth-top h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+    color: var(--ink);
+}
+
+.auth-top p {
+    color: var(--ink-mid);
+    font-size: 14.5px;
+    line-height: 1.65;
+    font-weight: 400;
+}
+
+/* ══════════════════════════════
+   PROGRESS STEPPER
+══════════════════════════════ */
+.progress-stepper {
+    display: flex;
+    align-items: center;
+    margin-bottom: 32px;
+    gap: 0;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    position: relative;
+}
+
+/* Circle */
+.step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    transition: all 0.35s ease;
+    position: relative;
+    z-index: 1;
+}
+
+/* Checkmark icon (hidden by default) */
+.step-circle .check {
+    display: none;
+    font-size: 14px;
+}
+
+.step-circle .num {
+    display: block;
+}
+
+/* Step label */
+.step-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    transition: color 0.3s ease;
+}
+
+/* Connector line between steps */
+.step-connector {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    top: -14px; /* align with circle center */
+    transition: background 0.4s ease;
+    margin: 0 4px;
+    max-width: 80px;
+    align-self: flex-start;
+    margin-top: 17px;
+}
+
+/* ── Active step ── */
+.step.active .step-circle {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(91, 79, 207, 0.3);
+}
+
+.step.active .step-label {
+    color: var(--accent);
+}
+
+/* ── Completed step ── */
+.step.completed .step-circle {
+    border-color: var(--success);
+    background: var(--success);
+    color: #fff;
+}
+
+.step.completed .step-circle .check { display: block; }
+.step.completed .step-circle .num   { display: none; }
+
+.step.completed .step-label {
+    color: var(--success);
+}
+
+.step-connector.completed {
+    background: var(--success);
+}
+
+/* ══════════════════════════════
+   FORM STEPS
+══════════════════════════════ */
+.form-step {
+    display: none;
+    flex-direction: column;
+    gap: 18px;
+    animation: fadeUp 0.4s ease both;
+}
+
+.form-step.active {
+    display: flex;
+}
+
+.section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding-bottom: 10px;
+    border-bottom: 1.5px solid var(--border);
+    margin-bottom: 2px;
+}
+
+/* ── Form groups ── */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.form-group input,
+.form-group textarea {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 16px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 400;
+    color: var(--ink);
+    background: var(--white);
+    outline: none;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+    resize: none;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(91, 79, 207, 0.09);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: var(--ink-soft);
+}
+
+/* Phone input */
+.phone-input {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.phone-input:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(91, 79, 207, 0.09);
+}
+
+.phone-input span {
+    padding: 13px 14px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 700;
+    border-right: 1.5px solid var(--border);
+    white-space: nowrap;
+}
+
+.phone-input input {
+    flex: 1;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* ── Two-column row ── */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* ══════════════════════════════
+   NAVIGATION BUTTONS
+══════════════════════════════ */
+.step-nav {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.btn-back {
+    flex: 1;
+    height: 52px;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    background: var(--white);
+    color: var(--ink-mid);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.22s ease;
+}
+
+.btn-back:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-next,
+.btn-submit {
+    flex: 2;
+    height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.22s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-next:hover,
+.btn-submit:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(91, 79, 207, 0.25);
+}
+
+.btn-arrow {
+    font-size: 16px;
+    transition: transform 0.2s ease;
+}
+
+.btn-next:hover .btn-arrow {
+    transform: translateX(3px);
+}
+
+/* ── Bottom link ── */
+.auth-bottom {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--ink-mid);
+}
+
+.auth-bottom a {
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+    margin-left: 4px;
+}
+
+.auth-bottom a:hover {
+    text-decoration: underline;
+}
+
+/* ── Animation ── */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 540px) {
+    .seller-card { padding: 32px 24px; }
+    .auth-top h1 { font-size: 26px; }
+    .form-row { grid-template-columns: 1fr; }
+    .step-label { font-size: 10px; }
+}
