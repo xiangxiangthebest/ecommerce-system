@@ -75,7 +75,10 @@ namespace EcommerceSystem.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
+            Console.WriteLine("Login Success");
             return RedirectToAction("Index", "Home");
+
+            
         }
 
         // =========================
