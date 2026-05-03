@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using EcommerceSystem.Factories;
+using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
@@ -110,13 +112,9 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
-            var user = new User
-            {
-                FullName = dto.FullName,
-                Email = dto.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                Role = "Customer"
-            };
+            IUserFactory factory = new CustomerFactory(dto);
+
+            var user = factory.CreateUser();
 
             _context.Users.Add(user);
 
@@ -163,27 +161,29 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
-            var user = new User
-            {
-                FullName = dto.FullName,
-                NRICNumber = dto.NRICNumber,
-                State = dto.State,
-                PostalCode = dto.PostalCode,
-                DetailAddress = dto.DetailAddress,
-                TIN = dto.TIN,
-                ShopName = dto.ShopName,
-                PickupAddress = dto.PickupAddress,
-                Email = dto.Email,
-                PhoneNumber = dto.PhoneNumber,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                Role = "Seller"
-            };
+            IUserFactory factory = new SellerFactory(dto);
+
+            var user = factory.CreateUser();
 
             _context.Users.Add(user);
 
             await _context.SaveChangesAsync();
 
             return RedirectToAction("Login", new { role = "Seller" });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateCustomerService(RegisterCustomerServiceDto dto)
+        {
+            IUserFactory factory = new CustomerServiceFactory(dto);
+
+            var user = factory.CreateUser();
+
+            _context.Users.Add(user);
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("Index");
         }
 
         // =========================

@@ -2,6 +2,8 @@ using EcommerceSystem.Data;
 using EcommerceSystem.Models;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using EcommerceSystem.Factories;
+using EcommerceSystem.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,13 +30,11 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.Users.Any(x => x.Email == "admin@gmail.com"))
     {
-        context.Users.Add(new User
-        {
-            FullName = "Administrator",
-            Email = "admin@gmail.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
-            Role = "Admin"
-        });
+        IUserFactory factory = new AdminFactory();
+
+        var admin = factory.CreateUser();
+
+        context.Users.Add(admin);
 
         context.SaveChanges();
     }
