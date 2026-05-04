@@ -1,10 +1,24 @@
-namespace EcommerceSystem.Models;
-
-public class Category
+namespace EcommerceSystem.Models
 {
-    public int CategoryId { get; set; }
+    public class Category
+    {
+        public int CategoryId { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public List<Product> Products { get; set; }
 
-    public string CategoryName { get; set; }
+        // 默认构造函数
+        public Category()
+        {
+            Products = new List<Product>();
+        }
 
-    public ICollection<Product>? Products { get; set; }
+        public Category(int categoryId, string name, string description, List<Product> products)
+        {
+            CategoryId = categoryId;
+            Name = name;
+            Description = description;
+            Products = products;
+        }
+    }
 }

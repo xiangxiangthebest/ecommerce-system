@@ -1,26 +1,32 @@
-namespace EcommerceSystem.Models;
-
-public class Product
+namespace EcommerceSystem.Models
 {
-    public int ProductId { get; set; }
+    public class Product
+    {
+        public int ProductId { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public double Price { get; set; }
+        public int StockQuantity { get; set; }
+        public Category Category { get; set; }
+        public Seller Seller { get; set; }
 
-    public int SellerId { get; set; }
+        // 默认构造函数
+        public Product() { }
 
-    public int CategoryId { get; set; }
+        public Product(int productId, string name, string description, double price, int stockQuantity, Category category, Seller seller)
+        {
+            ProductId = productId;
+            Name = name;
+            Description = description;
+            Price = price;
+            StockQuantity = stockQuantity;
+            Category = category;
+            Seller = seller;
+        }
 
-    public string ProductName { get; set; }
-
-    public string Description { get; set; }
-
-    public decimal Price { get; set; }
-
-    public int StockQuantity { get; set; }
-
-    public string? ProductImage { get; set; }
-
-    public string Status { get; set; } = "Pending";
-
-    public User? Seller { get; set; }
-
-    public Category? Category { get; set; }
+        public bool IsInStock()
+        {
+            return StockQuantity > 0;
+        }
+    }
 }
