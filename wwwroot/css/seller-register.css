@@ -386,3 +386,12 @@ body {
     .form-row { grid-template-columns: 1fr; }
     .step-label { font-size: 10px; }
 }
+
+.error-message {
+    background: #ffe5e5;
+    color: #d8000c;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
