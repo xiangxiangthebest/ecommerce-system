@@ -9,5 +9,5 @@ public class Product
     public string Category { get; set; }
     public string Description { get; set; }
     public string ImagePath { get; set; }
-    public int SellerId { get; set; } // Link to the user who owns it
+    public int SellerId { get; set; } 
 }

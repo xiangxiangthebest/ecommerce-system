@@ -8,6 +8,7 @@
 <div class="auth-container">
     <div class="auth-card seller-card">
 
+<<<<<<< HEAD
     @if (ViewBag.Error != null)
     {
         <div id="errorBackdrop" class="modal-backdrop">
@@ -20,15 +21,20 @@
     }
 
         @**Badge + Title*@
+=======
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
         <div class="auth-top">
             <div class="auth-badge">Seller Portal</div>
             <h1>Seller Registration</h1>
             <p>Register your business and start selling on the platform.</p>
         </div>
 
+<<<<<<< HEAD
 
 
         @**── Progress Stepper ──*@
+=======
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
         <div class="progress-stepper">
 
             <div class="step active" id="step-indicator-1">
@@ -51,12 +57,15 @@
 
         </div>
 
-        @**── Form ──*@
+        @if (ViewBag.Error != null)
+        {
+            <div class="error-message">
+                @ViewBag.Error
+            </div>
+        }
+
         <form method="post" id="seller-form">
 
-            @**════════════════════════════*@
-            @**STEP 1 — Seller Information*@
-            @**════════════════════════════*@
             <div class="form-step active" id="form-step-1">
 
                 <div class="section-label">Seller Information</div>
@@ -130,15 +139,24 @@
                 </div>
 
                 <div class="step-nav">
+<<<<<<< HEAD
                     <button type="button" class="btn-next" onclick="goToStep(2)">Next</button>
+=======
+                    <button type="button" class="btn-next" onclick="validateStep1()">
+                        Next
+                    </button>
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
                 </div>
 
             </div>
 
+<<<<<<< HEAD
             @**════════════════════════════*@
             @**STEP 2 — Shop Information  *@
             @**════════════════════════════*@
             <!-- RegisterSeller.cshtml (Step 2 portion) -->
+=======
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
             <div class="form-step" id="form-step-2">
                 <div class="section-label">Shop Information</div>
 
@@ -198,6 +216,7 @@
 </div>
 
 <script>
+<<<<<<< HEAD
 
 // ─── HELPER FUNCTIONS FOR ERRORS ───
 function showError(input, message) {
@@ -426,3 +445,88 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
 })();
 
 </script>
+=======
+
+    function validateStep1() {
+        const fields = document.querySelectorAll(
+            '#form-step-1 input, #form-step-1 textarea'
+        );
+
+        for (let field of fields) {
+            if (!field.checkValidity()) {
+                field.reportValidity();
+                return;
+            }
+        }
+
+        goToStep(2);
+    }
+
+    document.getElementById('seller-form')
+        .addEventListener('submit', function (e) {
+
+            const password =
+                document.querySelector('input[name="Password"]').value;
+
+            const confirmPassword =
+                document.querySelector('input[name="ConfirmPassword"]').value;
+
+            if (password !== confirmPassword) {
+                e.preventDefault();
+                alert("Passwords do not match");
+                return;
+            }
+
+            const fields = document.querySelectorAll(
+                '#form-step-2 input, #form-step-2 textarea'
+            );
+
+            for (let field of fields) {
+                if (!field.checkValidity()) {
+                    e.preventDefault();
+                    field.reportValidity();
+                    return;
+                }
+            }
+        });
+
+    function goToStep(step) {
+
+        document.querySelectorAll('.form-step')
+            .forEach(s => s.classList.remove('active'));
+
+        document.querySelectorAll('.step')
+            .forEach(s => s.classList.remove('active'));
+
+        document.getElementById('form-step-' + step)
+            .classList.add('active');
+
+        document.getElementById('step-indicator-' + step)
+            .classList.add('active');
+
+        if (step === 2) {
+
+            document.getElementById('step-indicator-1')
+                .classList.add('completed');
+
+            document.getElementById('connector')
+                .classList.add('completed');
+        }
+        else {
+
+            document.getElementById('step-indicator-1')
+                .classList.remove('completed');
+
+            document.getElementById('connector')
+                .classList.remove('completed');
+        }
+
+        document.querySelector('.seller-card')
+            .scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+    }
+
+</script>
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825

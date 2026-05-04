@@ -19,10 +19,6 @@ namespace EcommerceSystem.Controllers
             _context = context;
         }
 
-        // =========================
-        // LOGIN PAGE
-        // =========================
-
         [HttpGet]
         public IActionResult Login(string role)
         {
@@ -31,15 +27,12 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // =========================
-        // LOGIN PROCESS
-        // =========================
-
         [HttpPost]
         public async Task<IActionResult> Login(LoginDto dto, string role)
         {
             ViewBag.Role = role;
 
+            // check user
             var user = await _context.Users
                 .FirstOrDefaultAsync(x => x.Email == dto.Email);
 
@@ -76,6 +69,7 @@ namespace EcommerceSystem.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
+<<<<<<< HEAD
             // Updated Redirection Logic
             if (user.Role == "Seller")
             {
@@ -87,11 +81,17 @@ namespace EcommerceSystem.Controllers
             }
 
             return RedirectToAction("Index", "Home");
+=======
+            return user.Role switch
+            {
+                "Admin" => RedirectToAction("Home", "Admin"),
+                "Customer" => RedirectToAction("Home", "Customer"),
+                "Seller" => RedirectToAction("Home", "Seller"),
+                "CustomerService" => RedirectToAction("Home", "CustomerService"),
+                _ => RedirectToAction("Index", "Home")
+            };
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
         }
-
-        // =========================
-        // CUSTOMER REGISTER PAGE
-        // =========================
 
         [HttpGet]
         public IActionResult RegisterCustomer()
@@ -99,25 +99,20 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // =========================
-        // CUSTOMER REGISTER PROCESS
-        // =========================
-
         [HttpPost]
         public async Task<IActionResult> RegisterCustomer(RegisterCustomerDto dto)
         {
+            if (!ModelState.IsValid)
+            {
+                return View(dto);
+            }
+
             bool emailExists = await _context.Users
                 .AnyAsync(x => x.Email == dto.Email);
 
             if (emailExists)
             {
-                ViewBag.Error = "Email already exists";
-                return View(dto);
-            }
-
-            if (dto.Password != dto.ConfirmPassword)
-            {
-                ViewBag.Error = "Passwords do not match";
+                ModelState.AddModelError("Email", "Email already exists");
                 return View(dto);
             }
 
@@ -126,15 +121,10 @@ namespace EcommerceSystem.Controllers
             var user = factory.CreateUser();
 
             _context.Users.Add(user);
-
             await _context.SaveChangesAsync();
-
+                
             return RedirectToAction("Login", new { role = "Customer" });
         }
-
-        // =========================
-        // SELLER REGISTER PAGE
-        // =========================
 
         [HttpGet]
         public IActionResult RegisterSeller()
@@ -142,16 +132,15 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // =========================
-        // SELLER REGISTER PROCESS
-        // =========================
-
         [HttpPost]
         public async Task<IActionResult> RegisterSeller(RegisterSellerDto dto)
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.Error = "Please fill in all required fields";
+                ViewBag.Error = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .FirstOrDefault()?.ErrorMessage;
+
                 return View(dto);
             }
 
@@ -176,6 +165,7 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
+<<<<<<< HEAD
             if (dto.Password != dto.ConfirmPassword)
             {
                 ViewBag.Error = "Passwords do not match";
@@ -183,6 +173,8 @@ namespace EcommerceSystem.Controllers
             }
 
             // If all checks pass, proceed with creation[cite: 1, 11]
+=======
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
             IUserFactory factory = new SellerFactory(dto);
             var user = factory.CreateUser();
             _context.Users.Add(user);
@@ -204,10 +196,6 @@ namespace EcommerceSystem.Controllers
 
             return RedirectToAction("Index");
         }
-
-        // =========================
-        // LOGOUT
-        // =========================
 
         public async Task<IActionResult> Logout()
         {

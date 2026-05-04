@@ -423,7 +423,15 @@ body {
 }
 
 @keyframes modalPop {
-    /* Updated to include the centering translate so the animation doesn't break position */
     from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
     to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+    .error-message {
+    background: #ffe5e5;
+    color: #d8000c;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 14px;
 }

@@ -36,7 +36,6 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // GET: Just show the Add Product form
         [HttpGet]
         public async Task<IActionResult> AddProduct()
         {
@@ -46,22 +45,18 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // POST: Save the product to the database
         [HttpPost]
         public async Task<IActionResult> AddProduct(Product model, IFormFile ImageFile)
         {
-            // Link product to the logged-in seller
             var email = User.FindFirst(ClaimTypes.Email)?.Value;
             var user = await _context.Users.FirstOrDefaultAsync(x => x.Email == email);
             if (user != null) model.SellerId = user.UserId;
 
-            // Handle image upload
             if (ImageFile != null && ImageFile.Length > 0)
             {
                 var fileName = Guid.NewGuid().ToString() + Path.GetExtension(ImageFile.FileName);
                 var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images");
 
-                // Create the folder if it doesn't exist
                 if (!Directory.Exists(folderPath))
                     Directory.CreateDirectory(folderPath);
 
@@ -74,7 +69,6 @@ namespace EcommerceSystem.Controllers
             }
             else
             {
-                // Use a default placeholder if no image uploaded
                 model.ImagePath = "/images/placeholder.png";
             }
 
@@ -90,7 +84,6 @@ namespace EcommerceSystem.Controllers
             var product = await _context.Products.FindAsync(id);
             if (product != null)
             {
-                // Optional: Delete the physical file from wwwroot/images
                 var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", product.ImagePath.TrimStart('/'));
                 if (System.IO.File.Exists(filePath))
                 {

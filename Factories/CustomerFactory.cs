@@ -15,13 +15,14 @@ namespace EcommerceSystem.Factories
 
         public User CreateUser()
         {
-            return new User
+            return new Customer
             {
                 FullName = _dto.FullName,
                 Email = _dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(_dto.Password),
                 Role = "Customer"
             };
+            
         }
     }
 }

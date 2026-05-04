@@ -15,7 +15,7 @@ namespace EcommerceSystem.Factories
 
         public User CreateUser()
         {
-            return new User
+            return new Seller
             {
                 FullName = _dto.FullName,
                 NRICNumber = _dto.NRICNumber,
