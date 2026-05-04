@@ -3,6 +3,7 @@ using System;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504132120_bsd")]
+    partial class bsd
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -211,8 +214,6 @@ namespace ecommerce_system.Migrations
                     b.Property<int?>("CartId")
                         .HasColumnType("INTEGER");
 
-                    b.HasIndex("CartId");
-
                     b.ToTable("Customers", (string)null);
                 });
 
@@ -304,17 +305,11 @@ namespace ecommerce_system.Migrations
 
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>
                 {
-                    b.HasOne("EcommerceSystem.Models.Cart", "Cart")
-                        .WithMany()
-                        .HasForeignKey("CartId");
-
                     b.HasOne("EcommerceSystem.Models.User", null)
                         .WithOne()
                         .HasForeignKey("EcommerceSystem.Models.Customer", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Cart");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Seller", b =>

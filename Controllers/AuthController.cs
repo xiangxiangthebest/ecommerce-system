@@ -41,6 +41,7 @@ namespace EcommerceSystem.Controllers
         {
             ViewBag.Role = role;
 
+            // check user
             var user = await _context.Users
                 .FirstOrDefaultAsync(x => x.Email == dto.Email);
 
@@ -90,6 +91,8 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
+        [HttpPost]
+
         // =========================
         // CUSTOMER REGISTER PROCESS
         // =========================
@@ -112,6 +115,7 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
+            
             IUserFactory factory = new CustomerFactory(dto);
 
             var user = factory.CreateUser();
@@ -119,7 +123,7 @@ namespace EcommerceSystem.Controllers
             _context.Users.Add(user);
 
             await _context.SaveChangesAsync();
-
+                
             return RedirectToAction("Login", new { role = "Customer" });
         }
 
