@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = "Add Product";
+}
+
+<link rel="stylesheet" href="~/css/seller-dashboard.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="dashboard-wrapper">
+
+    <!-- ── Sidebar (Remains Fixed on Left) ── -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3 class="shop-title">@ViewBag.ShopName</h3>
+        </div>
+        <ul class="nav-links">
+            <li><a href="@Url.Action("Index", "Seller", new { tab = "General" })">General</a></li>
+            <li class="active">
+                <a href="@Url.Action("Index", "Seller", new { tab = "Product" })">Product</a>
+                <ul class="sub-nav">
+                    <li class="sub-active">Add New Product</li>
+                </ul>
+            </li>
+            <li><a href="@Url.Action("Index", "Seller", new { tab = "Order" })">Order</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <form asp-controller="Auth" asp-action="Logout" method="post">
+                <button type="submit" class="logout-link">Logout</button>
+            </form>
+        </div>
+    </nav>
+
+    <!-- ── Main Content Area ── -->
+    <main class="content-area">
+        <div class="add-product-container">
+            <h1 class="shop-title">@ViewBag.ShopName - Add Product</h1>
+
+            <!-- form now posts to the correct AddProduct action -->
+            <form id="productForm"
+                  asp-controller="Seller"
+                  asp-action="AddProduct"
+                  method="post"
+                  enctype="multipart/form-data">
+
+                <div class="form-body">
+                    <!-- NEW: Product Price Field[cite: 26] -->
+                    <div class="form-row">
+                        <label>Product Price:</label>
+                        <input type="number" name="Price" step="0.01" required placeholder="0.00" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Product SKU:</label>
+                        <input type="text" name="SKU" required />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Product Name:</label>
+                        <input type="text" name="Name" required />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Categories:</label>
+                        <select name="Category" class="category-select" required>
+                            <option value="" disabled selected>Select a category</option>
+                            <option value="Fashion/Apparel">Fashion/Apparel</option>
+                            <option value="Consumer Electronics">Consumer Electronics</option>
+                            <option value="Food and Beverages">Food and Beverages</option>
+                            <option value="Beauty and Personal Care">Beauty and Personal Care</option>
+                            <option value="Home Improvement">Home Improvement</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="upload-section">
+                        <label>Product Image/ Video:</label>
+                        <label for="file-upload" class="upload-box" id="drop-zone">
+                            <img src="~/images/cloud-upload-icon.png" alt="Upload" class="upload-icon" id="preview-icon" />
+                            <span class="upload-text" id="upload-text">Upload Product Image or Video</span>
+                            
+                            <input type="file" id="file-upload" name="ImageFile" 
+                                accept="image/*,video/*" style="display: none;" 
+                                onchange="handleFileSelect(this)" />
+                            
+                            <span id="file-name-display" class="file-name-text"></span>
+                            <button type="button" id="remove-file-btn" class="btn-remove" style="display: none;" onclick="removeFile(event)">
+                                Remove Image
+                            </button>
+                        </label>
+                    </div>
+
+                    <div class="description-section">
+                        <label>Product Description:</label>
+                        <textarea name="Description" rows="5"></textarea>
+                    </div>
+                </div>
+
+                <!-- NEW: Fixed Right Sidebar for Buttons[cite: 24, 26] -->
+                <div class="fixed-right-actions">
+                    <a href="@Url.Action("Index", "Seller", new { tab = "Product" })" class="btn-navy-side">Cancel Action</a>
+                    <button type="submit" class="btn-navy-side">Save & Publish</button>
+                    <button type="button" class="btn-navy-side">Save as draft</button>
+                </div>
+
+            </form>
+        </div>
+    </main>
+
+</div>
+
+<script>
+    function handleFileSelect(input) {
+        const display = document.getElementById('file-name-display');
+        const removeBtn = document.getElementById('remove-file-btn');
+        const uploadText = document.getElementById('upload-text');
+        const icon = document.getElementById('preview-icon');
+
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            
+            // 1. Show the File Name[cite: 26]
+            display.innerText = "Selected: " + file.name;
+            
+            // 2. Show Image Preview (if it's an image)[cite: 26]
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    icon.src = e.target.result; 
+                    icon.style.width = "150px"; 
+                    icon.style.height = "auto";
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // 3. Toggle UI elements[cite: 26]
+            removeBtn.style.display = "inline-block";
+            uploadText.style.display = "none";
+        }
+    }
+
+    function removeFile(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const input = document.getElementById('file-upload');
+        const display = document.getElementById('file-name-display');
+        const removeBtn = document.getElementById('remove-file-btn');
+        const uploadText = document.getElementById('upload-text');
+        const icon = document.getElementById('preview-icon');
+
+        // Reset everything to original state[cite: 26]
+        input.value = ""; 
+        display.innerText = "";
+        removeBtn.style.display = "none";
+        uploadText.style.display = "block";
+        icon.src = "/images/cloud-upload-icon.png"; 
+        icon.style.width = "60px"; 
+    }
+</script>

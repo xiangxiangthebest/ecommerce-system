@@ -11,6 +11,9 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
+<<<<<<< HEAD
+    public DbSet<Product> Products { get; set; }
+=======
     public DbSet<Customer> Customers { get; set; }
     public DbSet<Cart> Cart { get; set; }
     public DbSet<DeliveryField> DeliveryField { get; set; }
@@ -25,4 +28,5 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
     }
+>>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
 }
