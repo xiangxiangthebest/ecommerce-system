@@ -386,3 +386,44 @@ body {
     .form-row { grid-template-columns: 1fr; }
     .step-label { font-size: 10px; }
 }
+
+.modal-backdrop {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 25vw; 
+    height: 30vh; 
+    background:  #d0d9ff; 
+    display: flex;
+    align-items: center;    
+    justify-content: center; 
+    z-index: 10000;
+    backdrop-filter: blur(2px);
+    padding: 35px;
+    border-radius: 32px;
+    flex-direction: column;
+    animation: modalPop 0.3s ease-out forwards;
+}
+
+.modal-window h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 27px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #1e1b4b;
+    align-items: center;
+}
+
+.modal-window p {
+    font-size: 20px;
+    color: #1e1b4b;
+    line-height: 1.4;
+    font-weight: 600;
+}
+
+@keyframes modalPop {
+    /* Updated to include the centering translate so the animation doesn't break position */
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}

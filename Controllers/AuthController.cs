@@ -1,13 +1,12 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.DTOs;
-using EcommerceSystem.Models;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using EcommerceSystem.Factories;
 using EcommerceSystem.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 
 namespace EcommerceSystem.Controllers
 {
@@ -76,6 +75,16 @@ namespace EcommerceSystem.Controllers
             var principal = new ClaimsPrincipal(identity);
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+            // Updated Redirection Logic
+            if (user.Role == "Seller")
+            {
+                return RedirectToAction("Index", "Seller"); // Sends to SellerController
+            }
+            else if (user.Role == "Customer")
+            {
+                return RedirectToAction("Index", "Customer"); // Sends to CustomerController
+            }
 
             return RedirectToAction("Index", "Home");
         }
@@ -146,12 +155,24 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
-            bool emailExists = await _context.Users
-                .AnyAsync(x => x.Email == dto.Email);
-
-            if (emailExists)
+            // 1. Check if Email is taken
+            if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
             {
-                ViewBag.Error = "Email already exists";
+                ViewBag.Error = "Email already linked to an account. <br />Please try another email.";
+                return View(dto);
+            }
+
+            // 2. Check if Shop Name is taken (New Check)
+            if (await _context.Users.AnyAsync(x => x.ShopName == dto.ShopName))
+            {
+                ViewBag.Error = "This Shop Name is already taken. <br />Please try name.";
+                return View(dto);
+            }
+
+            // 3. Check if Phone Number is taken (New Check)
+            if (await _context.Users.AnyAsync(x => x.PhoneNumber == dto.PhoneNumber))
+            {
+                ViewBag.Error = "This Phone Number is already linked to an account. <br />Please try phone number.";
                 return View(dto);
             }
 
@@ -161,12 +182,10 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
+            // If all checks pass, proceed with creation[cite: 1, 11]
             IUserFactory factory = new SellerFactory(dto);
-
             var user = factory.CreateUser();
-
             _context.Users.Add(user);
-
             await _context.SaveChangesAsync();
 
             return RedirectToAction("Login", new { role = "Seller" });
@@ -193,8 +212,9 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync();
-
-            return RedirectToAction("Login", new { role = "Customer" });
+            
+            // Redirect to the general Login selection page instead of home
+            return RedirectToAction("Login", "Auth"); 
         }
     }
 }
