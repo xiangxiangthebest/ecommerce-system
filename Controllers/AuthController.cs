@@ -1,12 +1,13 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.DTOs;
-using Microsoft.AspNetCore.Authentication;
+
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using EcommerceSystem.Factories;
 using EcommerceSystem.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 
 namespace EcommerceSystem.Controllers
 {
