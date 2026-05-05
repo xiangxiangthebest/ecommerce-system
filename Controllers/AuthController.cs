@@ -1,5 +1,6 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.DTOs;
+
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -69,19 +70,6 @@ namespace EcommerceSystem.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-<<<<<<< HEAD
-            // Updated Redirection Logic
-            if (user.Role == "Seller")
-            {
-                return RedirectToAction("Index", "Seller"); // Sends to SellerController
-            }
-            else if (user.Role == "Customer")
-            {
-                return RedirectToAction("Index", "Customer"); // Sends to CustomerController
-            }
-
-            return RedirectToAction("Index", "Home");
-=======
             return user.Role switch
             {
                 "Admin" => RedirectToAction("Home", "Admin"),
@@ -90,7 +78,6 @@ namespace EcommerceSystem.Controllers
                 "CustomerService" => RedirectToAction("Home", "CustomerService"),
                 _ => RedirectToAction("Index", "Home")
             };
->>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
         }
 
         [HttpGet]
@@ -140,41 +127,35 @@ namespace EcommerceSystem.Controllers
                 ViewBag.Error = ModelState.Values
                     .SelectMany(v => v.Errors)
                     .FirstOrDefault()?.ErrorMessage;
-
                 return View(dto);
             }
 
-            // 1. Check if Email is taken
             if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
             {
                 ViewBag.Error = "Email already linked to an account. <br />Please try another email.";
                 return View(dto);
             }
 
-            // 2. Check if Shop Name is taken (New Check)
-            if (await _context.Users.AnyAsync(x => x.ShopName == dto.ShopName))
+            if (await _context.Seller.AnyAsync(x => x.ShopName == dto.ShopName))
+
             {
-                ViewBag.Error = "This Shop Name is already taken. <br />Please try name.";
+                ViewBag.Error = "This Shop Name is already taken. <br />Please try another name.";
                 return View(dto);
             }
 
-            // 3. Check if Phone Number is taken (New Check)
-            if (await _context.Users.AnyAsync(x => x.PhoneNumber == dto.PhoneNumber))
+            if (await _context.Seller.AnyAsync(x => x.PhoneNumber == dto.PhoneNumber))
+
             {
-                ViewBag.Error = "This Phone Number is already linked to an account. <br />Please try phone number.";
+                ViewBag.Error = "This Phone Number is already linked to an account. <br />Please try another phone number.";
                 return View(dto);
             }
 
-<<<<<<< HEAD
             if (dto.Password != dto.ConfirmPassword)
             {
                 ViewBag.Error = "Passwords do not match";
                 return View(dto);
             }
 
-            // If all checks pass, proceed with creation[cite: 1, 11]
-=======
->>>>>>> 04c6af2119bd62de94709f219fdccecbefdd0825
             IUserFactory factory = new SellerFactory(dto);
             var user = factory.CreateUser();
             _context.Users.Add(user);
@@ -199,10 +180,10 @@ namespace EcommerceSystem.Controllers
 
         public async Task<IActionResult> Logout()
         {
-            await HttpContext.SignOutAsync();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+            return RedirectToAction("Index", "Home");
             
-            // Redirect to the general Login selection page instead of home
-            return RedirectToAction("Login", "Auth"); 
         }
     }
 }

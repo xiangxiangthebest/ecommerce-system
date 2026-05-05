@@ -1,0 +1,117 @@
+@{
+    ViewData["Title"] = "Seller Dashboard";
+}
+
+<link rel="stylesheet" href="~/css/seller-dashboard.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="dashboard-wrapper">
+    <!-- ── Sidebar ── -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3 class="shop-title">@ViewBag.ShopName</h3>
+        </div>
+
+        <ul class="nav-links">
+            <li class="@(ViewBag.ActiveTab == "General" ? "active" : "")">
+                <a href="@Url.Action("Home", "Seller", new { tab = "General" })">
+                    <span class="nav-text">General</span>
+                </a>
+            </li>
+            <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
+                <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">
+                    <span class="nav-text">Product</span>
+                </a>
+            </li>
+            <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
+                <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
+                    <span class="nav-text">Order</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <form asp-controller="Auth" asp-action="Logout" method="post">
+                <button type="submit" class="logout-link">Logout</button>
+            </form>
+        </div>
+    </nav>
+
+    <!-- ── Main Content Area ── -->
+    <main class="content-area">
+        @if (ViewBag.ActiveTab == "Product")
+        {
+            <div class="product-header">
+                <h2 class="section-title">Your Product</h2>
+                <div class="header-actions">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" placeholder="Search Product...." />
+                    </div>
+                    <a href="@Url.Action("AddProduct", "Seller")" class="btn-add-product">+ Add New Product</a>
+                </div>
+            </div>
+
+            <div class="product-grid">
+                @if (ViewBag.Products != null && ((List<EcommerceSystem.Models.Product>)ViewBag.Products).Any())
+                {
+                    foreach (var item in (List<EcommerceSystem.Models.Product>)ViewBag.Products)
+                    {
+                        <div class="product-card" style="position: relative;">
+
+                            @* Draft badge *@
+                            @if (item.IsDraft)
+                            {
+                                <span style="position: absolute; top: 8px; left: 8px; color: red; font-weight: bold; font-size: 13px; background: rgba(255,255,255,0.85); padding: 2px 8px; border-radius: 4px; z-index: 1;">Draft</span>
+                            }
+
+                            <div class="product-image-placeholder">
+                                <img src="@item.ImagePath" alt="Product" />
+                            </div>
+
+                            <div class="product-info">
+                                <h3 class="product-name">@item.Name</h3>
+                                <div class="price-row">
+                                    <span class="current-price">RM @item.Price.ToString("F2")</span>
+                                </div>
+                                <p class="sub-text">@item.Description</p>
+                                <p class="sub-text">Stock: @item.StockQuantity</p>
+
+                                <div class="product-actions" style="display: flex; gap: 8px; margin-top: 8px;">
+                                    <!-- Edit -->
+                                    <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })"
+                                       style="background: #1a237e; color: white; padding: 5px 14px; border-radius: 5px; text-decoration: none; font-size: 13px;">
+                                        Edit
+                                    </a>
+                                    <!-- Delete -->
+                                    <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post"
+                                          onsubmit="return confirm('Delete this product?');">
+                                        <button type="submit"
+                                                style="background: #c62828; color: white; padding: 5px 14px; border-radius: 5px; border: none; font-size: 13px; cursor: pointer;">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="empty-state-full-width">
+                        <p>No products yet. Click "+ Add New Product" to start.</p>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="details-container">
+                <h1 class="welcome-text">Welcome Back, @ViewBag.ShopName!</h1>
+                <div class="separator"></div>
+                <p class="sub-text">Use the sidebar to manage your products and monitor your orders.</p>
+            </div>
+        }
+    </main>
+</div>

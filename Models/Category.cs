@@ -2,12 +2,11 @@ namespace EcommerceSystem.Models
 {
     public class Category
     {
-        public int CategoryId { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public List<Product> Products { get; set; }
-
-        // 默认构造函数
+        public int CategoryId { get; set; }        
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;        
+        public List<Product> Products { get; set; } = new();
+    
         public Category()
         {
             Products = new List<Product>();

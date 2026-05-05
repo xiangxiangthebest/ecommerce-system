@@ -1,5 +1,7 @@
+@model EcommerceSystem.Models.Product
+
 @{
-    ViewData["Title"] = "Add Product";
+    ViewData["Title"] = "Edit Product";
 }
 
 <link rel="stylesheet" href="~/css/seller-dashboard.css" />
@@ -17,7 +19,7 @@
             <li class="active">
                 <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">Product</a>
                 <ul class="sub-nav">
-                    <li class="sub-active">Add New Product</li>
+                    <li class="sub-active">Edit Product</li>
                 </ul>
             </li>
             <li><a href="@Url.Action("Home", "Seller", new { tab = "Order" })">Order</a></li>
@@ -32,41 +34,43 @@
     <!-- ── Main Content ── -->
     <main class="content-area">
         <div class="add-product-container">
-            <h1 class="shop-title">@ViewBag.ShopName - Add Product</h1>
+            <h1 class="shop-title">@ViewBag.ShopName - Edit Product</h1>
 
-            <form id="productForm"
+            <form id="editForm"
                   asp-controller="Seller"
-                  asp-action="AddProduct"
+                  asp-action="EditProduct"
                   method="post"
                   enctype="multipart/form-data">
+
+                <!-- Hidden field to pass the ProductId back -->
+                <input type="hidden" name="ProductId" value="@Model.ProductId" />
 
                 <div class="form-body">
 
                     <div class="form-row">
                         <label>Product Price:</label>
-                        <input type="number" name="Price" step="0.01" required placeholder="0.00" />
+                        <input type="number" name="Price" step="0.01" required value="@Model.Price" />
                     </div>
 
                     <div class="form-row">
                         <label>Product SKU:</label>
-                        <input type="text" name="SKU" required />
+                        <input type="text" name="SKU" required value="@Model.SKU" />
                     </div>
 
                     <div class="form-row">
                         <label>Product Name:</label>
-                        <input type="text" name="Name" required />
+                        <input type="text" name="Name" required value="@Model.Name" />
                     </div>
 
-                    <!-- Stock Quantity -->
                     <div class="form-row">
                         <label>Quantity (Stock):</label>
-                        <input type="number" name="StockQuantity" min="0" required placeholder="0" />
+                        <input type="number" name="StockQuantity" min="0" required value="@Model.StockQuantity" />
                     </div>
 
                     <div class="form-row">
                         <label>Categories:</label>
                         <select name="Category" class="category-select" required>
-                            <option value="" disabled selected>Select a category</option>
+                            <option value="" disabled>Select a category</option>
                             <option value="Fashion/Apparel">Fashion/Apparel</option>
                             <option value="Consumer Electronics">Consumer Electronics</option>
                             <option value="Food and Beverages">Food and Beverages</option>
@@ -77,28 +81,35 @@
                     </div>
 
                     <div class="upload-section">
-                        <label>Product Image / Video:</label>
+                        <label>Product Image (leave blank to keep current):</label>
+                        @if (!string.IsNullOrEmpty(Model.ImagePath))
+                        {
+                            <div style="margin-bottom: 8px;">
+                                <img src="@Model.ImagePath" alt="Current image" style="max-height: 120px; border-radius: 6px;" />
+                                <p style="font-size: 12px; color: #666;">Current image</p>
+                            </div>
+                        }
                         <label for="file-upload" class="upload-box" id="drop-zone">
                             <img src="~/images/cloud-upload-icon.png" alt="Upload" class="upload-icon" id="preview-icon" />
-                            <span class="upload-text" id="upload-text">Upload Product Image or Video</span>
+                            <span class="upload-text" id="upload-text">Upload New Image (optional)</span>
                             <input type="file" id="file-upload" name="ImageFile"
                                 accept="image/*,video/*" style="display: none;"
                                 onchange="handleFileSelect(this)" />
                             <span id="file-name-display" class="file-name-text"></span>
                             <button type="button" id="remove-file-btn" class="btn-remove" style="display: none;" onclick="removeFile(event)">
-                                Remove Image
+                                Remove
                             </button>
                         </label>
                     </div>
 
                     <div class="description-section">
                         <label>Product Description:</label>
-                        <textarea name="Description" rows="5"></textarea>
+                        <textarea name="Description" rows="5">@Model.Description</textarea>
                     </div>
 
                 </div>
 
-                <!-- Action Buttons — name="actionType" tells controller which was clicked -->
+                <!-- Action Buttons -->
                 <div class="fixed-right-actions">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-navy-side">Cancel</a>
                     <button type="submit" name="actionType" value="Publish" class="btn-navy-side">Save &amp; Publish</button>
