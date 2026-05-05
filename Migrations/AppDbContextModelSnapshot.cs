@@ -47,7 +47,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasKey("CategoryId");
 
-                    b.ToTable("Category");
+                    b.ToTable("Category", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
@@ -120,6 +120,13 @@ namespace ecommerce_system.Migrations
                         .HasMaxLength(13)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImagePath")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDraft")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -127,7 +134,11 @@ namespace ecommerce_system.Migrations
                     b.Property<double>("Price")
                         .HasColumnType("REAL");
 
-                    b.Property<int>("SellerUserId")
+                    b.Property<string>("SKU")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SellerId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("StockQuantity")
@@ -137,9 +148,9 @@ namespace ecommerce_system.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("SellerUserId");
+                    b.HasIndex("SellerId");
 
-                    b.ToTable("Product");
+                    b.ToTable("Product", (string)null);
 
                     b.HasDiscriminator<string>("Discriminator").HasValue("Product");
 
@@ -255,7 +266,7 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.ToTable("Seller");
+                    b.ToTable("Seller", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
@@ -286,7 +297,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasOne("EcommerceSystem.Models.Seller", "Seller")
                         .WithMany("Products")
-                        .HasForeignKey("SellerUserId")
+                        .HasForeignKey("SellerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

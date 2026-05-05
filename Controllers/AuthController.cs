@@ -1,6 +1,5 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.DTOs;
-using EcommerceSystem.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -127,25 +126,38 @@ namespace EcommerceSystem.Controllers
                 ViewBag.Error = ModelState.Values
                     .SelectMany(v => v.Errors)
                     .FirstOrDefault()?.ErrorMessage;
-
                 return View(dto);
             }
 
-            bool emailExists = await _context.Users
-                .AnyAsync(x => x.Email == dto.Email);
-
-            if (emailExists)
+            if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
             {
-                ViewBag.Error = "Email already exists";
+                ViewBag.Error = "Email already linked to an account. <br />Please try another email.";
+                return View(dto);
+            }
+
+            if (await _context.Seller.AnyAsync(x => x.ShopName == dto.ShopName))
+
+            {
+                ViewBag.Error = "This Shop Name is already taken. <br />Please try another name.";
+                return View(dto);
+            }
+
+            if (await _context.Seller.AnyAsync(x => x.PhoneNumber == dto.PhoneNumber))
+
+            {
+                ViewBag.Error = "This Phone Number is already linked to an account. <br />Please try another phone number.";
+                return View(dto);
+            }
+
+            if (dto.Password != dto.ConfirmPassword)
+            {
+                ViewBag.Error = "Passwords do not match";
                 return View(dto);
             }
 
             IUserFactory factory = new SellerFactory(dto);
-
             var user = factory.CreateUser();
-
             _context.Users.Add(user);
-
             await _context.SaveChangesAsync();
 
             return RedirectToAction("Login", new { role = "Seller" });
@@ -167,9 +179,10 @@ namespace EcommerceSystem.Controllers
 
         public async Task<IActionResult> Logout()
         {
-            await HttpContext.SignOutAsync();
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
-            return RedirectToAction("Login", new { role = "Customer" });
+            return RedirectToAction("Index", "Home");
+            
         }
     }
 }

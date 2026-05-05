@@ -2,18 +2,20 @@ namespace EcommerceSystem.Models
 {
     public class Seller : User
     {
-        public int UserId { get; set; }
-        public string NRICNumber { get; set; }
-        public string State { get; set; }
-        public string DetailAddress { get; set; }
-        public string PostalCode { get; set; }
-        public string TIN { get; set; }
-        public string ShopName { get; set; }
-        public string PickupAddress { get; set; }
-        public string PhoneNumber { get; set; }
-        public int SoldItemCount { get; set; }
-        public List<Product> Products { get; set; }
-        public List<Order> Orders { get; set; }
+        // REMOVED: UserId (It is already inherited from the User class)
 
+        public string NRICNumber { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string DetailAddress { get; set; } = string.Empty;
+        public string PostalCode { get; set; } = string.Empty;
+        public string TIN { get; set; } = string.Empty;
+        public string ShopName { get; set; } = string.Empty;
+        public string PickupAddress { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        public int SoldItemCount { get; set; }
+
+        // Initialize lists to prevent null reference errors
+        public List<Product> Products { get; set; } = new();
+        public List<Order> Orders { get; set; } = new();
     }
 }
