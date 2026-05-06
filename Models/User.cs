@@ -1,6 +1,6 @@
 namespace EcommerceSystem.Models;
 
-public class User
+public abstract class User
 {
     public int UserId { get; set; }
     public string Role { get; set; } = string.Empty;
