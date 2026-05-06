@@ -30,9 +30,9 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.Users.Any(x => x.Email == "admin@gmail.com"))
     {
-        IUserFactory factory = new AdminFactory();
+        UserCreator creator = new AdminCreator();
 
-        var admin = factory.CreateUser();
+        var admin = creator.CreateUser();
 
         context.Users.Add(admin);
 

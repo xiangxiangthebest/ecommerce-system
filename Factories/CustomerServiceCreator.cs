@@ -4,18 +4,18 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Factories
 {
-    public class CustomerServiceFactory : IUserFactory
+    public class CustomerServiceCreator : UserCreator
     {
         private readonly RegisterCustomerServiceDto _dto;
 
-        public CustomerServiceFactory(RegisterCustomerServiceDto dto)
+        public CustomerServiceCreator(RegisterCustomerServiceDto dto)
         {
             _dto = dto;
         }
 
-        public User CreateUser()
+        public override User CreateUser()
         {
-            return new User
+            return new CustomerService
             {
                 FullName = _dto.FullName,
                 Email = _dto.Email,

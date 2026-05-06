@@ -103,9 +103,9 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
-            IUserFactory factory = new CustomerFactory(dto);
+            UserCreator creator = new CustomerCreator(dto);
 
-            var user = factory.CreateUser();
+            var user = creator.CreateUser();
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -156,8 +156,8 @@ namespace EcommerceSystem.Controllers
                 return View(dto);
             }
 
-            IUserFactory factory = new SellerFactory(dto);
-            var user = factory.CreateUser();
+            UserCreator creator = new SellerCreator(dto);
+            var user = creator.CreateUser();
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
@@ -167,9 +167,9 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateCustomerService(RegisterCustomerServiceDto dto)
         {
-            IUserFactory factory = new CustomerServiceFactory(dto);
+            UserCreator creator = new CustomerServiceCreator(dto);
 
-            var user = factory.CreateUser();
+            var user = creator.CreateUser();
 
             _context.Users.Add(user);
 

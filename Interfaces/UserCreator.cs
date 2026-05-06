@@ -2,8 +2,8 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Interfaces
 {
-    public interface IUserFactory
+    public abstract class UserCreator
     {
-        User CreateUser();
+        public abstract User CreateUser();
     }
 }

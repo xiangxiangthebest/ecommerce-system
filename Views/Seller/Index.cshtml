@@ -75,7 +75,7 @@
                                 <p class="sub-text">@item.Description</p>
 
                             <div class="product-actions">
-                <form asp-action="DeleteProduct" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Delete this product?');">
+                <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post" onsubmit="return confirm('Delete this product?');">
                     <button type="submit" class="btn-delete-small">Delete</button>
                 </form>
             </div>

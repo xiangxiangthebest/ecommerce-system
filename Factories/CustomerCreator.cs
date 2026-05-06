@@ -4,16 +4,16 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Factories
 {
-    public class CustomerFactory : IUserFactory
+    public class CustomerCreator : UserCreator
     {
         private readonly RegisterCustomerDto _dto;
 
-        public CustomerFactory(RegisterCustomerDto dto)
+        public CustomerCreator(RegisterCustomerDto dto)
         {
             _dto = dto;
         }
 
-        public User CreateUser()
+        public override User CreateUser()
         {
             return new Customer
             {

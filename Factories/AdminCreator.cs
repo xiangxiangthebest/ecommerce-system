@@ -3,11 +3,11 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Factories
 {
-    public class AdminFactory : IUserFactory
+    public class AdminCreator : UserCreator
     {
-        public User CreateUser()
+        public override User CreateUser()
         {
-            return new User
+            return new Admin
             {
                 FullName = "Administrator",
                 Email = "admin@gmail.com",
