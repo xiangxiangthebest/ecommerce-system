@@ -174,13 +174,23 @@
 
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" name="Password" placeholder="Create a Password" required />
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="Password" placeholder="Create a Password" required />
+                        <span class="toggle-password" onclick="togglePassword('password', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </span>
+                    </div>
                     <span class="field-reminder"></span> 
                 </div>
 
                 <div class="form-group">
                     <label>Confirm Password</label>
-                    <input type="password" name="ConfirmPassword" placeholder="Confirm Password" required />
+                    <div class="password-wrapper">
+                        <input type="password" id="confirmPassword" name="ConfirmPassword" placeholder="Confirm Password" required />
+                        <span class="toggle-password" onclick="togglePassword('confirmPassword', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </span>
+                    </div>
                     <span class="field-reminder"></span> 
                 </div>
 
@@ -201,6 +211,25 @@
 </div>
 
 <script>
+
+function togglePassword(inputId, element) {
+
+    const input = document.getElementById(inputId);
+    const icon = element.querySelector("i");
+
+    if (input.type === "password") {
+        input.type = "text";
+
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+    }
+    else {
+        input.type = "password";
+
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+    }
+}
 
 // ─── HELPER FUNCTIONS FOR ERRORS ───
 function showError(input, message) {

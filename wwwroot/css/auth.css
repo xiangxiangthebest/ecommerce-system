@@ -184,3 +184,28 @@ body {
     margin-bottom: 15px;
     font-size: 14px;
 }
+
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper input {
+    width: 100%;
+    padding-right: 45px;
+}
+
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
