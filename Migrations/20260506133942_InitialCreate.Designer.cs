@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260505030755_InitialCreate")]
+    [Migration("20260506133942_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -218,6 +218,13 @@ namespace ecommerce_system.Migrations
                     b.HasDiscriminator().HasValue("CartProduct");
                 });
 
+            modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
+                {
+                    b.HasBaseType("EcommerceSystem.Models.User");
+
+                    b.ToTable("Admin", (string)null);
+                });
+
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>
                 {
                     b.HasBaseType("EcommerceSystem.Models.User");
@@ -314,6 +321,15 @@ namespace ecommerce_system.Migrations
                     b.HasOne("EcommerceSystem.Models.Cart", null)
                         .WithMany("products")
                         .HasForeignKey("CartId");
+                });
+
+            modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
+                {
+                    b.HasOne("EcommerceSystem.Models.User", null)
+                        .WithOne()
+                        .HasForeignKey("EcommerceSystem.Models.Admin", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>

@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     
     // CRITICAL: Added these for your Seller logic to work
     public DbSet<Seller> Seller { get; set; } 
+    public DbSet<Admin> Admin { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Category { get; set; }
 
@@ -31,6 +32,7 @@ public class AppDbContext : DbContext
         
         // Ensures Seller is its own table linked to Users
         modelBuilder.Entity<Seller>().ToTable("Seller");
+        modelBuilder.Entity<Admin>().ToTable("Admin");
         
         modelBuilder.Entity<Cart>().ToTable("Cart");
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");

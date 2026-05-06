@@ -30,12 +30,15 @@ using (var scope = app.Services.CreateScope())
 
     if (!context.Users.Any(x => x.Email == "admin@gmail.com"))
     {
-        UserCreator creator = new AdminCreator();
-
-        var admin = creator.CreateUser();
+        var admin = new Admin
+        {
+            FullName = "Administrator",
+            Email = "admin@gmail.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            Role = "Admin"
+        };
 
         context.Users.Add(admin);
-
         context.SaveChanges();
     }
 }
