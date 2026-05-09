@@ -31,7 +31,49 @@ namespace EcommerceSystem.Controllers
         public IActionResult ManageUsers()
         {
             // Logic to fetch all users from the database
-            return View();
+            return RedirectToAction("ManageSellers");
+        }
+
+        public async Task<IActionResult> ManageSellers()
+        {
+            var sellers = await _context.Seller.ToListAsync();
+            return View(sellers);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveSeller(int id)
+        {
+            var seller = await _context.Seller.FindAsync(id);
+            if (seller == null)
+            {
+                TempData["Error"] = "Seller not found.";
+                return RedirectToAction("ManageSellers");
+            }
+ 
+            seller.IsApproved = true;
+            await _context.SaveChangesAsync();
+ 
+            TempData["Success"] = $"{seller.ShopName} has been approved successfully.";
+            return RedirectToAction("ManageSellers");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RevokeSeller(int id)
+        {
+            var seller = await _context.Seller.FindAsync(id);
+            if (seller == null)
+            {
+                TempData["Error"] = "Seller not found.";
+                return RedirectToAction("ManageSellers");
+            }
+ 
+            seller.IsApproved = false;
+            await _context.SaveChangesAsync();
+ 
+            TempData["Success"] = $"{seller.ShopName}'s approval has been revoked.";
+            return RedirectToAction("ManageSellers");
         }
 
         // Product Control
