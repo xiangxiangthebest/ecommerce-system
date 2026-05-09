@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<Customer> Customers { get; set; }
+    public DbSet<CustomerService> CustomerServices { get; set; }
     
     // CRITICAL: Added these for your Seller logic to work
     public DbSet<Seller> Seller { get; set; } 
@@ -29,6 +30,7 @@ public class AppDbContext : DbContext
             .HasDefaultValueSql("datetime('now')");
 
         modelBuilder.Entity<Customer>().ToTable("Customers");
+        modelBuilder.Entity<CustomerService>().ToTable("CustomerService");
         
         // Ensures Seller is its own table linked to Users
         modelBuilder.Entity<Seller>().ToTable("Seller");

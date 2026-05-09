@@ -1,0 +1,90 @@
+@{
+    ViewData["Title"] = "Admin Overview";
+    Layout = "~/Views/Admin/Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin-dashboard.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+
+<div class="dashboard-wrapper">
+    <!-- Main Content Area -->
+    <main class="content-area">
+        <!-- Header Section -->
+        <div class="admin-header">
+            <div class="header-content">
+                <h1 class="main-title">Admin Dashboard</h1>
+                <h2 class="subtitle">Command Center</h2>
+                <p class="header-description">Welcome back, Administrator. Manage your platform efficiently.</p>
+            </div>
+            <form asp-controller="Auth" asp-action="Logout" method="post" style="align-self: flex-start;">
+                <button type="submit" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </form>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats-section">
+            <div class="card stat-card primary">
+                <div class="card-body d-flex align-items-center p-4">
+                    <div class="icon-shape"><i class="fas fa-shopping-cart"></i></div>
+                    <div>
+                        <div class="stat-label">Total Orders</div>
+                        <div class="stat-value">@ViewBag.TotalOrders</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Cards Section -->
+        <div class="cards-section">
+            <!-- Support Staff Card -->
+            <div class="feature-card info">
+                <div class="feature-icon">
+                    <i class="fas fa-headset"></i>
+                </div>
+                <h3 class="feature-title">Support Staff</h3>
+                <p class="feature-description">Create and manage Customer Service accounts with specialized support permissions.</p>
+                <a href="@Url.Action("CreateCustomerService", "Admin")" class="btn btn-manage btn-info">
+                    <i class="fas fa-plus me-2"></i> Create Account
+                </a>
+            </div>
+
+            <!-- User Management Card -->
+            <div class="feature-card primary">
+                <div class="feature-icon">
+                    <i class="fas fa-users-cog"></i>
+                </div>
+                <h3 class="feature-title">User Access</h3>
+                <p class="feature-description">Review seller applications, manage accounts, and control permissions across the platform.</p>
+                <a href="@Url.Action("ManageUsers", "Admin")" class="btn btn-manage btn-primary">
+                    <i class="fas fa-arrow-right me-2"></i> Manage Users
+                </a>
+            </div>
+
+            <!-- Inventory Review Card -->
+            <div class="feature-card warning">
+                <div class="feature-icon">
+                    <i class="fas fa-boxes-stacked"></i>
+                </div>
+                <h3 class="feature-title">Inventory Review</h3>
+                <p class="feature-description">Validate product listings, review violations, and maintain catalog quality standards.</p>
+                <a href="#" class="btn btn-manage btn-warning">
+                    <i class="fas fa-arrow-right me-2"></i> Review Queue
+                </a>
+            </div>
+
+            <!-- System Settings Card -->
+            <div class="feature-card dark">
+                <div class="feature-icon">
+                    <i class="fas fa-gears"></i>
+                </div>
+                <h3 class="feature-title">System Settings</h3>
+                <p class="feature-description">Configure API keys, platform fees, and manage site-wide maintenance modes.</p>
+                <a href="@Url.Action("Settings", "Admin")" class="btn btn-manage btn-dark">
+                    <i class="fas fa-arrow-right me-2"></i> Configure
+                </a>
+            </div>
+        </div>
+    </main>
+</div>
