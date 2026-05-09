@@ -2,7 +2,6 @@ using EcommerceSystem.Data;
 using EcommerceSystem.Models;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
-using EcommerceSystem.Factories;
 using EcommerceSystem.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,8 +25,8 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    context.Database.EnsureCreated();
-
+    context.Database.Migrate();
+    
     if (!context.Users.Any(x => x.Email == "admin@gmail.com"))
     {
         var admin = new Admin

@@ -87,11 +87,24 @@ namespace ecommerce_system.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("CustomerUserId")
+                    b.Property<int>("CurrentStatus")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("SellerUserId")
+                    b.Property<int>("CustomerUserId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("OrderTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SellerUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
 
                     b.HasKey("OrderId");
 
@@ -204,6 +217,9 @@ namespace ecommerce_system.Migrations
                     b.Property<int>("ItemStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
 
@@ -211,6 +227,8 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasIndex("CartId");
+
+                    b.HasIndex("OrderId");
 
                     b.HasDiscriminator().HasValue("CartProduct");
                 });
@@ -248,6 +266,9 @@ namespace ecommerce_system.Migrations
                     b.Property<string>("DetailAddress")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NRICNumber")
                         .IsRequired()
@@ -292,13 +313,21 @@ namespace ecommerce_system.Migrations
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
-                    b.HasOne("EcommerceSystem.Models.Customer", null)
+                    b.HasOne("EcommerceSystem.Models.Customer", "Customer")
                         .WithMany("PreviousOrders")
-                        .HasForeignKey("CustomerUserId");
+                        .HasForeignKey("CustomerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.HasOne("EcommerceSystem.Models.Seller", null)
+                    b.HasOne("EcommerceSystem.Models.Seller", "Seller")
                         .WithMany("Orders")
-                        .HasForeignKey("SellerUserId");
+                        .HasForeignKey("SellerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Seller");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Product", b =>
@@ -325,6 +354,10 @@ namespace ecommerce_system.Migrations
                     b.HasOne("EcommerceSystem.Models.Cart", null)
                         .WithMany("products")
                         .HasForeignKey("CartId");
+
+                    b.HasOne("EcommerceSystem.Models.Order", null)
+                        .WithMany("Products")
+                        .HasForeignKey("OrderId");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
@@ -375,6 +408,11 @@ namespace ecommerce_system.Migrations
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Category", b =>
+                {
+                    b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Navigation("Products");
                 });

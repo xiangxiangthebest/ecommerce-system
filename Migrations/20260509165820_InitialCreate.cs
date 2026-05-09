@@ -99,6 +99,24 @@ namespace ecommerce_system.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CustomerService",
+                columns: table => new
+                {
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CustomerService", x => x.UserId);
+                    table.ForeignKey(
+                        name: "FK_CustomerService_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Seller",
                 columns: table => new
                 {
@@ -112,7 +130,8 @@ namespace ecommerce_system.Migrations
                     ShopName = table.Column<string>(type: "TEXT", nullable: false),
                     PickupAddress = table.Column<string>(type: "TEXT", nullable: false),
                     PhoneNumber = table.Column<string>(type: "TEXT", nullable: false),
-                    SoldItemCount = table.Column<int>(type: "INTEGER", nullable: false)
+                    SoldItemCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsApproved = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -153,8 +172,12 @@ namespace ecommerce_system.Migrations
                 {
                     OrderId = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    CustomerUserId = table.Column<int>(type: "INTEGER", nullable: true),
-                    SellerUserId = table.Column<int>(type: "INTEGER", nullable: true)
+                    CustomerUserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SellerUserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    CurrentStatus = table.Column<int>(type: "INTEGER", nullable: false),
+                    OrderTime = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    TotalAmount = table.Column<decimal>(type: "TEXT", nullable: false),
+                    PaymentMethod = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -163,12 +186,14 @@ namespace ecommerce_system.Migrations
                         name: "FK_Order_Customers_CustomerUserId",
                         column: x => x.CustomerUserId,
                         principalTable: "Customers",
-                        principalColumn: "UserId");
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_Order_Seller_SellerUserId",
                         column: x => x.SellerUserId,
                         principalTable: "Seller",
-                        principalColumn: "UserId");
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -190,7 +215,8 @@ namespace ecommerce_system.Migrations
                     Quantity = table.Column<int>(type: "INTEGER", nullable: true),
                     TimeAdded = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ItemStatus = table.Column<int>(type: "INTEGER", nullable: true),
-                    CartId = table.Column<int>(type: "INTEGER", nullable: true)
+                    CartId = table.Column<int>(type: "INTEGER", nullable: true),
+                    OrderId = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -206,6 +232,11 @@ namespace ecommerce_system.Migrations
                         principalTable: "Category",
                         principalColumn: "CategoryId",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Product_Order_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Order",
+                        principalColumn: "OrderId");
                     table.ForeignKey(
                         name: "FK_Product_Seller_SellerId",
                         column: x => x.SellerId,
@@ -245,6 +276,11 @@ namespace ecommerce_system.Migrations
                 column: "CategoryId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Product_OrderId",
+                table: "Product",
+                column: "OrderId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Product_SellerId",
                 table: "Product",
                 column: "SellerId");
@@ -257,19 +293,22 @@ namespace ecommerce_system.Migrations
                 name: "Admin");
 
             migrationBuilder.DropTable(
-                name: "DeliveryField");
+                name: "CustomerService");
 
             migrationBuilder.DropTable(
-                name: "Order");
+                name: "DeliveryField");
 
             migrationBuilder.DropTable(
                 name: "Product");
 
             migrationBuilder.DropTable(
-                name: "Customers");
+                name: "Category");
 
             migrationBuilder.DropTable(
-                name: "Category");
+                name: "Order");
+
+            migrationBuilder.DropTable(
+                name: "Customers");
 
             migrationBuilder.DropTable(
                 name: "Seller");

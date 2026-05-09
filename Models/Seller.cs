@@ -14,7 +14,8 @@ namespace EcommerceSystem.Models
         public string PhoneNumber { get; set; } = string.Empty;
         public int SoldItemCount { get; set; }
 
-        // Initialize lists to prevent null reference errors
+        public bool IsApproved { get; set; } = false;
+
         public List<Product> Products { get; set; } = new();
         public List<Order> Orders { get; set; } = new();
     }

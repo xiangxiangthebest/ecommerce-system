@@ -1,5 +1,6 @@
 @{
     ViewData["Title"] = "Seller Dashboard";
+    bool isApproved = ViewBag.IsApproved == true;
 }
 
 <link rel="stylesheet" href="~/css/seller-dashboard.css" />
@@ -13,21 +14,43 @@
         </div>
 
         <ul class="nav-links">
+            <!-- General: always accessible -->
             <li class="@(ViewBag.ActiveTab == "General" ? "active" : "")">
                 <a href="@Url.Action("Home", "Seller", new { tab = "General" })">
                     <span class="nav-text">General</span>
                 </a>
             </li>
-            <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
-                <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">
-                    <span class="nav-text">Product</span>
-                </a>
-            </li>
-            <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
-                <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
-                    <span class="nav-text">Order</span>
-                </a>
-            </li>
+
+            @if (isApproved)
+            {
+                <!-- Product: only for approved sellers -->
+                <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">
+                        <span class="nav-text">Product</span>
+                    </a>
+                </li>
+
+                <!-- Order: only for approved sellers -->
+                <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
+                        <span class="nav-text">Order</span>
+                    </a>
+                </li>
+            }
+            else
+            {
+                <!-- Locked tabs shown as disabled for unapproved sellers -->
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Product
+                    </span>
+                </li>
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Order
+                    </span>
+                </li>
+            }
         </ul>
 
         <div class="sidebar-footer">
@@ -39,10 +62,52 @@
 
     <!-- ── Main Content Area ── -->
     <main class="content-area">
-        @if (ViewBag.ActiveTab == "Product")
+
+        @* Global flash messages *@
+        @if (TempData["Error"] != null)
         {
+            <div class="alert-banner alert-error">
+                <i class="fas fa-exclamation-circle"></i> @TempData["Error"]
+            </div>
+        }
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert-banner alert-success">
+                <i class="fas fa-check-circle"></i> @TempData["Success"]
+            </div>
+        }
+
+        @* ── PENDING APPROVAL BANNER ── *@
+        @if (!isApproved)
+        {
+            <div class="pending-approval-banner">
+                <div class="pending-icon-wrap">
+                    <i class="fas fa-hourglass-half pending-icon"></i>
+                </div>
+                <div class="pending-text-wrap">
+                    <h2 class="pending-title">Account Pending Approval</h2>
+                    <p class="pending-desc">
+                        Your seller account is currently under review. Once an admin approves your account,
+                        you will be able to list products and manage orders.
+                    </p>
+                    <p class="pending-desc">
+                        Please check back later or contact support if you have any questions.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Still show the General welcome content below the banner -->
+            <div class="details-container">
+                <h1 class="welcome-text">Welcome, @ViewBag.ShopName!</h1>
+                <div class="separator"></div>
+                <p class="sub-text">Your shop has been registered. We are currently reviewing your details.</p>
+            </div>
+        }
+        else if (ViewBag.ActiveTab == "Product")
+        {
+            @* ── PRODUCT TAB ── *@
             <div class="product-header">
-                <h2 class="section-title">Your Product</h2>
+                <h2 class="section-title">Your Products</h2>
                 <div class="header-actions">
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
@@ -59,10 +124,9 @@
                     {
                         <div class="product-card" style="position: relative;">
 
-                            @* Draft badge *@
                             @if (item.IsDraft)
                             {
-                                <span style="position: absolute; top: 8px; left: 8px; color: red; font-weight: bold; font-size: 13px; background: rgba(255,255,255,0.85); padding: 2px 8px; border-radius: 4px; z-index: 1;">Draft</span>
+                                <span style="position:absolute;top:8px;left:8px;color:red;font-weight:bold;font-size:13px;background:rgba(255,255,255,0.85);padding:2px 8px;border-radius:4px;z-index:1;">Draft</span>
                             }
 
                             <div class="product-image-placeholder">
@@ -77,23 +141,20 @@
                                 <p class="sub-text">@item.Description</p>
                                 <p class="sub-text">Stock: @item.StockQuantity</p>
 
-                                <div class="product-actions" style="display: flex; gap: 8px; margin-top: 8px;">
-                                    <!-- Edit -->
+                                <div class="product-actions" style="display:flex;gap:8px;margin-top:8px;">
                                     <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })"
-                                       style="background: #1a237e; color: white; padding: 5px 14px; border-radius: 5px; text-decoration: none; font-size: 13px;">
+                                       style="background:#1a237e;color:white;padding:5px 14px;border-radius:5px;text-decoration:none;font-size:13px;">
                                         Edit
                                     </a>
-                                    <!-- Delete -->
                                     <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post"
                                           onsubmit="return confirm('Delete this product?');">
                                         <button type="submit"
-                                                style="background: #c62828; color: white; padding: 5px 14px; border-radius: 5px; border: none; font-size: 13px; cursor: pointer;">
+                                                style="background:#c62828;color:white;padding:5px 14px;border-radius:5px;border:none;font-size:13px;cursor:pointer;">
                                             Delete
                                         </button>
                                     </form>
                                 </div>
                             </div>
-
                         </div>
                     }
                 }
@@ -105,8 +166,75 @@
                 }
             </div>
         }
+        else if (ViewBag.ActiveTab == "Order")
+        {
+            @* ── ORDER TAB ── *@
+            <div class="product-header">
+                <h2 class="section-title">Your Orders</h2>
+            </div>
+
+            @if (ViewBag.Orders != null && ((List<EcommerceSystem.Models.Order>)ViewBag.Orders).Any())
+            {
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Date</th>
+                            <th>Total (RM)</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in (List<EcommerceSystem.Models.Order>)ViewBag.Orders)
+                        {
+                            <tr>
+                                <td>#@order.OrderId</td>
+                                <td>@(order.Customer?.Email ?? "—")</td>
+                                <td>@order.OrderTime.ToString("dd MMM yyyy")</td>
+                                <td>@order.TotalAmount.ToString("F2")</td>
+                                <td>@order.PaymentMethod</td>
+                                <td>
+                                    <span class="status-badge status-@order.CurrentStatus.ToString().ToLower()">
+                                        @order.CurrentStatus
+                                    </span>
+                                </td>
+                                <td>
+                                    <form asp-action="UpdateOrderStatus" method="post" style="display:flex;gap:6px;align-items:center;">
+                                        <input type="hidden" name="orderId" value="@order.OrderId" />
+                                        <select name="newStatus" class="status-select">
+                                            @foreach (var s in Enum.GetValues<EcommerceSystem.Models.OrderStatus>())
+                                            {
+                                                if (s == order.CurrentStatus)
+                                                {
+                                                    <option value="@s" selected>@s</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@s">@s</option>
+                                                }
+                                            }
+                                        </select>
+                                        <button type="submit" class="btn-update-status">Update</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="empty-state-full-width">
+                    <p>No orders yet.</p>
+                </div>
+            }
+        }
         else
         {
+            @* ── GENERAL TAB (approved sellers) ── *@
             <div class="details-container">
                 <h1 class="welcome-text">Welcome Back, @ViewBag.ShopName!</h1>
                 <div class="separator"></div>
