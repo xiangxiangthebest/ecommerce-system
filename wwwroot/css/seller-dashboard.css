@@ -78,10 +78,10 @@
 }
 
 .sidebar-header h3 {
-    color: #ffffff; 
-    font-family: 'Syne', sans-serif; 
+    color: #ffffff; /* This changes the shop name to white */
+    font-family: 'Syne', sans-serif; /* Keeps your branding font */
     font-weight: 700;
-    font-size: 20px; 
+    font-size: 24px; /* You can adjust this size to fit the sidebar better */
     margin-top: 20px;
     line-height: 1.2;
 }
