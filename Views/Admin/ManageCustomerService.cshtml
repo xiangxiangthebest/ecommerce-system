@@ -1,0 +1,70 @@
+@model List<EcommerceSystem.Models.CustomerService>
+
+@{
+    ViewData["Title"] = "Manage Support Staff";
+    Layout = "~/Views/Admin/Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin-manage-users.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="glass-container">
+    <div class="dashboard-header">
+        <div class="header-text">
+            <h1 class="gradient-text">Support Team</h1>
+            <p class="subtitle">Manage customer service accounts and access levels</p>
+        </div>
+        <div class="header-actions">
+            <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
+                <i class="fas fa-arrow-left"></i> <span>Dashboard</span>
+            </a>
+            <a href="@Url.Action("CreateCustomerService", "Admin")" class="glass-btn primary">
+                <i class="fas fa-plus"></i> <span>Add New Staff</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="fancy-table">
+            <thead>
+                <tr>
+                    <th>Staff Member</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var staff in Model)
+                {
+                    <tr>
+                        <td>
+                            <div class="shop-cell">
+                                <div class="shop-avatar" style="background: #e0f7fa; color: #00acc1;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <div class="shop-name">@staff.FullName</div>
+                                    <div class="shop-id">Staff ID: @staff.UserId</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>@staff.Email</td>
+                        <td><span class="pill pill-success">Active</span></td>
+                        <td class="text-right">
+                            @* Updated Action: Delete Form *@
+                            <form asp-action="DeleteCustomerService" asp-route-id="@staff.UserId" method="post" 
+                                  onsubmit="return confirm('Are you sure you want to delete account: @staff.FullName?');" 
+                                  style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="icon-btn-revoke" title="Remove Access">
+                                    <i class="fas fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,160 @@
+/* wwwroot/css/admin-manage-sellers.css */
+:root {
+    --primary: #6366f1;
+    --secondary: #4f46e5;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --bg: #f8fafc;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+}
+
+.glass-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+/* --- Header Styles --- */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+}
+
+.gradient-text {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.subtitle { color: var(--text-muted); margin-top: 5px; }
+
+/* --- Buttons --- */
+.glass-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    background: white;
+    border: 1px solid #e2e8f0;
+    color: var(--text-main);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+.glass-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+/* --- Card Grid (Pending) --- */
+.seller-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.seller-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease;
+}
+
+.seller-card:hover { transform: scale(1.02); }
+.card-accent { height: 4px; background: linear-gradient(90deg, #6366f1, #a855f7); }
+.card-content { padding: 1.5rem; }
+
+.seller-info h3 { margin: 0; font-size: 1.25rem; color: var(--text-main); }
+.seller-id { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+
+.detail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.card-actions { padding: 1rem 1.5rem; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
+
+.action-btn.approve {
+    width: 100%;
+    padding: 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.action-btn.approve:hover { background: var(--secondary); }
+
+/* --- Table (Approved) --- */
+.table-wrapper {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.fancy-table { width: 100%; border-collapse: collapse; }
+.fancy-table th { background: #f8fafc; padding: 1rem; text-align: left; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.fancy-table td { padding: 1.25rem 1rem; border-top: 1px solid #f1f5f9; }
+
+.shop-cell { display: flex; align-items: center; gap: 12px; }
+.shop-avatar {
+    width: 40px; height: 40px; background: #e0e7ff; color: #4338ca;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-weight: 700;
+}
+
+.shop-name { font-weight: 700; color: var(--text-main); }
+.shop-id { font-size: 0.75rem; color: var(--text-muted); }
+
+.pill { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+.pill-success { background: #dcfce7; color: #166534; }
+
+.icon-btn-revoke {
+    background: none; border: none; color: #cbd5e1;
+    font-size: 1.1rem; cursor: pointer; transition: 0.2s;
+}
+.icon-btn-revoke:hover { color: var(--danger); }
+
+/* --- UI Elements --- */
+.section-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 1rem; }
+.status-indicator { width: 12px; height: 12px; border-radius: 50%; }
+.status-indicator.pending { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,0.5); }
+.status-indicator.approved { background: var(--success); box-shadow: 0 0 10px rgba(34,197,94,0.5); }
+
+.count-pill {
+    background: #f1f5f9; padding: 2px 10px; border-radius: 10px;
+    font-size: 0.85rem; font-weight: 700; color: var(--text-muted);
+}
+
+.mt-5 { margin-top: 3.5rem; }
+.text-right { text-align: right; }
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem;
+    background: rgba(255,255,255,0.5);
+    border: 2px dashed #e2e8f0;
+    border-radius: 16px;
+    color: var(--text-muted);
+}
+.empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }

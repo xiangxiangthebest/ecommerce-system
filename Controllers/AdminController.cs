@@ -40,6 +40,12 @@ namespace EcommerceSystem.Controllers
             return View(sellers);
         }
 
+        public IActionResult ManageCustomerService()
+        {
+            var staffList = _context.CustomerServices.ToList(); // Or your logic
+            return View(staffList);
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveSeller(int id)
@@ -120,26 +126,13 @@ namespace EcommerceSystem.Controllers
                 await _context.SaveChangesAsync();
 
                 TempData["Success"] = "Customer Service account created successfully!";
-                return RedirectToAction("Home");
+                return RedirectToAction("ManageCustomerService");
             }
             catch (Exception ex)
             {
                 ModelState.AddModelError("", "An error occurred while saving: " + ex.Message);
                 return View(model);
             }
-        }
-
-        // GET: Show confirmation page before deleting
-        public async Task<IActionResult> DeleteCustomerService(int id)
-        {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-            {
-                TempData["Error"] = "User not found.";
-                return RedirectToAction("Home");
-            }
-
-            return View(user);
         }
 
         // POST: Confirm and perform deletion
@@ -152,7 +145,7 @@ namespace EcommerceSystem.Controllers
             if (user == null)
             {
                 TempData["Error"] = "User not found.";
-                return RedirectToAction("Home");
+                return RedirectToAction("ManageCustomerService");
             }
 
             // Safety check: only delete CustomerService accounts from this action
@@ -168,7 +161,7 @@ namespace EcommerceSystem.Controllers
                 await _context.SaveChangesAsync();
 
                 TempData["Success"] = "Customer Service account deleted successfully.";
-                return RedirectToAction("ManageUsers");
+                return RedirectToAction("ManageCustomerService");
             }
             catch (Exception ex)
             {
