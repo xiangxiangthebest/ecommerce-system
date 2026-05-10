@@ -491,3 +491,160 @@
     color: #1e1b4b;
     font-size: 14px;
 }
+
+.nav-links .nav-locked {
+    list-style: none;
+    padding: 12px 20px;
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+ 
+.nav-text-locked {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b0bec5;          /* muted colour */
+    font-size: 0.95rem;
+    user-select: none;
+}
+ 
+.nav-lock-icon {
+    font-size: 0.8rem;
+}
+ 
+/* ── Pending approval banner ─────────────────────────────────── */
+.pending-approval-banner {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%);
+    border: 1.5px solid #ffe082;
+    border-left: 5px solid #f9a825;
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(249,168,37,0.10);
+}
+ 
+.pending-icon-wrap {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    background: #fff8e1;
+    border: 2px solid #ffe082;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+ 
+.pending-icon {
+    font-size: 1.5rem;
+    color: #f9a825;
+    animation: pulse-spin 2.4s ease-in-out infinite;
+}
+ 
+@keyframes pulse-spin {
+    0%   { transform: rotate(0deg);   opacity: 1;    }
+    50%  { transform: rotate(20deg);  opacity: 0.65; }
+    100% { transform: rotate(0deg);   opacity: 1;    }
+}
+ 
+.pending-text-wrap {
+    flex: 1;
+}
+ 
+.pending-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #e65100;
+    margin: 0 0 8px;
+}
+ 
+.pending-desc {
+    font-size: 0.9rem;
+    color: #6d4c41;
+    margin: 0 0 6px;
+    line-height: 1.55;
+}
+ 
+/* ── Alert banners (flash messages inside seller dashboard) ───── */
+.alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+.alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.alert-error   { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+ 
+/* ── Orders table (Order tab) ────────────────────────────────── */
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-top: 1rem;
+}
+ 
+.orders-table thead {
+    background: #1a237e;
+    color: #fff;
+}
+ 
+.orders-table th,
+.orders-table td {
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 0.88rem;
+    border-bottom: 1px solid #e8eaf6;
+}
+ 
+.orders-table tbody tr:last-child td { border-bottom: none; }
+.orders-table tbody tr:hover { background: #f5f5f5; }
+ 
+/* ── Status badge ─────────────────────────────────────────────── */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+ 
+.status-pending   { background: #fff9c4; color: #f57f17; }
+.status-shipped   { background: #e3f2fd; color: #1565c0; }
+.status-delivered { background: #e8f5e9; color: #2e7d32; }
+.status-cancelled,
+.status-canceled  { background: #ffebee; color: #c62828; }
+ 
+/* ── Order status select & update button ─────────────────────── */
+.status-select {
+    padding: 5px 8px;
+    border: 1px solid #c5cae9;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    background: #f5f5f5;
+    cursor: pointer;
+}
+ 
+.btn-update-status {
+    padding: 5px 14px;
+    background: #1a237e;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.btn-update-status:hover { background: #283593; }
