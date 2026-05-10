@@ -37,10 +37,10 @@
             <tbody>
                 @foreach (var staff in Model)
                 {
-                    <tr>
+                    <tr class="@(staff.IsActive ? "" : "deactivated-row")">
                         <td>
                             <div class="shop-cell">
-                                <div class="shop-avatar" style="background: #e0f7fa; color: #00acc1;">
+                                <div class="shop-avatar" style="background: @(staff.IsActive ? "#e0f7fa" : "#f1f5f9"); color: @(staff.IsActive ? "#00acc1" : "#94a3b8");">
                                     <i class="fas fa-user"></i>
                                 </div>
                                 <div>
@@ -50,17 +50,32 @@
                             </div>
                         </td>
                         <td>@staff.Email</td>
-                        <td><span class="pill pill-success">Active</span></td>
+                        <td>
+                            @if (staff.IsActive)
+                            {
+                                <span class="pill pill-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="pill pill-danger">Inactive</span>
+                            }
+                        </td>
                         <td class="text-right">
-                            @* Updated Action: Delete Form *@
-                            <form asp-action="DeleteCustomerService" asp-route-id="@staff.UserId" method="post" 
-                                  onsubmit="return confirm('Are you sure you want to delete account: @staff.FullName?');" 
-                                  style="display:inline;">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="icon-btn-revoke" title="Remove Access">
-                                    <i class="fas fa-trash-can"></i>
-                                </button>
-                            </form>
+                            @if (staff.IsActive)
+                            {
+                                <form asp-action="DeleteCustomerService" asp-route-id="@staff.UserId" method="post" 
+                                      onsubmit="return confirm('Deactivate account for @staff.FullName?');" 
+                                      style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="icon-btn-revoke" title="Deactivate Account">
+                                        <i class="fas fa-user-slash"></i>
+                                    </button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="text-muted"><i class="fas fa-lock"></i></span>
+                            }
                         </td>
                     </tr>
                 }

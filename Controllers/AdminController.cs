@@ -148,28 +148,26 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("ManageCustomerService");
             }
 
-            // Safety check: only delete CustomerService accounts from this action
-            if (user.Role != "CustomerService")
-            {
-                ModelState.AddModelError("", "This account cannot be deleted from this action.");
-                return View(user);
-            }
-
             try
             {
-                _context.Users.Remove(user);
+                // Instead of _context.Users.Remove(user);
+                // We update the status. For example:
+                user.IsActive = false; 
+                
+                _context.Update(user);
                 await _context.SaveChangesAsync();
 
-                TempData["Success"] = "Customer Service account deleted successfully.";
+                TempData["Success"] = "Staff member deactivated successfully.";
+                
+                // Redirect back to the list so you stay on the same page
                 return RedirectToAction("ManageCustomerService");
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError("", "An error occurred while deleting: " + ex.Message);
-                return View(user);
+                TempData["Error"] = "Error deactivating account: " + ex.Message;
+                return RedirectToAction("ManageCustomerService");
             }
         }
-
         // System Settings
         public IActionResult Home()
         {
