@@ -1,0 +1,119 @@
+@model EcommerceSystem.Models.Customer
+
+<link rel="stylesheet" href="~/css/customer/profile.css" />
+
+<div class="profile-page">
+
+    <div class="profile-layout">
+
+        <!-- Sidebar -->
+        <div class="profile-sidebar">
+
+            <div class="avatar-card">
+                <div class="avatar-wrap">
+                    <img src="@(string.IsNullOrEmpty(Model.ProfilePicture)
+                                ? "/images/profile/default.png"
+                                : Model.ProfilePicture)"
+                         alt="Profile picture"
+                         class="avatar-img" />
+                    <label for="profileImageInput" class="avatar-upload" aria-label="Upload photo">
+                        <i class="ti ti-camera" aria-hidden="true"></i>
+                    </label>
+                </div>
+                <div>
+                    <p class="avatar-name">@Model.FullName</p>
+                    <p class="avatar-email">@Model.Email</p>
+                </div>
+                <span class="status-badge">
+                    <span class="status-dot @(Model.IsActive ? "" : "inactive")"></span>
+                    @(Model.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+
+            <div class="meta-card">
+                <div class="meta-row">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    <div>
+                        <div class="meta-sub">Member since</div>
+                        <span>@Model.DateJoin.ToString("MMM dd, yyyy")</span>
+                    </div>
+                </div>
+                <div class="meta-row">
+                    <i class="ti ti-shield-check" aria-hidden="true"></i>
+                    <div>
+                        <div class="meta-sub">Account status</div>
+                        <span>Verified</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Form -->
+        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data" class="form-card">
+
+            <input type="hidden" asp-for="UserId" />
+            <input type="file" id="profileImageInput" name="profileImage" style="display:none" />
+
+            <div class="form-section">
+                <p class="section-label">Personal info</p>
+                <div class="field-grid">
+                    <div class="field">
+                        <label asp-for="FullName">Full Name</label>
+                        <input asp-for="FullName" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Gender">Gender</label>
+                        <div class="select-wrap">
+                            <select asp-for="Gender">
+                                <option>Male</option>
+                                <option>Female</option>
+                            </select>
+                            <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Birthday">Birthday</label>
+                        <input asp-for="Birthday" type="date" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Phone">Phone</label>
+                        <input asp-for="Phone" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <p class="section-label">Account</p>
+                <div class="field-grid">
+                    <div class="field">
+                        <label asp-for="Email">Email</label>
+                        <input asp-for="Email" readonly />
+                    </div>
+                    <div class="field">
+                        <label>Status</label>
+                        <input value="@(Model.IsActive ? "Active" : "Inactive")" readonly />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <p class="section-label">Delivery address</p>
+                <div class="field full">
+                    <label asp-for="Address">Address</label>
+                    <textarea asp-for="Address"></textarea>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a asp-action="ChangePassword" class="btn-change-pass">
+                    <i class="ti ti-lock" aria-hidden="true"></i> Change password
+                </a>
+                <button type="submit" class="btn-save">
+                    <i class="ti ti-check" aria-hidden="true"></i> Save changes
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>

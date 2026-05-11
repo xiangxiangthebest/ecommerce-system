@@ -1,0 +1,95 @@
+@model IEnumerable<EcommerceSystem.Models.Product>
+
+<link rel="stylesheet" href="~/css/customer/home.css" />
+
+<div class="home-page">
+
+    <!-- Hero bar -->
+    <div class="home-hero">
+        <div class="home-hero-text">
+            <span class="home-eyebrow">New arrivals · Free shipping over RM100</span>
+            <h1 class="home-title">Find what you love</h1>
+        </div>
+        <div class="home-hero-count">
+            <span class="hero-count-number">@Model.Count()</span>
+            <span class="hero-count-label">products</span>
+        </div>
+    </div>
+
+    <!-- Filter bar -->
+    <form method="get" class="filter-bar">
+        <div class="filter-search">
+            <i class="ti ti-search"></i>
+            <input type="text"
+                   name="search"
+                   placeholder="Search products…"
+                   class="filter-input" />
+        </div>
+
+        <div class="filter-sep"></div>
+
+        <div class="filter-select-wrap">
+            <i class="ti ti-layout-grid"></i>
+            <select name="categoryId" class="filter-select">
+                <option value="">All Categories</option>
+                @foreach (var category in ViewBag.Category)
+                {
+                    <option value="@category.CategoryId">@category.Name</option>
+                }
+            </select>
+            <i class="ti ti-chevron-down filter-chevron"></i>
+        </div>
+
+        <button type="submit" class="filter-btn">
+            <i class="ti ti-adjustments-horizontal"></i>
+            Filter
+        </button>
+    </form>
+
+    <!-- Product grid -->
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="empty-icon"><i class="ti ti-mood-empty"></i></div>
+            <p class="empty-title">No products found</p>
+            <p class="empty-sub">Try adjusting your search or category filter.</p>
+        </div>
+    }
+    else
+    {
+        <div class="product-grid">
+            @{int idx = 0;}
+            @foreach (var item in Model)
+            {
+                <a asp-action="ProductDetails"
+                   asp-route-id="@item.ProductId"
+                   class="product-card"
+                   style="animation-delay: @(idx * 60)ms">
+
+                    <div class="product-img-wrap">
+                        <img src="@item.ImagePath"
+                             alt="@item.Name"
+                             class="product-img" />
+                        <div class="product-img-overlay">
+                            <span class="overlay-cta">
+                                <i class="ti ti-eye"></i> View details
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="product-info">
+                        <p class="product-category">@(ViewBag.Category != null ? "" : "")</p>
+                        <h3 class="product-name">@item.Name</h3>
+                        <div class="product-footer">
+                            <span class="product-price">RM @item.Price.ToString("0.00")</span>
+                            <span class="product-arrow"><i class="ti ti-arrow-up-right"></i></span>
+                        </div>
+                    </div>
+
+                </a>
+                idx++;
+            }
+        </div>
+    }
+
+</div>

@@ -1,34 +1,18 @@
-namespace EcommerceSystem.Models;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Cart
+namespace EcommerceSystem.Models
 {
-    public int CartId { get; set; }
-    public int UserId { get; set; }
-    // Cart contains products with extra attributes
-    public List<CartProduct> products{ get; set; }
+    public class Cart
+    {
+        [Key]
+        public int CartId { get; set; }
 
-        // public Cart()
-        // {
-        //     products = new List<CartProduct>();
-        // }
+        public int UserId { get; set; }
 
-        // public Cart(List<CartProduct> products)
-        // {
-        //     this.products = products;
-        // }
+        [ForeignKey("UserId")]
+        public User? User { get; set; }
 
-        // public List<CartProduct> GetProducts()
-        // {
-        //     return products;
-        // }
-
-        // public void SetProducts(List<CartProduct> products)
-        // {
-        //     this.products = products;
-        // }
-
-        // public decimal CalculateTotal()
-        // {
-        //     return products.Sum(cp => cp.price * cp.quantity);
-        // }
+        public List<CartItem> CartItems { get; set; } = new();
+    }
 }

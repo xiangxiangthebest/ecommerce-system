@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ecommerce_system</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/customer/layout.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ecommerce_system.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar-shell">
+            <div class="navbar-inner">
+
+            <!-- Hamburger (mobile only) -->
+            <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle menu">
+                <i class="ti ti-menu-2"></i>
+            </button>
+
+            <a class="nav-brand" asp-controller="Customer" asp-action="Home">
+                <div class="brand-icon">🛍️</div>
+                <span class="brand-name">MMU Shop</span>
+            </a>
+
+            <div class="nav-divider-v"></div>
+
+            <!-- Desktop links -->
+            <div class="nav-links">
+                <a class="nav-link" asp-controller="Customer" asp-action="Home">
+                <i class="ti ti-home"></i> Home
+                </a>
+                <a class="nav-link" asp-controller="Customer" asp-action="PurchaseHistory">
+                <i class="ti ti-receipt"></i> Orders
+                </a>
+                <a class="nav-link" asp-controller="Customer" asp-action="Chat">
+                <i class="ti ti-messages"></i> Chat
+                </a>
+            </div>
+
+            <div class="nav-search">
+                <i class="ti ti-search"></i>
+                <span>Search products…</span>
+                <span class="search-kbd">⌘K</span>
+            </div>
+
+            <div class="nav-right">
+                <a class="icon-btn" asp-controller="Customer" asp-action="Notifications">
+                <i class="ti ti-bell"></i>
+                <span class="notification-dot"></span>
+                </a>
+                <a class="cart-btn" asp-controller="Customer" asp-action="Cart">
+                <i class="ti ti-shopping-cart"></i>
+                <span>Cart</span>
+                <span class="cart-count">3</span>
+                </a>
+                <div class="nav-divider-v"></div>
+                <div class="profile-dropdown">
+                <button class="profile-btn">
+                    @{
+                        var fullName = ViewBag.FullName as string ?? "User";
+
+                        var names = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                        var initials = names.Length >= 2
+                            ? $"{names[0][0]}{names[^1][0]}".ToUpper()
+                            : fullName.Substring(0, 1).ToUpper();
+                    }
+                    <div class="avatar">@initials</div>
+                    <span class="profile-name">@fullName</span>
+                    @* <div class="avatar">JD</div>
+                    <span class="profile-name">Jane</span> *@
+                    <i class="ti ti-chevron-down"></i>
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" asp-controller="Customer" asp-action="Profile">
+                    <i class="ti ti-user"></i> My Profile
+                    </a>
+                    <hr class="dropdown-sep" />
+                    <a class="dropdown-item danger" asp-controller="Auth" asp-action="Logout">
+                    <i class="ti ti-logout"></i> Sign out
+                    </a>
+                </div>
+                </div>
+            </div>
+
+            </div>
+
+            <!-- Mobile drawer -->
+            <div class="mobile-drawer" id="mobileDrawer">
+            <a class="nav-link" asp-controller="Customer" asp-action="Home">
+                <i class="ti ti-home"></i> Home
+            </a>
+            <a class="nav-link" asp-controller="Customer" asp-action="PurchaseHistory">
+                <i class="ti ti-receipt"></i> Orders
+            </a>
+            <a class="nav-link" asp-controller="Customer" asp-action="Chat">
+                <i class="ti ti-messages"></i> Chat
+            </a>
+            </div>
+
+        </nav>
+        </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2026 - ecommerce_system - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+        (function () {
+            // Profile dropdown
+            const profileDropdown = document.querySelector('.profile-dropdown');
+            const profileBtn = profileDropdown?.querySelector('.profile-btn');
+            if (profileBtn) {
+            profileBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                profileDropdown.classList.toggle('open');
+            });
+            }
+
+            // Hamburger / mobile drawer
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+            const mobileDrawer = document.getElementById('mobileDrawer');
+            if (hamburgerBtn && mobileDrawer) {
+            hamburgerBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const isOpen = mobileDrawer.classList.toggle('open');
+                hamburgerBtn.querySelector('i').className = isOpen
+                ? 'ti ti-x'
+                : 'ti ti-menu-2';
+            });
+            }
+
+            // Close both on outside click
+            document.addEventListener('click', function () {
+            profileDropdown?.classList.remove('open');
+            mobileDrawer?.classList.remove('open');
+            if (hamburgerBtn) {
+                hamburgerBtn.querySelector('i').className = 'ti ti-menu-2';
+            }
+            });
+        })();
+    </script>
+</body>
+</html>
