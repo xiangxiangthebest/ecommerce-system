@@ -19,13 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Admin> Admin { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Category { get; set; }
-
     public DbSet<Cart> Cart { get; set; }
-    public DbSet<CartItem> CartItem { get; set; }
-    public DbSet<Review> Review { get; set; }
-    public DbSet<Complaint> Complaint { get; set; }
-    public DbSet<Notification> Notification { get; set; }
-    public DbSet<ChatMessage> ChatMessage { get; set; }
     public DbSet<DeliveryField> DeliveryField { get; set; }
     public DbSet<Order> Order { get; set; }
 
