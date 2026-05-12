@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260511060104_Customer")]
-    partial class Customer
+    [Migration("20260512050902_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,36 +31,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasKey("CartId");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("Cart", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.CartItem", b =>
-                {
-                    b.Property<int>("CartItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("CartId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<double>("Price")
-                        .HasColumnType("REAL");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CartItemId");
-
-                    b.HasIndex("CartId");
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("CartItem");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Category", b =>
@@ -80,63 +51,6 @@ namespace ecommerce_system.Migrations
                     b.HasKey("CategoryId");
 
                     b.ToTable("Category", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.ChatMessage", b =>
-                {
-                    b.Property<int>("MessageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ReceiverId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SenderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("MessageId");
-
-                    b.ToTable("ChatMessage");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Complaint", b =>
-                {
-                    b.Property<int>("ComplaintId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("OrderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("ComplaintId");
-
-                    b.HasIndex("OrderId");
-
-                    b.ToTable("Complaint");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
@@ -163,34 +77,6 @@ namespace ecommerce_system.Migrations
                     b.HasKey("DeliveryFieldId");
 
                     b.ToTable("DeliveryField", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Notification", b =>
-                {
-                    b.Property<int>("NotificationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("NotificationId");
-
-                    b.ToTable("Notification");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
@@ -249,6 +135,10 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImagePathsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDraft")
                         .HasColumnType("INTEGER");
 
@@ -269,6 +159,10 @@ namespace ecommerce_system.Migrations
                     b.Property<int>("StockQuantity")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("VariationsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("ProductId");
 
                     b.HasIndex("CategoryId");
@@ -280,37 +174,6 @@ namespace ecommerce_system.Migrations
                     b.HasDiscriminator<string>("Discriminator").HasValue("Product");
 
                     b.UseTphMappingStrategy();
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Review", b =>
-                {
-                    b.Property<int>("ReviewId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Comment")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("ReviewId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Review");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.User", b =>
@@ -354,6 +217,9 @@ namespace ecommerce_system.Migrations
                 {
                     b.HasBaseType("EcommerceSystem.Models.Product");
 
+                    b.Property<int?>("CartId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("ItemStatus")
                         .HasColumnType("INTEGER");
 
@@ -365,6 +231,8 @@ namespace ecommerce_system.Migrations
 
                     b.Property<DateTime>("TimeAdded")
                         .HasColumnType("TEXT");
+
+                    b.HasIndex("CartId");
 
                     b.HasIndex("OrderId");
 
@@ -393,11 +261,11 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("Phone")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Phone")
+                    b.Property<string>("ProfilePicture")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -456,47 +324,6 @@ namespace ecommerce_system.Migrations
                     b.ToTable("Seller", (string)null);
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.Cart", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.CartItem", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Cart", "Cart")
-                        .WithMany("CartItems")
-                        .HasForeignKey("CartId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EcommerceSystem.Models.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Cart");
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Complaint", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.Customer", "Customer")
@@ -535,27 +362,12 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Seller");
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.Review", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EcommerceSystem.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.CartProduct", b =>
                 {
+                    b.HasOne("EcommerceSystem.Models.Cart", null)
+                        .WithMany("products")
+                        .HasForeignKey("CartId");
+
                     b.HasOne("EcommerceSystem.Models.Order", null)
                         .WithMany("Products")
                         .HasForeignKey("OrderId");
@@ -599,7 +411,7 @@ namespace ecommerce_system.Migrations
 
             modelBuilder.Entity("EcommerceSystem.Models.Cart", b =>
                 {
-                    b.Navigation("CartItems");
+                    b.Navigation("products");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Category", b =>

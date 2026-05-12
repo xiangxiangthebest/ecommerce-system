@@ -132,6 +132,10 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImagePathsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDraft")
                         .HasColumnType("INTEGER");
 
@@ -151,6 +155,10 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("StockQuantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("VariationsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("ProductId");
 
@@ -255,7 +263,6 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ProfilePicture")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.ToTable("Customers", (string)null);

@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260509165820_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260512051116_MakeProfilePictureOptional")]
+    partial class MakeProfilePictureOptional
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -63,9 +63,6 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("CustomerUserId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("IsDefault")
                         .HasColumnType("INTEGER");
 
@@ -78,8 +75,6 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("DeliveryFieldId");
-
-                    b.HasIndex("CustomerUserId");
 
                     b.ToTable("DeliveryField", (string)null);
                 });
@@ -140,6 +135,10 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImagePathsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDraft")
                         .HasColumnType("INTEGER");
 
@@ -159,6 +158,10 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("StockQuantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("VariationsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("ProductId");
 
@@ -247,10 +250,24 @@ namespace ecommerce_system.Migrations
                 {
                     b.HasBaseType("EcommerceSystem.Models.User");
 
-                    b.Property<int?>("CartId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
-                    b.HasIndex("CartId");
+                    b.Property<DateTime?>("Birthday")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProfilePicture")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -307,17 +324,10 @@ namespace ecommerce_system.Migrations
                     b.ToTable("Seller", (string)null);
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Customer", null)
-                        .WithMany("DeliveryFields")
-                        .HasForeignKey("CustomerUserId");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.Customer", "Customer")
-                        .WithMany("PreviousOrders")
+                        .WithMany()
                         .HasForeignKey("CustomerUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -374,17 +384,11 @@ namespace ecommerce_system.Migrations
 
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>
                 {
-                    b.HasOne("EcommerceSystem.Models.Cart", "Cart")
-                        .WithMany()
-                        .HasForeignKey("CartId");
-
                     b.HasOne("EcommerceSystem.Models.User", null)
                         .WithOne()
                         .HasForeignKey("EcommerceSystem.Models.Customer", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Cart");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.CustomerService", b =>
@@ -418,13 +422,6 @@ namespace ecommerce_system.Migrations
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Navigation("Products");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>
-                {
-                    b.Navigation("DeliveryFields");
-
-                    b.Navigation("PreviousOrders");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Seller", b =>

@@ -53,14 +53,14 @@ namespace EcommerceSystem.Controllers
             var seller = await _context.Seller.FindAsync(id);
             if (seller == null)
             {
-                TempData["Error"] = "Seller not found.";
+                TempData["AdminError"] = "Seller not found.";
                 return RedirectToAction("ManageSellers");
             }
  
             seller.IsApproved = true;
             await _context.SaveChangesAsync();
  
-            TempData["Success"] = $"{seller.ShopName} has been approved successfully.";
+            TempData["AdminSuccess"] = $"{seller.ShopName} has been approved successfully.";
             return RedirectToAction("ManageSellers");
         }
 
@@ -71,14 +71,14 @@ namespace EcommerceSystem.Controllers
             var seller = await _context.Seller.FindAsync(id);
             if (seller == null)
             {
-                TempData["Error"] = "Seller not found.";
+                TempData["AdminError"] = "Seller not found.";
                 return RedirectToAction("ManageSellers");
             }
  
             seller.IsApproved = false;
             await _context.SaveChangesAsync();
  
-            TempData["Success"] = $"{seller.ShopName}'s approval has been revoked.";
+            TempData["AdminSuccess"] = $"{seller.ShopName}'s approval has been revoked.";
             return RedirectToAction("ManageSellers");
         }
 
@@ -125,7 +125,7 @@ namespace EcommerceSystem.Controllers
                 _context.Users.Add(customerServiceAccount);
                 await _context.SaveChangesAsync();
 
-                TempData["Success"] = "Customer Service account created successfully!";
+                TempData["AdminSuccess"] = "Customer Service account created successfully!";
                 return RedirectToAction("ManageCustomerService");
             }
             catch (Exception ex)
@@ -157,7 +157,7 @@ namespace EcommerceSystem.Controllers
                 _context.Update(user);
                 await _context.SaveChangesAsync();
 
-                TempData["Success"] = "Staff member deactivated successfully.";
+                TempData["AdminSuccess"] = "Staff member deactivated successfully.";
                 
                 // Redirect back to the list so you stay on the same page
                 return RedirectToAction("ManageCustomerService");

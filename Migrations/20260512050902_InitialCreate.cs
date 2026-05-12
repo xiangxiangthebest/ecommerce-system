@@ -39,6 +39,22 @@ namespace ecommerce_system.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "DeliveryField",
+                columns: table => new
+                {
+                    DeliveryFieldId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Address = table.Column<string>(type: "TEXT", nullable: false),
+                    PhoneNumber = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    IsDefault = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeliveryField", x => x.DeliveryFieldId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Users",
                 columns: table => new
                 {
@@ -80,16 +96,15 @@ namespace ecommerce_system.Migrations
                 {
                     UserId = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    CartId = table.Column<int>(type: "INTEGER", nullable: true)
+                    Phone = table.Column<string>(type: "TEXT", nullable: false),
+                    Address = table.Column<string>(type: "TEXT", nullable: false),
+                    Gender = table.Column<string>(type: "TEXT", nullable: false),
+                    Birthday = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ProfilePicture = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Customers", x => x.UserId);
-                    table.ForeignKey(
-                        name: "FK_Customers_Cart_CartId",
-                        column: x => x.CartId,
-                        principalTable: "Cart",
-                        principalColumn: "CartId");
                     table.ForeignKey(
                         name: "FK_Customers_Users_UserId",
                         column: x => x.UserId,
@@ -145,28 +160,6 @@ namespace ecommerce_system.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "DeliveryField",
-                columns: table => new
-                {
-                    DeliveryFieldId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Address = table.Column<string>(type: "TEXT", nullable: false),
-                    PhoneNumber = table.Column<string>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    IsDefault = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CustomerUserId = table.Column<int>(type: "INTEGER", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DeliveryField", x => x.DeliveryFieldId);
-                    table.ForeignKey(
-                        name: "FK_DeliveryField_Customers_CustomerUserId",
-                        column: x => x.CustomerUserId,
-                        principalTable: "Customers",
-                        principalColumn: "UserId");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Order",
                 columns: table => new
                 {
@@ -208,9 +201,11 @@ namespace ecommerce_system.Migrations
                     StockQuantity = table.Column<int>(type: "INTEGER", nullable: false),
                     SKU = table.Column<string>(type: "TEXT", nullable: false),
                     ImagePath = table.Column<string>(type: "TEXT", nullable: false),
+                    ImagePathsJson = table.Column<string>(type: "TEXT", nullable: false),
                     SellerId = table.Column<int>(type: "INTEGER", nullable: false),
                     CategoryId = table.Column<int>(type: "INTEGER", nullable: false),
                     IsDraft = table.Column<bool>(type: "INTEGER", nullable: false),
+                    VariationsJson = table.Column<string>(type: "TEXT", nullable: false),
                     Discriminator = table.Column<string>(type: "TEXT", maxLength: 13, nullable: false),
                     Quantity = table.Column<int>(type: "INTEGER", nullable: true),
                     TimeAdded = table.Column<DateTime>(type: "TEXT", nullable: true),
@@ -244,16 +239,6 @@ namespace ecommerce_system.Migrations
                         principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Customers_CartId",
-                table: "Customers",
-                column: "CartId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DeliveryField_CustomerUserId",
-                table: "DeliveryField",
-                column: "CustomerUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Order_CustomerUserId",
@@ -302,6 +287,9 @@ namespace ecommerce_system.Migrations
                 name: "Product");
 
             migrationBuilder.DropTable(
+                name: "Cart");
+
+            migrationBuilder.DropTable(
                 name: "Category");
 
             migrationBuilder.DropTable(
@@ -312,9 +300,6 @@ namespace ecommerce_system.Migrations
 
             migrationBuilder.DropTable(
                 name: "Seller");
-
-            migrationBuilder.DropTable(
-                name: "Cart");
 
             migrationBuilder.DropTable(
                 name: "Users");

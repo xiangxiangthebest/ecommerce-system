@@ -29,7 +29,6 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── Layout ── */
 .auth-container {
     min-height: 100vh;
     display: flex;
@@ -38,7 +37,6 @@ body {
     padding: 32px 24px;
 }
 
-/* ── Card ── */
 .seller-card {
     width: 100%;
     max-width: 600px;
@@ -50,7 +48,6 @@ body {
     animation: fadeUp 0.55s ease both;
 }
 
-/* ── Badge ── */
 .auth-badge {
     display: inline-block;
     padding: 6px 14px;
@@ -64,7 +61,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* ── Top ── */
 .auth-top {
     margin-bottom: 28px;
 }
@@ -86,9 +82,7 @@ body {
     font-weight: 400;
 }
 
-/* ══════════════════════════════
-   PROGRESS STEPPER
-══════════════════════════════ */
+
 .progress-stepper {
     display: flex;
     align-items: center;
@@ -105,7 +99,6 @@ body {
     position: relative;
 }
 
-/* Circle */
 .step-circle {
     width: 36px;
     height: 36px;
@@ -123,7 +116,6 @@ body {
     z-index: 1;
 }
 
-/* Checkmark icon (hidden by default) */
 .step-circle .check {
     display: none;
     font-size: 14px;
@@ -133,7 +125,6 @@ body {
     display: block;
 }
 
-/* Step label */
 .step-label {
     font-size: 11px;
     font-weight: 600;
@@ -144,13 +135,12 @@ body {
     transition: color 0.3s ease;
 }
 
-/* Connector line between steps */
 .step-connector {
     flex: 1;
     height: 2px;
     background: var(--border);
     position: relative;
-    top: -14px; /* align with circle center */
+    top: -14px; 
     transition: background 0.4s ease;
     margin: 0 4px;
     max-width: 80px;
@@ -158,7 +148,6 @@ body {
     margin-top: 17px;
 }
 
-/* ── Active step ── */
 .step.active .step-circle {
     border-color: var(--accent);
     background: var(--accent);
@@ -170,7 +159,6 @@ body {
     color: var(--accent);
 }
 
-/* ── Completed step ── */
 .step.completed .step-circle {
     border-color: var(--success);
     background: var(--success);
@@ -188,9 +176,6 @@ body {
     background: var(--success);
 }
 
-/* ══════════════════════════════
-   FORM STEPS
-══════════════════════════════ */
 .form-step {
     display: none;
     flex-direction: column;
@@ -213,7 +198,6 @@ body {
     margin-bottom: 2px;
 }
 
-/* ── Form groups ── */
 .form-group {
     display: flex;
     flex-direction: column;
@@ -252,7 +236,6 @@ body {
     color: var(--ink-soft);
 }
 
-/* Phone input */
 .phone-input {
     display: flex;
     align-items: center;
@@ -284,16 +267,12 @@ body {
     box-shadow: none !important;
 }
 
-/* ── Two-column row ── */
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
 }
 
-/* ══════════════════════════════
-   NAVIGATION BUTTONS
-══════════════════════════════ */
 .step-nav {
     display: flex;
     gap: 12px;
@@ -373,13 +352,11 @@ body {
     text-decoration: underline;
 }
 
-/* ── Animation ── */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(16px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Responsive ── */
 @media (max-width: 540px) {
     .seller-card { padding: 32px 24px; }
     .auth-top h1 { font-size: 26px; }
