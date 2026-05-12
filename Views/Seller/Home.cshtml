@@ -7,30 +7,23 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <div class="dashboard-wrapper">
-    <!-- ── Sidebar ── -->
     <nav class="sidebar">
         <div class="sidebar-header">
             <h3 class="shop-title">@ViewBag.ShopName</h3>
         </div>
-
         <ul class="nav-links">
-            <!-- General: always accessible -->
             <li class="@(ViewBag.ActiveTab == "General" ? "active" : "")">
                 <a href="@Url.Action("Home", "Seller", new { tab = "General" })">
                     <span class="nav-text">General</span>
                 </a>
             </li>
-
             @if (isApproved)
             {
-                <!-- Product: only for approved sellers -->
                 <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">
                         <span class="nav-text">Product</span>
                     </a>
                 </li>
-
-                <!-- Order: only for approved sellers -->
                 <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
                         <span class="nav-text">Order</span>
@@ -39,7 +32,6 @@
             }
             else
             {
-                <!-- Locked tabs shown as disabled for unapproved sellers -->
                 <li class="nav-locked" title="Pending admin approval">
                     <span class="nav-text nav-text-locked">
                         <i class="fas fa-lock nav-lock-icon"></i> Product
@@ -52,7 +44,6 @@
                 </li>
             }
         </ul>
-
         <div class="sidebar-footer">
             <form asp-controller="Auth" asp-action="Logout" method="post">
                 <button type="submit" class="logout-link">Logout</button>
@@ -60,10 +51,8 @@
         </div>
     </nav>
 
-    <!-- ── Main Content Area ── -->
     <main class="content-area">
 
-        @* Global flash messages *@
         @if (TempData["Error"] != null)
         {
             <div class="alert-banner alert-error">
@@ -77,7 +66,6 @@
             </div>
         }
 
-        @* ── PENDING APPROVAL BANNER ── *@
         @if (!isApproved)
         {
             <div class="pending-approval-banner">
@@ -90,13 +78,9 @@
                         Your seller account is currently under review. Once an admin approves your account,
                         you will be able to list products and manage orders.
                     </p>
-                    <p class="pending-desc">
-                        Please check back later or contact support if you have any questions.
-                    </p>
+                    <p class="pending-desc">Please check back later or contact support if you have any questions.</p>
                 </div>
             </div>
-
-            <!-- Still show the General welcome content below the banner -->
             <div class="details-container">
                 <h1 class="welcome-text">Welcome, @ViewBag.ShopName!</h1>
                 <div class="separator"></div>
@@ -105,74 +89,144 @@
         }
         else if (ViewBag.ActiveTab == "Product")
         {
-            @* ── PRODUCT TAB ── *@
+            var allProducts    = ViewBag.Products as List<EcommerceSystem.Models.Product> ?? new List<EcommerceSystem.Models.Product>();
+            var activeProducts = allProducts.Where(p => !p.IsDraft).ToList();
+            var draftProducts  = allProducts.Where(p => p.IsDraft).ToList();
+            var bannedProducts = new List<EcommerceSystem.Models.Product>(); // placeholder for future admin ban feature
+
             <div class="product-header">
                 <h2 class="section-title">Your Products</h2>
                 <div class="header-actions">
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search Product...." />
+                        <input type="text" id="product-search" placeholder="Search Product...." oninput="filterCards()" />
                     </div>
                     <a href="@Url.Action("AddProduct", "Seller")" class="btn-add-product">+ Add New Product</a>
                 </div>
             </div>
 
-            <div class="product-grid">
-                @if (ViewBag.Products != null && ((List<EcommerceSystem.Models.Product>)ViewBag.Products).Any())
+            <div class="product-sub-tabs">
+                <button class="pst-btn active" onclick="switchTab(this,'active')">
+                    Active Product <span class="pst-count">@activeProducts.Count</span>
+                </button>
+                <button class="pst-btn" onclick="switchTab(this,'draft')">
+                    Draft Product <span class="pst-count">@draftProducts.Count</span>
+                </button>
+                <button class="pst-btn" onclick="switchTab(this,'banned')">
+                    Banned Product <span class="pst-count">@bannedProducts.Count</span>
+                </button>
+            </div>
+
+            <div id="tab-active" class="pst-panel">
+                @if (activeProducts.Any())
                 {
-                    foreach (var item in (List<EcommerceSystem.Models.Product>)ViewBag.Products)
-                    {
-                        <div class="product-card" style="position: relative;">
-
-                            @if (item.IsDraft)
-                            {
-                                <span style="position:absolute;top:8px;left:8px;color:red;font-weight:bold;font-size:13px;background:rgba(255,255,255,0.85);padding:2px 8px;border-radius:4px;z-index:1;">Draft</span>
-                            }
-
-                            <div class="product-image-placeholder">
-                                <img src="@item.ImagePath" alt="Product" />
-                            </div>
-
-                            <div class="product-info">
-                                <h3 class="product-name">@item.Name</h3>
-                                <div class="price-row">
-                                    <span class="current-price">RM @item.Price.ToString("F2")</span>
+                    <div class="product-grid-large">
+                        @foreach (var item in activeProducts)
+                        {
+                            <div class="product-card-large" data-name="@item.Name.ToLower()">
+                                <div class="pcl-image">
+                                    <img src="@item.ImagePath" alt="@item.Name" />
                                 </div>
-                                <p class="sub-text">@item.Description</p>
-                                <p class="sub-text">Stock: @item.StockQuantity</p>
-
-                                <div class="product-actions" style="display:flex;gap:8px;margin-top:8px;">
-                                    <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })"
-                                       style="background:#1a237e;color:white;padding:5px 14px;border-radius:5px;text-decoration:none;font-size:13px;">
-                                        Edit
-                                    </a>
-                                    <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post"
-                                          onsubmit="return confirm('Delete this product?');">
-                                        <button type="submit"
-                                                style="background:#c62828;color:white;padding:5px 14px;border-radius:5px;border:none;font-size:13px;cursor:pointer;">
-                                            Delete
-                                        </button>
-                                    </form>
+                                <div class="pcl-info">
+                                    <span class="pcl-category">@(item.Category?.Name ?? "—")</span>
+                                    <h3 class="pcl-name">@item.Name</h3>
+                                    <div class="pcl-price">RM @item.Price.ToString("F2")</div>
+                                    <p class="pcl-desc">@item.Description</p>
+                                    <div class="pcl-actions">
+                                        <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })" class="btn-pcl-edit">
+                                            <i class="fas fa-pen"></i> Edit
+                                        </a>
+                                        <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post"
+                                              onsubmit="return confirm('Delete this product?');" style="margin:0;flex:1;">
+                                            <button type="submit" class="btn-pcl-delete">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    }
+                        }
+                    </div>
                 }
                 else
                 {
-                    <div class="empty-state-full-width">
-                        <p>No products yet. Click "+ Add New Product" to start.</p>
+                    <div class="empty-state-panel">
+                        <i class="fas fa-box-open empty-icon"></i>
+                        <p>No active products yet. Click "+ Add New Product" to get started.</p>
                     </div>
                 }
             </div>
+
+            <div id="tab-draft" class="pst-panel" style="display:none;">
+                @if (draftProducts.Any())
+                {
+                    <div class="product-grid-large">
+                        @foreach (var item in draftProducts)
+                        {
+                            <div class="product-card-large" data-name="@item.Name.ToLower()">
+                                <div class="pcl-image" style="position:relative;">
+                                    <img src="@item.ImagePath" alt="@item.Name" />
+                                    <span class="draft-badge">Draft</span>
+                                </div>
+                                <div class="pcl-info">
+                                    <span class="pcl-category">@(item.Category?.Name ?? "—")</span>
+                                    <h3 class="pcl-name">@(string.IsNullOrEmpty(item.Name) ? "(Untitled)" : item.Name)</h3>
+                                    <div class="pcl-price">@(item.Price > 0 ? "RM " + item.Price.ToString("F2") : "—")</div>
+                                    <p class="pcl-desc">@item.Description</p>
+                                    <div class="pcl-actions">
+                                        <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })" class="btn-pcl-edit">
+                                            <i class="fas fa-pen"></i> Edit
+                                        </a>
+                                        <form asp-action="DeleteProduct" asp-route-id="@item.ProductId" method="post"
+                                              onsubmit="return confirm('Delete this draft?');" style="margin:0;flex:1;">
+                                            <button type="submit" class="btn-pcl-delete">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state-panel">
+                        <i class="fas fa-file-alt empty-icon"></i>
+                        <p>No draft products. Products saved as draft will appear here.</p>
+                    </div>
+                }
+            </div>
+
+            <div id="tab-banned" class="pst-panel" style="display:none;">
+                <div class="empty-state-panel">
+                    <i class="fas fa-ban empty-icon"></i>
+                    <p>No banned products.</p>
+                </div>
+            </div>
+
+            <script>
+                function switchTab(btn, name) {
+                    document.querySelectorAll('.pst-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.pst-panel').forEach(p => p.style.display = 'none');
+                    document.getElementById('tab-' + name).style.display = 'block';
+                    filterCards();
+                }
+
+                function filterCards() {
+                    const q = (document.getElementById('product-search')?.value || '').toLowerCase();
+                    document.querySelectorAll('.product-card-large').forEach(card => {
+                        card.style.display = card.getAttribute('data-name').includes(q) ? '' : 'none';
+                    });
+                }
+            </script>
         }
         else if (ViewBag.ActiveTab == "Order")
         {
-            @* ── ORDER TAB ── *@
             <div class="product-header">
                 <h2 class="section-title">Your Orders</h2>
             </div>
-
             @if (ViewBag.Orders != null && ((List<EcommerceSystem.Models.Order>)ViewBag.Orders).Any())
             {
                 <table class="orders-table">
@@ -227,14 +281,14 @@
             }
             else
             {
-                <div class="empty-state-full-width">
-                    <p>No orders yet.</p>
+                <div class="empty-state-panel" style="text-align:center;padding:60px 20px;color:#9a98b6;">
+                    <i class="fas fa-shopping-bag" style="font-size:48px;opacity:0.4;display:block;margin-bottom:16px;"></i>
+                    <p style="font-size:15px;font-weight:500;">No orders yet.</p>
                 </div>
             }
         }
         else
         {
-            @* ── GENERAL TAB (approved sellers) ── *@
             <div class="details-container">
                 <h1 class="welcome-text">Welcome Back, @ViewBag.ShopName!</h1>
                 <div class="separator"></div>
@@ -243,3 +297,213 @@
         }
     </main>
 </div>
+
+<style>
+    /* Sub-tab navigation bar */
+    .product-sub-tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 28px;
+        border-bottom: 2px solid #e8eaf6;
+    }
+
+    .pst-btn {
+        background: none;
+        border: none;
+        padding: 10px 22px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #9a98b6;
+        cursor: pointer;
+        position: relative;
+        transition: color 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-family: 'Syne', sans-serif;
+    }
+
+    .pst-btn.active { color: #1e1b4b; }
+
+    .pst-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0; right: 0;
+        height: 2px;
+        background: #1e1b4b;
+        border-radius: 2px 2px 0 0;
+    }
+
+    .pst-count {
+        background: #e8eaf6;
+        color: #5b587d;
+        border-radius: 10px;
+        padding: 1px 8px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .pst-btn.active .pst-count {
+        background: #1e1b4b;
+        color: #fff;
+    }
+
+    /* Large product card grid */
+    .product-grid-large {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 24px;
+    }
+
+    .product-card-large {
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(30,27,75,0.07);
+        display: flex;
+        flex-direction: column;
+        transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .product-card-large:hover {
+        box-shadow: 0 6px 24px rgba(30,27,75,0.13);
+        transform: translateY(-2px);
+    }
+
+    .pcl-image {
+        height: 220px;
+        background: #f8f9ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .pcl-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .draft-badge {
+        position: absolute;
+        top: 10px; left: 10px;
+        background: #fff3cd;
+        color: #856404;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        border: 1px solid #ffc107;
+    }
+
+    .pcl-info {
+        padding: 18px 18px 14px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    .pcl-category {
+        font-size: 11px;
+        color: #9a98b6;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 5px;
+    }
+
+    .pcl-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e1b4b;
+        margin: 0 0 6px;
+        line-height: 1.3;
+    }
+
+    .pcl-price {
+        font-size: 20px;
+        font-weight: 800;
+        color: #4f46e5;
+        margin-bottom: 8px;
+    }
+
+    .pcl-desc {
+        font-size: 13px;
+        color: #6b6b8a;
+        margin: 0 0 14px;
+        line-height: 1.45;
+        flex: 1;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .pcl-actions {
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid #f0f0f8;
+        padding-top: 12px;
+        margin-top: auto;
+    }
+
+    .btn-pcl-edit {
+        flex: 1;
+        background: #1e1b4b;
+        color: #fff;
+        text-align: center;
+        padding: 9px 0;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.2s;
+    }
+
+    .btn-pcl-edit:hover { background: #312e81; color: #fff; }
+
+    .btn-pcl-delete {
+        flex: 1;
+        background: #ffebee;
+        color: #c62828;
+        border: none;
+        padding: 9px 0;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.2s;
+        width: 100%;
+    }
+
+    .btn-pcl-delete:hover { background: #ffcdd2; }
+
+    /* Empty state panel */
+    .empty-state-panel {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9a98b6;
+    }
+
+    .empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.4;
+        display: block;
+    }
+
+    .empty-state-panel p {
+        font-size: 15px;
+        font-weight: 500;
+    }
+</style>

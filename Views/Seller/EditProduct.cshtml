@@ -2,14 +2,25 @@
 
 @{
     ViewData["Title"] = "Edit Product";
+    var currentCategory = Model.Category?.Name ?? "";
+
+    // Parse saved image paths
+    var savedImagePaths = new System.Collections.Generic.List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.ImagePathsJson) && Model.ImagePathsJson != "[]")
+    {
+        try { savedImagePaths = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(Model.ImagePathsJson) ?? new(); }
+        catch { }
+    }
+    // Fallback: single ImagePath
+    if (savedImagePaths.Count == 0 && !string.IsNullOrEmpty(Model.ImagePath) && Model.ImagePath != "/images/placeholder.png")
+        savedImagePaths.Add(Model.ImagePath);
 }
 
 <link rel="stylesheet" href="~/css/seller-dashboard.css" />
+<link rel="stylesheet" href="~/css/edit-product.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
 <div class="dashboard-wrapper">
-
-    <!-- ── Sidebar ── -->
     <nav class="sidebar">
         <div class="sidebar-header">
             <h3 class="shop-title">@ViewBag.ShopName</h3>
@@ -18,9 +29,7 @@
             <li><a href="@Url.Action("Home", "Seller", new { tab = "General" })">General</a></li>
             <li class="active">
                 <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">Product</a>
-                <ul class="sub-nav">
-                    <li class="sub-active">Edit Product</li>
-                </ul>
+                <ul class="sub-nav"><li class="sub-active">Edit Product</li></ul>
             </li>
             <li><a href="@Url.Action("Home", "Seller", new { tab = "Order" })">Order</a></li>
         </ul>
@@ -31,138 +40,566 @@
         </div>
     </nav>
 
-    <!-- ── Main Content ── -->
     <main class="content-area">
         <div class="add-product-container">
-            <h1 class="shop-title">@ViewBag.ShopName - Edit Product</h1>
+            <div class="page-header-row">
+                <h1 class="section-title">Edit Product</h1>
+                <button type="button" class="btn-preview-trigger" onclick="openPreview()">
+                    <i class="fas fa-eye"></i> Customer Preview
+                </button>
+            </div>
 
-            <form id="editForm"
-                  asp-controller="Seller"
-                  asp-action="EditProduct"
-                  method="post"
-                  enctype="multipart/form-data">
+            <div id="val-banner" class="val-banner" style="display:none;"></div>
 
-                <!-- Hidden field to pass the ProductId back -->
+            <form id="editForm" asp-controller="Seller" asp-action="EditProduct"
+                  method="post" enctype="multipart/form-data">
+
                 <input type="hidden" name="ProductId" value="@Model.ProductId" />
 
                 <div class="form-body">
 
+                    <!-- ══ BASIC INFO ══ -->
+                    <div class="form-section-label">Basic Information</div>
+
                     <div class="form-row">
-                        <label>Product Price:</label>
-                        <input type="number" name="Price" step="0.01" required value="@Model.Price" />
+                        <label>Product Name</label>
+                        <input type="text" id="field-name" name="Name"
+                               placeholder="Enter product name" value="@Model.Name" />
                     </div>
 
                     <div class="form-row">
-                        <label>Product SKU:</label>
-                        <input type="text" name="SKU" required value="@Model.SKU" />
+                        <label>Product Description <span class="desc-hint">max 3000 characters</span></label>
+                        <textarea name="Description" id="desc-field" rows="4"
+                                  placeholder="Describe your product..."
+                                  maxlength="3000" class="form-textarea"
+                                  oninput="document.getElementById('desc-count').textContent=this.value.length+' / 3000'">@Model.Description</textarea>
+                        <div class="char-count" id="desc-count">@(Model.Description?.Length ?? 0) / 3000</div>
                     </div>
 
-                    <div class="form-row">
-                        <label>Product Name:</label>
-                        <input type="text" name="Name" required value="@Model.Name" />
+                    <!-- ══ IMAGES ══ -->
+                    <div class="form-section-label">
+                        Product Images <span class="desc-hint">up to 5 · drag to reorder · first = main</span>
                     </div>
 
-                    <div class="form-row">
-                        <label>Quantity (Stock):</label>
-                        <input type="number" name="StockQuantity" min="0" required value="@Model.StockQuantity" />
+                    <!-- Large main preview -->
+                    <div class="img-main-preview" id="img-main-preview">
+                        @if (savedImagePaths.Count > 0)
+                        {
+                            <img id="img-main-display" src="@savedImagePaths[0]" alt="" style="display:block;" />
+                            <div class="img-main-empty" id="img-main-empty" style="display:none;">
+                                <i class="fas fa-image"></i><span>No image</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="img-main-empty" id="img-main-empty" style="display:flex;">
+                                <i class="fas fa-image"></i><span>No image yet</span>
+                            </div>
+                            <img id="img-main-display" src="" alt="" style="display:none;" />
+                        }
                     </div>
 
+                    <!-- Thumbnail strip -->
+                    <div class="img-thumb-strip" id="img-thumb-strip">
+                        @for (int i = 0; i < 5; i++)
+                        {
+                            var hasSaved = i < savedImagePaths.Count;
+                            var savedSrc = hasSaved ? savedImagePaths[i] : "";
+                            <div class="img-thumb-slot @(i == 0 && hasSaved ? "thumb-active" : "")"
+                                 id="thumb-@i" data-slot="@i"
+                                 draggable="true"
+                                 onclick="thumbClick(@i)"
+                                 ondragstart="dragStart(event,@i)"
+                                 ondragover="dragOver(event)"
+                                 ondrop="dragDrop(event,@i)"
+                                 ondragleave="dragLeave(event)">
+                                <input type="file" id="img-input-@i" name="ImageFiles"
+                                       accept="image/*" style="display:none;"
+                                       onchange="onFileSelected(this,@i)" />
+                                <div class="thumb-empty-inner" id="thumb-empty-@i"
+                                     style="display:@(hasSaved ? "none" : "flex");">
+                                    <i class="fas fa-plus"></i>
+                                    <span>@(i == 0 ? "Main" : "+" + (i + 1))</span>
+                                </div>
+                                <img class="thumb-preview" id="thumb-img-@i"
+                                     src="@savedSrc" alt=""
+                                     style="display:@(hasSaved ? "block" : "none");" />
+                                <button type="button" class="thumb-remove-btn" id="thumb-remove-@i"
+                                        style="display:@(hasSaved ? "flex" : "none");"
+                                        onclick="removeThumb(event,@i)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                <div class="thumb-main-badge" id="thumb-badge-@i"
+                                     style="display:@(i == 0 && hasSaved ? "block" : "none");">Main</div>
+                            </div>
+                        }
+                    </div>
+                    <p class="img-hint"><i class="fas fa-arrows-alt"></i> Drag thumbnails to reorder. First thumbnail = main image.</p>
+
+                    <!-- Hidden fields for backend -->
+                    <input type="hidden" name="SlotAssignment"     id="slot-assignment"    value="[]" />
+                    <input type="hidden" name="ExistingImageOrder" id="existing-img-order" value="@Html.Raw(Model.ImagePathsJson ?? "[]")" />
+
+                    <!-- ══ CATEGORY ══ -->
+                    <div class="form-section-label">Category</div>
                     <div class="form-row">
-                        <label>Categories:</label>
-                        <select name="Category" class="category-select" required>
-                            <option value="" disabled>Select a category</option>
-                            <option value="Fashion/Apparel">Fashion/Apparel</option>
-                            <option value="Consumer Electronics">Consumer Electronics</option>
-                            <option value="Food and Beverages">Food and Beverages</option>
-                            <option value="Beauty and Personal Care">Beauty and Personal Care</option>
-                            <option value="Home Improvement">Home Improvement</option>
-                            <option value="Other">Other</option>
+                        <select name="Category" id="field-category" class="category-select">
+                            <option value="">-- Select a category --</option>
+                            @{
+                                var cats      = new[] { "Fashion/Apparel", "Consumer Electronics", "Food and Beverages", "Beauty and Personal Care", "Home Improvement", "Other" };
+                                var catLabels = new[] { "Fashion / Apparel", "Consumer Electronics", "Food and Beverages", "Beauty and Personal Care", "Home Improvement", "Other" };
+                            }
+                            @for (int c = 0; c < cats.Length; c++)
+                            {
+                                if (cats[c] == currentCategory)
+                                {
+                                    <option value="@cats[c]" selected>@catLabels[c]</option>
+                                }
+                                else
+                                {
+                                    <option value="@cats[c]">@catLabels[c]</option>
+                                }
+                            }
                         </select>
                     </div>
 
-                    <div class="upload-section">
-                        <label>Product Image (leave blank to keep current):</label>
-                        @if (!string.IsNullOrEmpty(Model.ImagePath))
-                        {
-                            <div style="margin-bottom: 8px;">
-                                <img src="@Model.ImagePath" alt="Current image" style="max-height: 120px; border-radius: 6px;" />
-                                <p style="font-size: 12px; color: #666;">Current image</p>
-                            </div>
-                        }
-                        <label for="file-upload" class="upload-box" id="drop-zone">
-                            <img src="~/images/cloud-upload-icon.png" alt="Upload" class="upload-icon" id="preview-icon" />
-                            <span class="upload-text" id="upload-text">Upload New Image (optional)</span>
-                            <input type="file" id="file-upload" name="ImageFile"
-                                accept="image/*,video/*" style="display: none;"
-                                onchange="handleFileSelect(this)" />
-                            <span id="file-name-display" class="file-name-text"></span>
-                            <button type="button" id="remove-file-btn" class="btn-remove" style="display: none;" onclick="removeFile(event)">
-                                Remove
-                            </button>
-                        </label>
+                    <!-- ══ SALES INFO ══ -->
+                    <div class="form-section-label">Sales Information</div>
+
+                    <div class="form-row-inline">
+                        <div class="form-row" style="flex:1;">
+                            <label>Price (RM)</label>
+                            <input type="number" id="field-price" name="Price"
+                                   step="0.01" min="0" placeholder="0.00" value="@Model.Price" />
+                        </div>
+                        <div class="form-row" style="flex:1;" id="global-stock-wrap">
+                            <label>Stock Quantity <span class="desc-hint">per variation if using variations</span></label>
+                            <input type="number" id="field-stock" name="StockQuantity"
+                                   min="0" placeholder="0" value="@Model.StockQuantity" />
+                        </div>
+                        <div class="form-row" style="flex:1;">
+                            <label>SKU</label>
+                            <input type="text" name="SKU" placeholder="e.g. SKU-001" value="@Model.SKU" />
+                        </div>
                     </div>
 
-                    <div class="description-section">
-                        <label>Product Description:</label>
-                        <textarea name="Description" rows="5">@Model.Description</textarea>
-                    </div>
+                    <!-- ══ VARIATIONS ══ -->
+                    <div class="form-section-label">Variations</div>
+
+                    <div id="variation-wrapper"></div>
+
+                    <button type="button" class="btn-add-variation" onclick="addVariationGroup()">
+                        <i class="fas fa-plus"></i> Add Variation Group
+                    </button>
+
+                    <input type="hidden" name="VariationsJson" id="variations-json" value="[]" />
+                    <script>
+                        window.__savedVariations = @Html.Raw(Model.VariationsJson ?? "[]");
+                    </script>
 
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="fixed-right-actions">
-                    <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-navy-side">Cancel</a>
-                    <button type="submit" name="actionType" value="Publish" class="btn-navy-side">Save &amp; Publish</button>
-                    <button type="submit" name="actionType" value="Draft" class="btn-navy-side">Save as Draft</button>
+                <!-- ══ ACTION BAR ══ -->
+                <div class="ap-action-bar">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-ap btn-ap-cancel">Cancel</a>
+                    <div style="display:flex;gap:12px;">
+                        <button type="button" class="btn-ap btn-ap-draft"   onclick="submitForm('Draft')">Save as Draft</button>
+                        <button type="button" class="btn-ap btn-ap-publish" onclick="submitForm('Publish')">Save &amp; Publish</button>
+                    </div>
                 </div>
 
+                <input type="hidden" name="actionType" id="actionType-input" value="" />
             </form>
         </div>
     </main>
-
 </div>
 
+<!-- ══ CUSTOMER PREVIEW MODAL ══ -->
+@await Html.PartialAsync("_ProductPreviewModal")
+
 <script>
-    function handleFileSelect(input) {
-        const display = document.getElementById('file-name-display');
-        const removeBtn = document.getElementById('remove-file-btn');
-        const uploadText = document.getElementById('upload-text');
-        const icon = document.getElementById('preview-icon');
+// ════════════════════════════════════════════════════════════
+// IMAGE MANAGEMENT
+// Slots hold: { src: string|null, type: 'existing'|'new', path: string|null, file: File|null }
+// ════════════════════════════════════════════════════════════
 
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
-            display.innerText = "Selected: " + file.name;
+// Initialise slots from server-rendered saved paths
+const _savedPaths = @Html.Raw(
+    System.Text.Json.JsonSerializer.Serialize(savedImagePaths)
+);
 
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    icon.src = e.target.result;
-                    icon.style.width = "150px";
-                    icon.style.height = "auto";
-                };
-                reader.readAsDataURL(file);
-            }
+const slots = Array.from({ length: 5 }, (_, i) => {
+    if (i < _savedPaths.length && _savedPaths[i]) {
+        return { src: _savedPaths[i], type: 'existing', path: _savedPaths[i], file: null };
+    }
+    return { src: null, type: null, path: null, file: null };
+});
 
-            removeBtn.style.display = "inline-block";
-            uploadText.style.display = "none";
+let activeThumb = _savedPaths.length > 0 ? 0 : -1;
+let newFileCounter = 0; // counts new uploads to assign unique index
+
+function onFileSelected(input, slotIdx) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+        slots[slotIdx] = { src: e.target.result, type: 'new', path: null, file, newIndex: newFileCounter++ };
+        renderThumbs();
+        setMainDisplay(slotIdx);
+        updateSlotAssignment();
+    };
+    reader.readAsDataURL(file);
+}
+
+function thumbClick(slotIdx) {
+    if (slots[slotIdx].src) {
+        setMainDisplay(slotIdx);
+    } else {
+        document.getElementById('img-input-' + slotIdx).click();
+    }
+}
+
+function removeThumb(event, slotIdx) {
+    event.stopPropagation();
+    slots[slotIdx] = { src: null, type: null, path: null, file: null };
+    document.getElementById('img-input-' + slotIdx).value = '';
+    renderThumbs();
+    const first = slots.findIndex(s => s.src);
+    if (first >= 0) setMainDisplay(first);
+    else clearMainDisplay();
+    updateSlotAssignment();
+}
+
+function setMainDisplay(slotIdx) {
+    const display = document.getElementById('img-main-display');
+    const empty   = document.getElementById('img-main-empty');
+    activeThumb   = slotIdx;
+    display.src   = slots[slotIdx].src;
+    display.style.display = 'block';
+    empty.style.display   = 'none';
+    renderThumbs();
+}
+
+function clearMainDisplay() {
+    const display = document.getElementById('img-main-display');
+    const empty   = document.getElementById('img-main-empty');
+    display.src   = '';
+    display.style.display = 'none';
+    empty.style.display   = 'flex';
+    activeThumb = -1;
+    renderThumbs();
+}
+
+function renderThumbs() {
+    const firstFilled = slots.findIndex(s => s.src);
+    for (let i = 0; i < 5; i++) {
+        const thumbEl  = document.getElementById('thumb-' + i);
+        const emptyEl  = document.getElementById('thumb-empty-' + i);
+        const imgEl    = document.getElementById('thumb-img-' + i);
+        const removeEl = document.getElementById('thumb-remove-' + i);
+        const badgeEl  = document.getElementById('thumb-badge-' + i);
+
+        if (slots[i].src) {
+            imgEl.src = slots[i].src;
+            imgEl.style.display    = 'block';
+            emptyEl.style.display  = 'none';
+            removeEl.style.display = 'flex';
+        } else {
+            imgEl.style.display    = 'none';
+            emptyEl.style.display  = 'flex';
+            removeEl.style.display = 'none';
+        }
+
+        badgeEl.style.display  = (slots[i].src && i === firstFilled) ? 'block' : 'none';
+        thumbEl.classList.toggle('thumb-active', i === activeThumb && !!slots[i].src);
+    }
+}
+
+// ── DRAG TO REORDER ───────────────────────────────────────────
+let dragFromSlot = -1;
+
+function dragStart(event, slotIdx) {
+    if (!slots[slotIdx].src) { event.preventDefault(); return; }
+    dragFromSlot = slotIdx;
+    event.dataTransfer.effectAllowed = 'move';
+}
+function dragOver(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+function dragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+}
+function dragDrop(event, toSlot) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    if (dragFromSlot < 0 || dragFromSlot === toSlot) return;
+
+    const tmp = { ...slots[dragFromSlot] };
+    slots[dragFromSlot] = { ...slots[toSlot] };
+    slots[toSlot] = tmp;
+
+    if (activeThumb === dragFromSlot)     activeThumb = toSlot;
+    else if (activeThumb === toSlot)      activeThumb = dragFromSlot;
+
+    renderThumbs();
+    updateSlotAssignment();
+
+    // Update main display to follow the swap if active thumb was involved
+    const current = slots[activeThumb];
+    if (current && current.src) {
+        document.getElementById('img-main-display').src = current.src;
+    }
+    dragFromSlot = -1;
+}
+
+// ── SLOT ASSIGNMENT ────────────────────────────────────────────
+// Tells the backend: for each position, whether it's an existing image (keep path)
+// or a new upload (use newIndex to match upload order)
+let _newUploadOrder = []; // tracks order of new file uploads for index mapping
+
+function updateSlotAssignment() {
+    const assignment = [];
+    let newIdx = 0;
+    const keptPaths = [];
+
+    for (let i = 0; i < 5; i++) {
+        const s = slots[i];
+        if (!s.src) continue;
+        if (s.type === 'existing') {
+            assignment.push({ slot: i, source: 'existing', path: s.path });
+            keptPaths.push(s.path);
+        } else if (s.type === 'new') {
+            assignment.push({ slot: i, source: 'new', index: newIdx++ });
         }
     }
 
-    function removeFile(event) {
-        event.preventDefault();
-        event.stopPropagation();
+    document.getElementById('slot-assignment').value    = JSON.stringify(assignment);
+    document.getElementById('existing-img-order').value = JSON.stringify(keptPaths);
+}
 
-        const input = document.getElementById('file-upload');
-        const display = document.getElementById('file-name-display');
-        const removeBtn = document.getElementById('remove-file-btn');
-        const uploadText = document.getElementById('upload-text');
-        const icon = document.getElementById('preview-icon');
+function hasImage() {
+    return slots.some(s => s.src !== null);
+}
 
-        input.value = "";
-        display.innerText = "";
-        removeBtn.style.display = "none";
-        uploadText.style.display = "block";
-        icon.src = "/images/cloud-upload-icon.png";
-        icon.style.width = "60px";
+function getFirstImageSrc() {
+    return slots.find(s => s.src)?.src ?? null;
+}
+
+// ════════════════════════════════════════════════════════════
+// VARIATIONS
+// ════════════════════════════════════════════════════════════
+let groupCount = 0;
+let groups = {};
+
+function addVariationGroup(existingName = '', existingValues = []) {
+    const id = groupCount++;
+    groups[id] = {
+        name: existingName,
+        values: existingValues.map(v => ({
+            ...v,
+            imageSrc:  v.imagePath || null,
+            imageFile: null
+        }))
+    };
+
+    const wrapper = document.getElementById('variation-wrapper');
+    const div = document.createElement('div');
+    div.className = 'var-group';
+    div.id = 'vg-' + id;
+
+    div.innerHTML = `
+        <div class="var-group-header">
+            <input class="var-name-input" type="text"
+                   placeholder="Variation name (e.g. Flavour, Size)"
+                   value="${escHtml(existingName)}"
+                   oninput="groups[${id}].name=this.value; serializeVariations()" />
+            <button type="button" class="btn-remove-group" onclick="removeGroup(${id})">
+                <i class="fas fa-trash"></i> Remove
+            </button>
+        </div>
+        <div class="chip-area" id="chips-${id}"></div>
+        <div class="add-value-row">
+            <input type="text"   id="val-input-${id}"   placeholder="Value (e.g. Original, Chicken)" />
+            <input type="number" class="stock-input" id="stock-input-${id}" placeholder="Stock" min="0" />
+            <button type="button" class="btn-add-chip" onclick="addChip(${id})">+ Add</button>
+        </div>`;
+
+    wrapper.appendChild(div);
+    div.querySelector('#val-input-' + id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); addChip(id); }
+    });
+    if (existingValues.length > 0) renderChips(id);
+    updateGlobalStockVisibility();
+}
+
+function removeGroup(id) {
+    document.getElementById('vg-' + id).remove();
+    delete groups[id];
+    serializeVariations();
+    updateGlobalStockVisibility();
+}
+
+function addChip(groupId) {
+    const valInput   = document.getElementById('val-input-' + groupId);
+    const stockInput = document.getElementById('stock-input-' + groupId);
+    const label = valInput.value.trim();
+    const stock = parseInt(stockInput.value) || 0;
+    if (!label) { valInput.focus(); return; }
+    groups[groupId].values.push({ label, stock, imageSrc: null, imageFile: null });
+    renderChips(groupId);
+    valInput.value = ''; stockInput.value = '';
+    valInput.focus();
+    serializeVariations();
+}
+
+function removeChip(groupId, index) {
+    groups[groupId].values.splice(index, 1);
+    renderChips(groupId);
+    serializeVariations();
+}
+
+function triggerVariationImageUpload(groupId, valueIdx) {
+    document.getElementById(`var-img-input-${groupId}-${valueIdx}`)?.click();
+}
+
+function onVariationImageSelected(input, groupId, valueIdx) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        groups[groupId].values[valueIdx].imageSrc  = e.target.result;
+        groups[groupId].values[valueIdx].imageFile = input.files[0];
+        renderChips(groupId);
+        serializeVariations();
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function removeVariationImage(groupId, valueIdx) {
+    groups[groupId].values[valueIdx].imageSrc  = null;
+    groups[groupId].values[valueIdx].imageFile = null;
+    const inp = document.getElementById(`var-img-input-${groupId}-${valueIdx}`);
+    if (inp) inp.value = '';
+    renderChips(groupId);
+    serializeVariations();
+}
+
+function renderChips(groupId) {
+    const area = document.getElementById('chips-' + groupId);
+    area.innerHTML = '';
+    groups[groupId].values.forEach((v, i) => {
+        const chip = document.createElement('div');
+        chip.className = 'chip-card';
+        const imgSection = v.imageSrc
+            ? `<div class="chip-img-wrap">
+                   <img src="${v.imageSrc}" class="chip-img-preview" />
+                   <button type="button" class="chip-img-remove" onclick="removeVariationImage(${groupId},${i})">
+                       <i class="fas fa-times"></i>
+                   </button>
+               </div>`
+            : `<div class="chip-img-wrap chip-img-empty" onclick="triggerVariationImageUpload(${groupId},${i})">
+                   <i class="fas fa-camera"></i><span>Add photo</span>
+               </div>`;
+
+        chip.innerHTML = `
+            ${imgSection}
+            <input type="file" id="var-img-input-${groupId}-${i}" name="VarImg_${groupId}_${i}"
+                   accept="image/*" style="display:none;"
+                   onchange="onVariationImageSelected(this,${groupId},${i})" />
+            <div class="chip-info">
+                <span class="chip-label">${escHtml(v.label)}</span>
+                <span class="chip-stock">Qty: ${v.stock}</span>
+            </div>
+            <button type="button" class="chip-remove" onclick="removeChip(${groupId},${i})">
+                <i class="fas fa-times"></i>
+            </button>`;
+        area.appendChild(chip);
+    });
+}
+
+function escHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function serializeVariations() {
+    const data = Object.values(groups)
+        .filter(g => g.name || g.values.length > 0)
+        .map(g => ({
+            name: g.name,
+            values: g.values.map(v => ({
+                label:     v.label,
+                stock:     v.stock,
+                imagePath: v.type === 'existing' ? (v.path || '') : (v.imageSrc || '')
+            }))
+        }));
+    document.getElementById('variations-json').value = JSON.stringify(data);
+}
+
+function updateGlobalStockVisibility() {
+    const hasGroups = Object.keys(groups).length > 0;
+    document.getElementById('global-stock-wrap').style.opacity = hasGroups ? '0.4' : '1';
+    document.getElementById('field-stock').disabled = hasGroups;
+    if (hasGroups) document.getElementById('field-stock').value = 0;
+}
+
+// ── Restore saved variations on load ──────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const saved = window.__savedVariations;
+        if (Array.isArray(saved) && saved.length > 0) {
+            saved.forEach(g => addVariationGroup(g.name || '', g.values || []));
+            serializeVariations();
+        }
+    } catch(e) { console.error('Variation restore failed:', e); }
+    renderThumbs();
+    updateSlotAssignment();
+});
+
+// ════════════════════════════════════════════════════════════
+// FORM SUBMIT
+// ════════════════════════════════════════════════════════════
+function submitForm(type) {
+    serializeVariations();
+    updateSlotAssignment();
+
+    const banner = document.getElementById('val-banner');
+    banner.style.display = 'none';
+
+    const name     = document.getElementById('field-name').value.trim();
+    const price    = parseFloat(document.getElementById('field-price').value) || 0;
+    const category = document.getElementById('field-category').value;
+    const imgOk    = hasImage();
+    const hasExistingImg = @(!string.IsNullOrEmpty(Model.ImagePath) && Model.ImagePath != "/images/placeholder.png" ? "true" : "false");
+    const errors = [];
+
+    if (type === 'Publish') {
+        if (!name)                       errors.push('Product Name is required.');
+        if (price <= 0)                  errors.push('Price must be greater than 0.');
+        if (!category)                   errors.push('Please select a Category.');
+        if (!imgOk && !hasExistingImg)   errors.push('Please upload at least one image.');
+    } else {
+        if (!name && !imgOk && !hasExistingImg && !category)
+            errors.push('Please fill in at least one field before saving as draft.');
     }
+
+    if (errors.length > 0) {
+        banner.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + errors.join('<br>');
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    document.getElementById('actionType-input').value = type;
+    document.getElementById('editForm').submit();
+}
+
+// ════════════════════════════════════════════════════════════
+// CUSTOMER PREVIEW
+// ════════════════════════════════════════════════════════════
+function openPreview() {
+    const imgSrcs = slots.map(s => s.src).filter(Boolean);
+    buildPreviewModal(imgSrcs);
+    document.getElementById('preview-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
 </script>

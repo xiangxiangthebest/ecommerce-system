@@ -1,17 +1,15 @@
-/* Force the dashboard to ignore layout padding and fill the screen */
 .dashboard-wrapper {
     display: flex;
-    position: fixed; /* Fixes to the viewport */
+    position: fixed; 
     top: 0;
     left: 0;
-    width: 100vw;    /* Full screen width */
-    height: 100vh;   /* Full screen height */
+    width: 100vw;    
+    height: 100vh;   
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Prevents double scrollbars */
+    overflow: hidden; 
 }
 
-/* Sidebar stays a fixed size */
 .sidebar {
     width: 260px;
     height: 100vh;
@@ -20,7 +18,6 @@
     flex-direction: column;
 }
 
-/* Content area fills the rest of the 100% space */
 .content-area {
     flex-grow: 1;
     height: 100vh;
@@ -78,10 +75,10 @@
 }
 
 .sidebar-header h3 {
-    color: #ffffff; /* This changes the shop name to white */
-    font-family: 'Syne', sans-serif; /* Keeps your branding font */
+    color: #ffffff; 
+    font-family: 'Syne', sans-serif; 
     font-weight: 700;
-    font-size: 24px; /* You can adjust this size to fit the sidebar better */
+    font-size: 24px; 
     margin-top: 20px;
     line-height: 1.2;
 }
@@ -105,9 +102,8 @@
     gap: 15px;
 }
 
-/* Navy Search Box */
 .search-box {
-    background-color: #1e1b4b; /* Navy color from your image */
+    background-color: #1e1b4b;
     border-radius: 10px;
     padding: 8px 15px;
     display: flex;
@@ -141,7 +137,6 @@
 
 .btn-add-product:hover { background-color: #4739b0; }
 
-/* --- Product Grid & Cards --- */
 .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -164,11 +159,11 @@
 }
 
 .empty-state-full-width {
-    grid-column: 1 / -1; /* Forces the text to stay on one line across all columns */
+    grid-column: 1 / -1; 
     padding: 20px 0;
     font-size: 16px;
     color: #5b587d;
-    text-align: left; /* Aligns with your "Your Product" title */
+    text-align: left; 
 }
 
 .product-image-placeholder {
@@ -198,18 +193,18 @@
 .current-price {
     font-size: 18px;
     font-weight: 700;
-    color: #ff4d2d;
+    color: #4f46e5;
 }
 
 .discount-tag {
     background: #ffe5e5;
-    color: #ff4d2d;
+    color: #4f46e5;
     font-size: 11px;
     padding: 2px 4px;
 }
 
 .btn-navy {
-    background-color: #1e1b4b; /* Navy from your design[cite: 39] */
+    background-color: #1e1b4b; 
     color: white;
     border: none;
     padding: 10px 25px;
@@ -240,9 +235,8 @@
     position: relative;
 }
 
-/* --- Spaced Form Rows --- */
 .form-row {
-    margin-bottom: 25px; /* More vertical space between fields */
+    margin-bottom: 25px; 
 }
 
 .form-row label {
@@ -256,7 +250,7 @@
 
 .form-row input, 
 .description-section textarea {
-    width: 100%; /* Full width alignment */
+    width: 100%; 
     padding: 12px 15px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -301,37 +295,33 @@
     font-weight: 600;
 }
 
-/* Sidebar sub-menu styling */
 .sub-nav {
     list-style: none;
-    padding-left: 30px; /* Indent it under 'Product' */
+    padding-left: 30px; 
     margin-top: 10px;
 }
 
 .sub-active {
-    color: #9a98b6; /* Lighter color for sub-items */
+    color: #9a98b6; 
     font-size: 14px;
     font-weight: 500;
     padding: 5px 0;
     display: block;
 }
 
-/* Optional: Add a small dot or dash before sub-items */
 .sub-active::before {
     content: "• ";
     margin-right: 5px;
 }
 
-/* --- Action Buttons Alignment --- */
 .action-buttons {
     display: flex;
-    justify-content: space-between; /* Spreads buttons like the image */
+    justify-content: space-between; 
     margin: 30px 0 50px 0;
 }
 
-/* --- Spaced Form Rows --- */
 .form-row {
-    margin-bottom: 25px; /* More vertical space between fields */
+    margin-bottom: 25px; 
 }
 
 .form-row label {
@@ -345,7 +335,7 @@
 
 .form-row input, 
 .description-section textarea {
-    width: 100%; /* Full width alignment */
+    width: 100%; 
     padding: 12px 15px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -374,7 +364,7 @@
 }
 
 .category-select {
-    width: 100%; /* Full width alignment */
+    width: 100%; 
     padding: 12px 15px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -398,14 +388,14 @@
 
 .btn-remove {
     margin-top: 15px;
-    background-color: #ff4d4d; /* Red for 'remove' action */
+    background-color: #ff4d4d; 
     color: white;
     border: none;
     padding: 8px 15px;
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    z-index: 10; /* Ensure it stays clickable above the label */
+    z-index: 10; 
 }
 
 .btn-remove:hover {
@@ -418,7 +408,6 @@
     color: #1e1b4b;
 }
 
-/* seller-dashboard.css additions */
 .product-actions {
     margin-top: 15px;
     border-top: 1px solid #eee;
@@ -442,7 +431,6 @@
     background-color: #cc0000;
 }
 
-/* Ensure images/videos fill their container */
 .product-image-placeholder img, 
 .product-image-placeholder video {
     width: 100%;
@@ -455,7 +443,7 @@
     color: white;
     border: none;
     padding: 15px 30px;
-    border-radius: 25px; /* Fully rounded like your image */
+    border-radius: 25px; 
     font-weight: 700;
     font-size: 16px;
     text-align: center;
@@ -471,7 +459,6 @@
     transform: scale(1.05);
 }
 
-/* Adjust the main form layout[cite: 24] */
 .form-body {
     display: flex;
     flex-direction: column;
@@ -481,7 +468,7 @@
 .current-price {
     font-size: 20px;
     font-weight: 800;
-    color: #ff4d2d; /* Orange-red color for the price */
+    color: #4f46e5; 
     margin: 5px 0;
     display: block;
 }
@@ -503,7 +490,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #b0bec5;          /* muted colour */
+    color: #b0bec5;         
     font-size: 0.95rem;
     user-select: none;
 }
@@ -512,7 +499,6 @@
     font-size: 0.8rem;
 }
  
-/* ── Pending approval banner ─────────────────────────────────── */
 .pending-approval-banner {
     display: flex;
     gap: 20px;
@@ -568,7 +554,6 @@
     line-height: 1.55;
 }
  
-/* ── Alert banners (flash messages inside seller dashboard) ───── */
 .alert-banner {
     display: flex;
     align-items: center;
@@ -582,7 +567,6 @@
 .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
 .alert-error   { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
  
-/* ── Orders table (Order tab) ────────────────────────────────── */
 .orders-table {
     width: 100%;
     border-collapse: collapse;
@@ -609,7 +593,6 @@
 .orders-table tbody tr:last-child td { border-bottom: none; }
 .orders-table tbody tr:hover { background: #f5f5f5; }
  
-/* ── Status badge ─────────────────────────────────────────────── */
 .status-badge {
     display: inline-block;
     padding: 4px 10px;
@@ -626,7 +609,6 @@
 .status-cancelled,
 .status-canceled  { background: #ffebee; color: #c62828; }
  
-/* ── Order status select & update button ─────────────────────── */
 .status-select {
     padding: 5px 8px;
     border: 1px solid #c5cae9;

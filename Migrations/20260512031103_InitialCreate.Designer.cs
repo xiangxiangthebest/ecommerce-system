@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260509165820_InitialCreate")]
+    [Migration("20260512031103_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -140,6 +140,10 @@ namespace ecommerce_system.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImagePathsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDraft")
                         .HasColumnType("INTEGER");
 
@@ -159,6 +163,10 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("StockQuantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("VariationsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("ProductId");
 

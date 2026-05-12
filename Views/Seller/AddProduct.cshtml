@@ -4,10 +4,9 @@
 
 <link rel="stylesheet" href="~/css/seller-dashboard.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="~/css/add-product.css" />
 
 <div class="dashboard-wrapper">
-
-    <!-- ── Sidebar ── -->
     <nav class="sidebar">
         <div class="sidebar-header">
             <h3 class="shop-title">@ViewBag.ShopName</h3>
@@ -16,9 +15,7 @@
             <li><a href="@Url.Action("Home", "Seller", new { tab = "General" })">General</a></li>
             <li class="active">
                 <a href="@Url.Action("Home", "Seller", new { tab = "Product" })">Product</a>
-                <ul class="sub-nav">
-                    <li class="sub-active">Add New Product</li>
-                </ul>
+                <ul class="sub-nav"><li class="sub-active">Add New Product</li></ul>
             </li>
             <li><a href="@Url.Action("Home", "Seller", new { tab = "Order" })">Order</a></li>
         </ul>
@@ -29,45 +26,63 @@
         </div>
     </nav>
 
-    <!-- ── Main Content ── -->
     <main class="content-area">
         <div class="add-product-container">
-            <h1 class="shop-title">@ViewBag.ShopName - Add Product</h1>
+            <h1 class="section-title" style="margin-bottom:32px;">Add New Product</h1>
 
-            <form id="productForm"
-                  asp-controller="Seller"
-                  asp-action="AddProduct"
-                  method="post"
-                  enctype="multipart/form-data">
+            <!-- Validation error banner -->
+            <div id="val-banner" class="val-banner" style="display:none;"></div>
+
+            <form id="productForm" asp-controller="Seller" asp-action="AddProduct"
+                  method="post" enctype="multipart/form-data">
 
                 <div class="form-body">
 
+                    <!-- ══ BASIC INFO ══ -->
+                    <div class="form-section-label">Basic Information</div>
+
                     <div class="form-row">
-                        <label>Product Price:</label>
-                        <input type="number" name="Price" step="0.01" required placeholder="0.00" />
+                        <label>Product Name</label>
+                        <input type="text" id="field-name" name="Name" placeholder="Enter product name" />
                     </div>
 
                     <div class="form-row">
-                        <label>Product SKU:</label>
-                        <input type="text" name="SKU" required />
+                        <label>Product Description <span class="desc-hint">max 3000 characters</span></label>
+                        <textarea name="Description" id="desc-field" rows="4"
+                                  placeholder="Describe your product..."
+                                  maxlength="3000" class="form-textarea"
+                                  oninput="document.getElementById('desc-count').textContent=this.value.length+' / 3000'"></textarea>
+                        <div class="char-count" id="desc-count">0 / 3000</div>
                     </div>
 
-                    <div class="form-row">
-                        <label>Product Name:</label>
-                        <input type="text" name="Name" required />
+                    <!-- ══ IMAGES ══ -->
+                    <div class="form-section-label">Product Images <span class="desc-hint">up to 5 images</span></div>
+
+                    <div class="multi-image-grid" id="image-grid">
+                        @for (int i = 0; i < 5; i++)
+                        {
+                            <div class="img-slot" id="slot-@i" onclick="triggerUpload(@i)">
+                                <input type="file" id="img-input-@i" name="ImageFiles"
+                                       accept="image/*" style="display:none;"
+                                       onchange="previewImage(this,@i)" />
+                                <div class="img-slot-inner" id="slot-inner-@i">
+                                    <i class="fas fa-plus img-slot-icon"></i>
+                                    <span class="img-slot-text">@(i == 0 ? "Main" : "Image " + (i + 1))</span>
+                                </div>
+                                <button type="button" class="img-slot-remove" id="remove-@i"
+                                        style="display:none;" onclick="removeImage(event,@i)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        }
                     </div>
 
-                    <!-- Stock Quantity -->
+                    <!-- ══ CATEGORY ══ -->
+                    <div class="form-section-label">Category</div>
                     <div class="form-row">
-                        <label>Quantity (Stock):</label>
-                        <input type="number" name="StockQuantity" min="0" required placeholder="0" />
-                    </div>
-
-                    <div class="form-row">
-                        <label>Categories:</label>
-                        <select name="Category" class="category-select" required>
-                            <option value="" disabled selected>Select a category</option>
-                            <option value="Fashion/Apparel">Fashion/Apparel</option>
+                        <select name="Category" id="field-category" class="category-select">
+                            <option value="">-- Select a category --</option>
+                            <option value="Fashion/Apparel">Fashion / Apparel</option>
                             <option value="Consumer Electronics">Consumer Electronics</option>
                             <option value="Food and Beverages">Food and Beverages</option>
                             <option value="Beauty and Personal Care">Beauty and Personal Care</option>
@@ -76,82 +91,237 @@
                         </select>
                     </div>
 
-                    <div class="upload-section">
-                        <label>Product Image / Video:</label>
-                        <label for="file-upload" class="upload-box" id="drop-zone">
-                            <img src="~/images/cloud-upload-icon.png" alt="Upload" class="upload-icon" id="preview-icon" />
-                            <span class="upload-text" id="upload-text">Upload Product Image or Video</span>
-                            <input type="file" id="file-upload" name="ImageFile"
-                                accept="image/*,video/*" style="display: none;"
-                                onchange="handleFileSelect(this)" />
-                            <span id="file-name-display" class="file-name-text"></span>
-                            <button type="button" id="remove-file-btn" class="btn-remove" style="display: none;" onclick="removeFile(event)">
-                                Remove Image
-                            </button>
-                        </label>
+                    <!-- ══ SALES INFO ══ -->
+                    <div class="form-section-label">Sales Information</div>
+
+                    <div class="form-row-inline">
+                        <div class="form-row" style="flex:1;">
+                            <label>Price (RM)</label>
+                            <input type="number" id="field-price" name="Price" step="0.01" min="0" placeholder="0.00" />
+                        </div>
+                        <div class="form-row" style="flex:1;" id="global-stock-wrap">
+                            <label>Stock Quantity <span class="desc-hint">set per variation if using variations</span></label>
+                            <input type="number" id="field-stock" name="StockQuantity" min="0" placeholder="0" />
+                        </div>
+                        <div class="form-row" style="flex:1;">
+                            <label>SKU</label>
+                            <input type="text" name="SKU" placeholder="e.g. SKU-001" />
+                        </div>
                     </div>
 
-                    <div class="description-section">
-                        <label>Product Description:</label>
-                        <textarea name="Description" rows="5"></textarea>
-                    </div>
+                    <!-- ══ VARIATIONS ══ -->
+                    <div class="form-section-label">Variations</div>
+
+                    <div id="variation-wrapper"></div>
+
+                    <button type="button" class="btn-add-variation" onclick="addVariationGroup()">
+                        <i class="fas fa-plus"></i> Add Variation Group
+                    </button>
+
+                    <input type="hidden" name="VariationsJson" id="variations-json" value="[]" />
 
                 </div>
 
-                <!-- Action Buttons — name="actionType" tells controller which was clicked -->
-                <div class="fixed-right-actions">
-                    <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-navy-side">Cancel</a>
-                    <button type="submit" name="actionType" value="Publish" class="btn-navy-side">Save &amp; Publish</button>
-                    <button type="submit" name="actionType" value="Draft" class="btn-navy-side">Save as Draft</button>
+                <!-- ══ ACTION BAR ══ -->
+                <div class="ap-action-bar">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-ap btn-ap-cancel">Cancel</a>
+                    <div style="display:flex;gap:12px;">
+                        <button type="button" class="btn-ap btn-ap-draft" onclick="submitForm('Draft')">Save as Draft</button>
+                        <button type="button" class="btn-ap btn-ap-publish" onclick="submitForm('Publish')">Save &amp; Publish</button>
+                    </div>
                 </div>
 
+                <input type="hidden" name="actionType" id="actionType-input" value="" />
             </form>
         </div>
     </main>
-
 </div>
 
 <script>
-    function handleFileSelect(input) {
-        const display = document.getElementById('file-name-display');
-        const removeBtn = document.getElementById('remove-file-btn');
-        const uploadText = document.getElementById('upload-text');
-        const icon = document.getElementById('preview-icon');
+// ── Images ────────────────────────────────────────────────
+function triggerUpload(i) { document.getElementById('img-input-' + i).click(); }
 
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
-            display.innerText = "Selected: " + file.name;
+function previewImage(input, i) {
+    if (!input.files || !input.files[0]) return;
+    const slot = document.getElementById('slot-' + i);
+    const inner = document.getElementById('slot-inner-' + i);
+    const rmBtn = document.getElementById('remove-' + i);
+    const old = slot.querySelector('img.preview');
+    if (old) old.remove();
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = document.createElement('img');
+        img.src = e.target.result; img.className = 'preview';
+        slot.insertBefore(img, inner);
+        inner.style.display = 'none'; rmBtn.style.display = 'flex';
+    };
+    reader.readAsDataURL(input.files[0]);
+}
 
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    icon.src = e.target.result;
-                    icon.style.width = "150px";
-                    icon.style.height = "auto";
-                };
-                reader.readAsDataURL(file);
-            }
+function removeImage(event, i) {
+    event.stopPropagation();
+    document.getElementById('img-input-' + i).value = '';
+    const slot = document.getElementById('slot-' + i);
+    const inner = document.getElementById('slot-inner-' + i);
+    const rmBtn = document.getElementById('remove-' + i);
+    const old = slot.querySelector('img.preview');
+    if (old) old.remove();
+    inner.style.display = 'flex'; rmBtn.style.display = 'none';
+}
 
-            removeBtn.style.display = "inline-block";
-            uploadText.style.display = "none";
+function hasImage() {
+    for (let i = 0; i < 5; i++) {
+        const inp = document.getElementById('img-input-' + i);
+        if (inp && inp.files && inp.files.length > 0) return true;
+    }
+    return false;
+}
+
+// ── Variations ────────────────────────────────────────────
+let groupCount = 0;
+let groups = {}; // groupId -> { name, values: [{label, stock}] }
+
+// Add default values (= '' and = []) to prevent "undefined" errors
+function addVariationGroup(existingName = '', existingValues = []) {
+    const id = groupCount++;
+    
+    groups[id] = { name: existingName, values: existingValues };
+
+    const wrapper = document.getElementById('variation-wrapper');
+    const div = document.createElement('div');
+    div.className = 'var-group';
+    div.id = 'vg-' + id;
+    
+    div.innerHTML = `
+        <div class="var-group-header">
+            <input class="var-name-input" type="text"
+                   placeholder="Variation name (e.g. Flavour, Size)"
+                   value="${escHtml(existingName)}" 
+                   oninput="groups[${id}].name=this.value; serializeVariations()" />
+            <button type="button" class="btn-remove-group" onclick="removeGroup(${id})">
+                 <i class="fas fa-trash"></i> Remove
+            </button>
+        </div>
+        <div class="chip-area" id="chips-${id}"></div>
+        <div class="add-value-row">
+            <input type="text" id="val-input-${id}" placeholder="Value (e.g. Original, Chicken)" />
+            <input type="number" class="stock-input" id="stock-input-${id}" placeholder="Stock" min="0" />
+            <button type="button" class="btn-add-chip" onclick="addChip(${id})">+ Add</button>
+        </div>`;
+    
+    wrapper.appendChild(div);
+
+    div.querySelector('#val-input-' + id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); addChip(id); }
+    });
+
+    if (existingValues.length > 0) {
+        renderChips(id);
+    }
+
+    updateGlobalStockVisibility();
+}
+
+function removeGroup(id) {
+    document.getElementById('vg-' + id).remove();
+    delete groups[id];
+    serializeVariations();
+    updateGlobalStockVisibility();
+}
+
+function addChip(groupId) {
+    const valInput = document.getElementById('val-input-' + groupId);
+    const stockInput = document.getElementById('stock-input-' + groupId);
+    const label = valInput.value.trim();
+    const stock = parseInt(stockInput.value) || 0;
+    if (!label) { valInput.focus(); return; }
+
+    groups[groupId].values.push({ label, stock });
+    renderChips(groupId);
+    valInput.value = ''; stockInput.value = '';
+    valInput.focus();
+    serializeVariations();
+}
+
+function removeChip(groupId, index) {
+    groups[groupId].values.splice(index, 1);
+    renderChips(groupId);
+    serializeVariations();
+}
+
+function renderChips(groupId) {
+    const area = document.getElementById('chips-' + groupId);
+    area.innerHTML = '';
+    groups[groupId].values.forEach((v, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `
+            <span class="chip-label">${escHtml(v.label)}</span>
+            <span class="chip-stock">Qty: ${v.stock}</span>
+            <button type="button" class="chip-remove" onclick="removeChip(${groupId},${i})">
+                <i class="fas fa-times"></i>
+            </button>`;
+        area.appendChild(chip);
+    });
+}
+
+function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function serializeVariations() {
+    const data = Object.values(groups).filter(g => g.name || g.values.length > 0);
+    document.getElementById('variations-json').value = JSON.stringify(data);
+}
+
+function updateGlobalStockVisibility() {
+    const hasGroups = Object.keys(groups).length > 0;
+    const stockField = document.getElementById('field-stock');
+    const stockWrap = document.getElementById('global-stock-wrap');
+
+    if (hasGroups) {
+        stockWrap.style.opacity = '0.4';
+        stockField.disabled = true;
+        stockField.value = 0; 
+    } else {
+        stockWrap.style.opacity = '1';
+        stockField.disabled = false;
+    }
+}
+
+// ── Form submission with validation ───────────────────────
+function submitForm(type) {
+    serializeVariations();
+    const banner = document.getElementById('val-banner');
+    banner.style.display = 'none';
+
+    const name = document.getElementById('field-name').value.trim();
+    const price = parseFloat(document.getElementById('field-price').value) || 0;
+    const category = document.getElementById('field-category').value;
+    const imgPresent = hasImage();
+    const errors = [];
+
+    if (type === 'Publish') {
+        // All fields required for publish
+        if (!name)     errors.push('Product Name is required.');
+        if (price <= 0) errors.push('Price must be greater than 0.');
+        if (!category) errors.push('Please select a Category.');
+        if (!imgPresent) errors.push('Please upload at least one image.');
+    } else {
+        // Draft: at least one of Name, Image, or Category
+        if (!name && !imgPresent && !category) {
+            errors.push('Please fill in at least one field: Product Name, an Image, or a Category before saving as draft.');
         }
     }
 
-    function removeFile(event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const input = document.getElementById('file-upload');
-        const display = document.getElementById('file-name-display');
-        const removeBtn = document.getElementById('remove-file-btn');
-        const uploadText = document.getElementById('upload-text');
-        const icon = document.getElementById('preview-icon');
-
-        input.value = "";
-        display.innerText = "";
-        removeBtn.style.display = "none";
-        uploadText.style.display = "block";
-        icon.src = "/images/cloud-upload-icon.png";
-        icon.style.width = "60px";
+    if (errors.length > 0) {
+        banner.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + errors.join('<br>');
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
     }
+
+    document.getElementById('actionType-input').value = type;
+    document.getElementById('productForm').submit();
+}
 </script>

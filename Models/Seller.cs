@@ -2,7 +2,6 @@ namespace EcommerceSystem.Models
 {
     public class Seller : User
     {
-        // REMOVED: UserId (It is already inherited from the User class)
 
         public string NRICNumber { get; set; } = string.Empty;
         public string State { get; set; } = string.Empty;
