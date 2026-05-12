@@ -390,3 +390,27 @@
     font-size: 14px;
     font-weight: 600;
 }
+
+.cover-image-wrap { margin-bottom: 8px; }
+
+.cover-slot-large {
+    width: 100%;
+    max-width: 380px;
+    height: 380px;
+    border-radius: 14px !important;
+    cursor: pointer;
+}
+
+.cover-empty-inner {
+    flex-direction: column;
+    gap: 10px;
+    color: #9a98b6;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.cover-empty-inner .img-hint {
+    font-size: 11px;
+    color: #b0bec5;
+    margin: 0;
+}

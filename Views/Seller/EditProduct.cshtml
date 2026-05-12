@@ -77,32 +77,53 @@
                         <div class="char-count" id="desc-count">@(Model.Description?.Length ?? 0) / 3000</div>
                     </div>
 
-                    <!-- ══ IMAGES ══ -->
+                    <!-- COVER IMAGE -->
                     <div class="form-section-label">
-                        Product Images <span class="desc-hint">up to 5 · drag to reorder · first = main</span>
+                        Cover Image <span class="desc-hint">first image customers see</span>
                     </div>
 
-                    <!-- Large main preview -->
-                    <div class="img-main-preview" id="img-main-preview">
-                        @if (savedImagePaths.Count > 0)
-                        {
-                            <img id="img-main-display" src="@savedImagePaths[0]" alt="" style="display:block;" />
-                            <div class="img-main-empty" id="img-main-empty" style="display:none;">
-                                <i class="fas fa-image"></i><span>No image</span>
+                    @{
+                        var coverSrc = savedImagePaths.Count > 0 ? savedImagePaths[0] : "";
+                    }
+                    <!-- Slot 0 = cover image (large square) -->
+                    <div class="cover-image-wrap">
+                        <div class="img-thumb-slot cover-slot-large @(coverSrc != "" ? "thumb-active" : "")"
+                             id="thumb-0" data-slot="0"
+                             draggable="true"
+                             onclick="thumbClick(0)"
+                             ondragstart="dragStart(event,0)"
+                             ondragover="dragOver(event)"
+                             ondrop="dragDrop(event,0)"
+                             ondragleave="dragLeave(event)">
+                            <input type="file" id="img-input-0" name="ImageFiles"
+                                   accept="image/*" style="display:none;"
+                                   onchange="onFileSelected(this,0)" />
+                            <div class="thumb-empty-inner cover-empty-inner" id="thumb-empty-0"
+                                 style="display:@(coverSrc != "" ? "none" : "flex");">
+                                <i class="fas fa-camera" style="font-size:36px;"></i>
+                                <span>Click to upload cover image</span>
+                                <span class="img-hint">Recommended 1:1 ratio</span>
                             </div>
-                        }
-                        else
-                        {
-                            <div class="img-main-empty" id="img-main-empty" style="display:flex;">
-                                <i class="fas fa-image"></i><span>No image yet</span>
-                            </div>
-                            <img id="img-main-display" src="" alt="" style="display:none;" />
-                        }
+                            <img class="thumb-preview" id="thumb-img-0"
+                                 src="@coverSrc" alt=""
+                                 style="display:@(coverSrc != "" ? "block" : "none");" />
+                            <button type="button" class="thumb-remove-btn" id="thumb-remove-0"
+                                    style="display:@(coverSrc != "" ? "flex" : "none");"
+                                    onclick="removeThumb(event,0)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <div class="thumb-main-badge" id="thumb-badge-0"
+                                 style="display:@(coverSrc != "" ? "block" : "none");">Cover</div>
+                        </div>
                     </div>
 
-                    <!-- Thumbnail strip -->
+                    <!-- CONTENT IMAGES -->
+                    <div class="form-section-label" style="margin-top:24px;">
+                        Content Images <span class="desc-hint">up to 4 more · customers swipe through these · drag to reorder</span>
+                    </div>
+
                     <div class="img-thumb-strip" id="img-thumb-strip">
-                        @for (int i = 0; i < 5; i++)
+                        @for (int i = 1; i < 5; i++)
                         {
                             var hasSaved = i < savedImagePaths.Count;
                             var savedSrc = hasSaved ? savedImagePaths[i] : "";
@@ -120,7 +141,7 @@
                                 <div class="thumb-empty-inner" id="thumb-empty-@i"
                                      style="display:@(hasSaved ? "none" : "flex");">
                                     <i class="fas fa-plus"></i>
-                                    <span>@(i == 0 ? "Main" : "+" + (i + 1))</span>
+                                    <span>Image @i</span>
                                 </div>
                                 <img class="thumb-preview" id="thumb-img-@i"
                                      src="@savedSrc" alt=""
@@ -130,12 +151,11 @@
                                         onclick="removeThumb(event,@i)">
                                     <i class="fas fa-times"></i>
                                 </button>
-                                <div class="thumb-main-badge" id="thumb-badge-@i"
-                                     style="display:@(i == 0 && hasSaved ? "block" : "none");">Main</div>
+                                <div class="thumb-main-badge" id="thumb-badge-@i" style="display:none;"></div>
                             </div>
                         }
                     </div>
-                    <p class="img-hint"><i class="fas fa-arrows-alt"></i> Drag thumbnails to reorder. First thumbnail = main image.</p>
+                    <p class="img-hint"><i class="fas fa-arrows-alt"></i> Drag thumbnails to reorder.</p>
 
                     <!-- Hidden fields for backend -->
                     <input type="hidden" name="SlotAssignment"     id="slot-assignment"    value="[]" />
@@ -272,21 +292,12 @@ function removeThumb(event, slotIdx) {
 }
 
 function setMainDisplay(slotIdx) {
-    const display = document.getElementById('img-main-display');
-    const empty   = document.getElementById('img-main-empty');
-    activeThumb   = slotIdx;
-    display.src   = slots[slotIdx].src;
-    display.style.display = 'block';
-    empty.style.display   = 'none';
+    // Update the cover slot (slot 0) to show selected image when clicked on content thumbs
+    activeThumb = slotIdx;
     renderThumbs();
 }
 
 function clearMainDisplay() {
-    const display = document.getElementById('img-main-display');
-    const empty   = document.getElementById('img-main-empty');
-    display.src   = '';
-    display.style.display = 'none';
-    empty.style.display   = 'flex';
     activeThumb = -1;
     renderThumbs();
 }
@@ -604,3 +615,4 @@ function openPreview() {
     document.body.style.overflow = 'hidden';
 }
 </script>
+
