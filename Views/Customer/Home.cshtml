@@ -1,6 +1,6 @@
 @model IEnumerable<EcommerceSystem.Models.Product>
 
-<link rel="stylesheet" href="~/css/customer/home.css" />
+<link rel="stylesheet" href="~/css/customer/home.css" asp-append-version="true" />
 
 <div class="home-page">
 
@@ -58,18 +58,39 @@
     else
     {
         <div class="product-grid">
-            @{int idx = 0;}
+            @{ int idx = 0; }
+
             @foreach (var item in Model)
             {
+                var shopInitial = (item.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
+
+                string stockClass, stockLabel;
+                if (item.StockQuantity <= 0) {
+                    stockClass = "out-of-stock"; stockLabel = "Out of Stock";
+                } else if (item.StockQuantity <= 5) {
+                    stockClass = "low-stock"; stockLabel = "Low Stock";
+                } else {
+                    stockClass = "in-stock"; stockLabel = "In Stock";
+                }
+
+                double rating = item.AverageRating;
+                int fullStars  = (int)Math.Floor(rating);
+                int emptyStars = 5 - fullStars;
+
+                bool hasDiscount = item.OriginalPrice > item.Price;
+                int discountPct  = hasDiscount
+                    ? (int)Math.Round((1 - item.Price / item.OriginalPrice) * 100)
+                    : 0;
+
                 <a asp-action="ProductDetails"
                    asp-route-id="@item.ProductId"
                    class="product-card"
                    style="animation-delay: @(idx * 60)ms">
 
+                    <!-- Image -->
                     <div class="product-img-wrap">
-                        <img src="@item.ImagePath"
-                             alt="@item.Name"
-                             class="product-img" />
+                        <img src="@item.ImagePath" alt="@item.Name" class="product-img" />
+                        <span class="stock-badge @stockClass">@stockLabel</span>
                         <div class="product-img-overlay">
                             <span class="overlay-cta">
                                 <i class="ti ti-eye"></i> View details
@@ -77,16 +98,59 @@
                         </div>
                     </div>
 
+                    <!-- Info -->
                     <div class="product-info">
-                        <p class="product-category">@(ViewBag.Category != null ? "" : "")</p>
-                        <h3 class="product-name">@item.Name</h3>
-                        <div class="product-footer">
-                            <span class="product-price">RM @item.Price.ToString("0.00")</span>
-                            <span class="product-arrow"><i class="ti ti-arrow-up-right"></i></span>
-                        </div>
-                    </div>
 
+                        <p class="product-category">@(item.Category?.Name ?? "Uncategorized")</p>
+                        <h3 class="product-name">@item.Name</h3>
+
+                        <!-- Rating -->
+                        <div class="product-rating">
+                            <div class="product-stars">
+                                @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
+                                @for (int s = 0; s < emptyStars; s++) { <span class="star empty">★</span> }
+                            </div>
+                            <span class="rating-count">@rating.ToString("0.0") (0)</span>
+                        </div>
+
+                        <!-- Shop -->
+                        <div class="product-shop">
+                            <span class="shop-dot">@shopInitial</span>
+                            <span>@(item.Seller?.ShopName ?? "Unknown Shop")</span>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="product-footer">
+                            <div class="price-block">
+                                @if (hasDiscount) {
+                                    <span class="price-original">RM @item.OriginalPrice.ToString("0.00")</span>
+                                } else {
+                                    <span class="price-original" style="visibility:hidden">–</span>
+                                }
+                                <div class="price-row">
+                                    <span class="product-price">RM @item.Price.ToString("0.00")</span>
+                                    @if (hasDiscount) {
+                                        <span class="price-discount">−@discountPct%</span>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (item.StockQuantity > 0) {
+                                <button class="add-btn"
+                                        title="Add to cart"
+                                        onclick="event.preventDefault(); addToCart(@item.ProductId)">
+                                    <i class="ti ti-shopping-cart-plus"></i>
+                                </button>
+                            } else {
+                                <button class="add-btn" disabled title="Out of stock">
+                                    <i class="ti ti-shopping-cart-off"></i>
+                                </button>
+                            }
+                        </div>
+
+                    </div>
                 </a>
+
                 idx++;
             }
         </div>
