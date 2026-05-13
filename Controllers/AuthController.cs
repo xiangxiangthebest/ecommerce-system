@@ -43,6 +43,12 @@ namespace EcommerceSystem.Controllers
                 return View();
             }
 
+            if (!user.IsActive)
+            {
+                ViewBag.Error = "This account has been deactivated. Please contact the administrator.";
+                return View();
+            }
+
             if (user.Role != role)
             {
                 ViewBag.Error = $"This account is not a {role}";

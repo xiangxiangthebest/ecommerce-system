@@ -1,128 +1,97 @@
 @model List<EcommerceSystem.Models.Seller>
 
 @{
-    ViewData["Title"] = "Manage Sellers";
+    ViewData["Title"] = "Seller Directory";
     Layout = "~/Views/Admin/Layout.cshtml";
 }
 
 <link rel="stylesheet" href="~/css/admin/manage-users.css" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <div class="glass-container">
-    @* --- Header --- *@
     <div class="dashboard-header">
         <div class="header-text">
-            <h1 class="gradient-text">Seller Management</h1>
-            <p class="subtitle">Review applications and manage active partnerships</p>
+            <h1 class="gradient-text">Seller Directory</h1>
+            <p class="subtitle">Manage seller partnerships</p>
         </div>
         <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
             <i class="fas fa-arrow-left"></i> <span>Dashboard</span>
         </a>
     </div>
 
-    @* --- Pending Section (Card Grid) --- *@
-    <section class="management-section">
-        <div class="section-heading">
-            <div class="status-indicator pending"></div>
-            <h2>Pending Applications</h2>
-            <span class="count-pill">@Model.Count(s => !s.IsApproved)</span>
-        </div>
-
-        @{ var pendingSellers = Model.Where(s => !s.IsApproved).ToList(); }
-
-        <div class="seller-grid">
-            @if (pendingSellers.Any())
-            {
-                @foreach (var seller in pendingSellers)
+    <div class="table-wrapper">
+        <table class="fancy-table">
+            <thead>
+                <tr>
+                    <th>Shop Detail</th>
+                    <th>Email</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th class="text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var seller in Model)
                 {
-                    <div class="seller-card">
-                        <div class="card-accent"></div>
-                        <div class="card-content">
-                            <div class="seller-info">
-                                <h3>@seller.ShopName</h3>
-                                <span class="seller-id">#@seller.UserId</span>
+                    <tr class="@(!seller.IsActive ? "banned-row" : "")">
+                        <td>
+                            <div class="shop-cell">
+                                <div class="shop-avatar">@seller.ShopName[0]</div>
+                                <div>
+                                    <div class="shop-name">@seller.ShopName</div>
+                                    <div class="shop-id">ID: @seller.UserId</div>
+                                </div>
                             </div>
-                            <div class="detail-row">
-                                <i class="fas fa-envelope"></i> <span>@seller.Email</span>
-                            </div>
-                            <div class="detail-row">
-                                <i class="fas fa-location-dot"></i> <span>@seller.State</span>
-                            </div>
-                        </div>
-                        <div class="card-actions">
-                            <form asp-action="ApproveSeller" asp-route-id="@seller.UserId" method="post" 
-                                  onsubmit="return confirm('Approve @seller.ShopName?');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="action-btn approve">
-                                    <i class="fas fa-check"></i> Approve
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <div class="empty-state">
-                    <i class="fas fa-clipboard-check"></i>
-                    <p>No pending applications.</p>
-                </div>
-            }
-        </div>
-    </section>
+                        </td>
+                        <td>@seller.Email</td>
+                        <td>@seller.State</td>
+                        <td>
+                            @if (!seller.IsActive)
+                            {
+                                <span class="pill pill-danger">Banned</span>
+                            }
+                            else if (seller.IsApproved)
+                            {
+                                <span class="pill pill-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="pill pill-warning">Pending Review</span>
+                            }
+                        </td>
+                        <td class="action-column">
+                            <div class="actions-wrapper">
+                                @if (seller.IsActive)
+                                {
+                                    @if (!seller.IsApproved)
+                                    {
+                                        @* Approve Action: Only shows for Active + Unapproved sellers *@
+                                        <form asp-action="ApproveSeller" asp-route-id="@seller.UserId" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        </form>
+                                    }
 
-    @* --- Approved Section (Table) --- *@
-    <section class="management-section mt-5">
-        <div class="section-heading">
-            <div class="status-indicator approved"></div>
-            <h2>Active Sellers</h2>
-            <span class="count-pill">@Model.Count(s => s.IsApproved)</span>
-        </div>
-
-        @{ var approvedSellers = Model.Where(s => s.IsApproved).ToList(); }
-
-        @if (approvedSellers.Any())
-        {
-            <div class="table-wrapper">
-                <table class="fancy-table">
-                    <thead>
-                        <tr>
-                            <th>Shop Detail</th>
-                            <th>Contact</th>
-                            <th>Location</th>
-                            <th>Status</th>
-                            <th class="text-right">Manage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var seller in approvedSellers)
-                        {
-                            <tr>
-                                <td>
-                                    <div class="shop-cell">
-                                        <div class="shop-avatar">@seller.ShopName[0]</div>
-                                        <div>
-                                            <div class="shop-name">@seller.ShopName</div>
-                                            <div class="shop-id">ID: @seller.UserId</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>@seller.Email</td>
-                                <td>@seller.State</td>
-                                <td><span class="pill pill-success">Active</span></td>
-                                <td class="text-right">
-                                    <form asp-action="RevokeSeller" asp-route-id="@seller.UserId" method="post">
+                                    @* Ban Action: Sets IsActive to false permanently *@
+                                    <form asp-action="BanSeller" asp-route-id="@seller.UserId" method="post" 
+                                        onsubmit="return confirm('Permanently ban @seller.ShopName? This action cannot be undone.');">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="icon-btn-revoke">
-                                            <i class="fas fa-user-slash"></i>
+                                        <button type="submit" class="btn btn-sm btn-danger">
+                                            <i class="fas fa-ban"></i> Ban
                                         </button>
                                     </form>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </section>
+                                }
+                                else
+                                {
+                                    @* When Banned, no buttons are shown, or just a lock icon *@
+                                    <span class="text-muted"><i class="fas fa-user-lock"></i> Account Locked</span>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 </div>

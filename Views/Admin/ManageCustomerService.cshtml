@@ -60,22 +60,30 @@
                                 <span class="pill pill-danger">Inactive</span>
                             }
                         </td>
-                        <td class="text-right">
-                            @if (staff.IsActive)
-                            {
-                                <form asp-action="DeleteCustomerService" asp-route-id="@staff.UserId" method="post" 
-                                      onsubmit="return confirm('Deactivate account for @staff.FullName?');" 
-                                      style="display:inline;">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="icon-btn-revoke" title="Deactivate Account">
-                                        <i class="fas fa-user-slash"></i>
-                                    </button>
-                                </form>
-                            }
-                            else
-                            {
-                                <span class="text-muted"><i class="fas fa-lock"></i></span>
-                            }
+
+                        <td class="action-column">
+                            <div class="actions-wrapper">
+                                <a asp-action="EditCustomerService" asp-route-id="@staff.UserId" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+
+                                <div class="status-icon-container">
+                                    @if (staff.IsActive)
+                                    {
+                                        <form asp-action="DeleteCustomerService" asp-route-id="@staff.UserId" method="post" 
+                                            style="display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="icon-btn-revoke">
+                                                <i class="fas fa-user-slash"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="lock-status"><i class="fas fa-lock"></i></span>
+                                    }
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 }

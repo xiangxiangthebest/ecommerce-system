@@ -167,3 +167,81 @@
     font-size: 0.75rem;
     font-weight: 700;
 }
+
+/* --- Action Column Alignment --- */
+
+/* Add this to the <th> and <td> in your HTML for the Action column */
+.action-column {
+    text-align: left; /* Aligns with the "ACTIONS" header text */
+    padding-left: 2rem !important; /* Adjust this to move the group further right/left */
+}
+
+/* Container to align items horizontally */
+.actions-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* Aligns content to the left of the cell */
+    gap: 12px; /* Spacing between the Edit button and the Status icon */
+}
+
+/* Ensure the form and icons have consistent width so they don't shift */
+.status-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; /* Fixed width prevents "Edit" buttons from shifting horizontally */
+}
+
+/* Reset form margins that might be pushing things out of line */
+.status-action form {
+    margin: 0;
+    padding: 0;
+    display: flex;
+}
+
+/* Icon Buttons */
+.icon-btn-revoke {
+    background: none;
+    border: none;
+    color: #94a3b8; /* De-emphasized gray for the slash icon */
+    cursor: pointer;
+    padding: 4px;
+    font-size: 1.1rem;
+    transition: color 0.2s;
+}
+
+.icon-btn-revoke:hover {
+    color: var(--danger);
+}
+
+.lock-status {
+    color: #1e293b; /* Darker color for the locked icon */
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Add this to your existing css file */
+.pill-warning {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.btn-success {
+    background-color: var(--success);
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.btn-success:hover {
+    background-color: #166534;
+    transform: translateY(-1px);
+}
