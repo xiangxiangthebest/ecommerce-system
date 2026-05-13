@@ -1,6 +1,6 @@
 @model EcommerceSystem.Models.Customer
 
-<link rel="stylesheet" href="~/css/customer/profile.css" />
+<link rel="stylesheet" href="~/css/customer/profile.css" asp-append-version="true" />
 
 <div class="profile-page">
 
@@ -11,14 +11,24 @@
 
             <div class="avatar-card">
                 <div class="avatar-wrap">
-                    <img src="@(string.IsNullOrEmpty(Model.ProfilePicture)
-                                ? "/images/profile/default.png"
-                                : Model.ProfilePicture)"
-                         alt="Profile picture"
-                         class="avatar-img" />
-                    <label for="profileImageInput" class="avatar-upload" aria-label="Upload photo">
-                        <i class="ti ti-camera" aria-hidden="true"></i>
+
+                    @if (string.IsNullOrWhiteSpace(Model.ProfilePicture))
+                    {
+                        <div class="avatar-placeholder">
+                            Upload your profile picture
+                        </div>
+                    }
+                    else
+                    {
+                        <img src="@Url.Content(Model.ProfilePicture)"
+                            alt=""
+                            class="avatar-img" />
+                    }
+
+                    <label for="profileImageInput" class="avatar-upload">
+                        <i class="ti ti-camera"></i>
                     </label>
+
                 </div>
                 <div>
                     <p class="avatar-name">@Model.FullName</p>
@@ -50,7 +60,7 @@
         </div>
 
         <!-- Form -->
-        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data" class="form-card">
+        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data" class="form-card" id="profileForm">
 
             <input type="hidden" asp-for="UserId" />
             <input type="file" id="profileImageInput" name="profileImage" style="display:none" />
@@ -60,25 +70,30 @@
                 <div class="field-grid">
                     <div class="field">
                         <label asp-for="FullName">Full Name</label>
-                        <input asp-for="FullName" />
+                        <input asp-for="FullName" required/>
+                        <span asp-validation-for="FullName" class="text-danger"></span>
                     </div>
                     <div class="field">
                         <label asp-for="Gender">Gender</label>
                         <div class="select-wrap">
-                            <select asp-for="Gender">
+                            <select asp-for="Gender" required>
+                                <option value="" disabled selected>Select gender</option>
                                 <option>Male</option>
                                 <option>Female</option>
                             </select>
                             <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
                         </div>
+                        <span asp-validation-for="Gender" class="text-danger"></span>
                     </div>
                     <div class="field">
                         <label asp-for="Birthday">Birthday</label>
-                        <input asp-for="Birthday" type="date" />
+                        <input asp-for="Birthday" type="date" required />
+                        <span asp-validation-for="Birthday" class="text-danger"></span>
                     </div>
                     <div class="field">
                         <label asp-for="Phone">Phone</label>
-                        <input asp-for="Phone" />
+                        <input asp-for="Phone" required/>
+                        <span asp-validation-for="Phone" class="text-danger"></span>
                     </div>
                 </div>
             </div>
@@ -101,7 +116,8 @@
                 <p class="section-label">Delivery address</p>
                 <div class="field full">
                     <label asp-for="Address">Address</label>
-                    <textarea asp-for="Address"></textarea>
+                    <textarea asp-for="Address" required></textarea>
+                    <span asp-validation-for="Address" class="text-danger"></span>
                 </div>
             </div>
 
@@ -117,3 +133,17 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        document.getElementById("profileImageInput")
+            .addEventListener("change", function () {
+
+                if (this.files.length > 0) {
+                    document.getElementById("profileForm").submit();
+                }
+            });
+    </script>
+}

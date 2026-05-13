@@ -6,6 +6,7 @@ public class Cart
     public int UserId { get; set; }
     // Cart contains products with extra attributes
     public List<CartProduct> products{ get; set; }
+    public List<CartItem> CartItems { get; set; } = new();
 
         // public Cart()
         // {
