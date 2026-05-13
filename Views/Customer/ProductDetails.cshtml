@@ -1,0 +1,222 @@
+@model EcommerceSystem.Models.Product
+@using EcommerceSystem.Models
+@using System.Text.Json
+
+<link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
+
+@{
+    var images      = ViewBag.Images as List<string> ?? new List<string>();
+    var variations  = ViewBag.Variations as List<Product.VariationGroup> ?? new List<Product.VariationGroup>();
+    var firstImage  = images.Count > 0 ? images[0] : Model.ImagePath;
+    var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
+
+    string stockClass, stockLabel;
+    if (Model.StockQuantity <= 0) {
+        stockClass = "out-of-stock"; stockLabel = "Out of Stock";
+    } else if (Model.StockQuantity <= 5) {
+        stockClass = "low-stock";    stockLabel = "Low Stock";
+    } else {
+        stockClass = "in-stock";     stockLabel = "In Stock";
+    }
+
+    // Star rendering helpers
+    int fullStars  = (int)Math.Floor(Model.AverageRating);
+    int emptyStars = 5 - fullStars;
+}
+
+<div class="pd-page">
+
+    <!-- Main layout -->
+    <div class="pd-layout">
+
+        <!-- ── LEFT: Gallery ── -->
+        <div class="pd-gallery">
+
+            <div class="pd-main-img-wrap">
+                <img id="pdMainImg"
+                     src="@firstImage"
+                     alt="@Model.Name"
+                     class="pd-main-img" />
+                <div class="pd-zoom-hint">
+                    <i class="ti ti-zoom-in"></i> Hover to zoom
+                </div>
+            </div>
+
+            @if (images.Count > 1)
+            {
+                <div class="pd-thumbnails">
+                    @for (int i = 0; i < images.Count; i++)
+                    {
+                        <div class="pd-thumb @(i == 0 ? "active" : "")"
+                             onclick="switchImage('@images[i]', this)">
+                            <img src="@images[i]" alt="@Model.Name view @(i + 1)" />
+                        </div>
+                    }
+                </div>
+            }
+
+        </div>
+
+        <!-- ── RIGHT: Info ── -->
+        <div class="pd-info">
+
+            <!-- Category + stock badge -->
+            <div class="pd-top-row">
+                <span class="pd-category">@(Model.Category?.Name ?? "Uncategorised")</span>
+                <div class="pd-badges">
+                    <span class="pd-badge @stockClass">@stockLabel</span>
+                </div>
+            </div>
+
+            <!-- Name -->
+            <h1 class="pd-name">@Model.Name</h1>
+
+            <!-- Rating -->
+            <div class="pd-rating-row">
+                <div class="pd-stars">
+                    @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
+                    @for (int s = 0; s < emptyStars; s++) { <span class="star empty">★</span> }
+                </div>
+                <span class="pd-rating-text">@Model.AverageRating.ToString("0.0")</span>
+                <div class="pd-rating-sep"></div>
+                <span class="pd-rating-text">0 reviews</span>
+            </div>
+
+            <div class="pd-divider"></div>
+
+            <!-- Shop -->
+            <div class="pd-shop-row">
+                <div class="pd-shop-avatar">@shopInitial</div>
+                <span class="pd-shop-name">
+                    Sold by <strong>@(Model.Seller?.ShopName ?? "Unknown Shop")</strong>
+                </span>
+            </div>
+
+            <!-- Price -->
+            <div class="pd-price-block">
+                <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
+                <div class="pd-price-note">Price includes SST where applicable</div>
+            </div>
+
+            <!-- SKU -->
+            @if (!string.IsNullOrWhiteSpace(Model.SKU))
+            {
+                <div class="pd-sku">SKU: @Model.SKU</div>
+            }
+
+            <div class="pd-divider"></div>
+
+            <!-- Description -->
+            <p class="pd-description">
+                @(string.IsNullOrWhiteSpace(Model.Description)
+                    ? "No description provided."
+                    : Model.Description)
+            </p>
+
+            <!-- Variations -->
+            @if (variations.Count > 0)
+            {
+                <div class="pd-variations">
+                    @foreach (var group in variations)
+                    {
+                        <div class="pd-variation-group">
+                            <div class="pd-variation-label">@group.Name</div>
+                            <div class="pd-variation-options">
+                                @foreach (var val in group.Values)
+                                {
+                                    @if (!string.IsNullOrWhiteSpace(val.ImagePath))
+                                    {
+                                        <div class="pd-variation-swatch"
+                                             title="@val.Label"
+                                             onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                            <img src="@val.ImagePath" alt="@val.Label" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="pd-variation-btn"
+                                                @(val.Stock <= 0 ? "disabled" : "")
+                                                onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                            @val.Label
+                                        </button>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Quantity -->
+            <div class="pd-qty-row">
+                <span class="pd-qty-label">Qty</span>
+                <div class="pd-qty-control">
+                    <button class="pd-qty-btn" onclick="adjustQty(-1)" type="button">−</button>
+                    <input  id="pdQty" type="number" class="pd-qty-input"
+                            min="1" max="@Model.StockQuantity" value="1" readonly />
+                    <button class="pd-qty-btn" onclick="adjustQty(1)"  type="button">+</button>
+                </div>
+                @if (Model.StockQuantity > 0)
+                {
+                    <span class="pd-stock-note">@Model.StockQuantity left</span>
+                }
+            </div>
+
+            <!-- Actions -->
+            <div class="pd-actions">
+                <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                    <i class="ti ti-shopping-cart-plus"></i> Add to Cart
+                </button>
+                <button class="pd-btn-buy" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                    <i class="ti ti-bolt"></i> Buy Now
+                </button>
+            </div>
+
+            <!-- Wishlist -->
+            <div class="pd-wishlist-row">
+                <i class="ti ti-heart"></i>
+                <span>Save to wishlist</span>
+            </div>
+
+            <!-- Trust badges -->
+            <div class="pd-trust">
+                <div class="pd-trust-item">
+                    <i class="ti ti-truck-delivery"></i>
+                    <span>Free shipping over RM100</span>
+                </div>
+                <div class="pd-trust-item">
+                    <i class="ti ti-shield-check"></i>
+                    <span>Secure checkout</span>
+                </div>
+                <div class="pd-trust-item">
+                    <i class="ti ti-refresh"></i>
+                    <span>7-day returns</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchImage(src, el) {
+        document.getElementById('pdMainImg').src = src;
+        document.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function adjustQty(delta) {
+        const input = document.getElementById('pdQty');
+        const max   = parseInt(input.max) || 999;
+        const val   = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
+        input.value = val;
+    }
+
+    function selectVariation(el, groupName, label) {
+        // Deselect siblings in same group
+        const parent = el.closest('.pd-variation-options');
+        parent.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
+              .forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+</script>

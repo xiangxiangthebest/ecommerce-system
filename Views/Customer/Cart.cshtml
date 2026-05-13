@@ -1,0 +1,225 @@
+@model EcommerceSystem.Models.Cart
+@using System.Text.Json
+
+<link rel="stylesheet" href="~/css/customer/cart.css" />
+
+@{
+    var items        = Model.CartItems ?? new List<EcommerceSystem.Models.CartItem>();
+    int itemCount    = items.Sum(i => i.Quantity);
+    double subtotal  = items.Sum(i => i.Price * i.Quantity);
+    double shipping  = subtotal >= 100 ? 0 : 10;
+    double total     = subtotal + shipping;
+}
+
+<div class="cart-page">
+
+    <!-- Header -->
+    <div class="cart-header">
+        <h1 class="cart-title">Your Cart</h1>
+        <span class="cart-count-badge">@itemCount @(itemCount == 1 ? "item" : "items")</span>
+    </div>
+
+    @if (!items.Any())
+    {
+        <!-- Empty state -->
+        <div class="cart-empty">
+            <div class="cart-empty-icon"><i class="ti ti-shopping-cart-off"></i></div>
+            <p class="cart-empty-title">Your cart is empty</p>
+            <p class="cart-empty-sub">Looks like you haven't added anything yet.</p>
+            <a asp-action="Home" class="btn-shop-now">
+                <i class="ti ti-arrow-left"></i> Continue Shopping
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="cart-layout">
+
+            <!-- ── Items column ── -->
+            <div class="cart-items-col">
+
+                <!-- Column headers (desktop) -->
+                <div class="cart-items-header">
+                    <span>Product</span>
+                    <span>Unit Price</span>
+                    <span>Quantity</span>
+                    <span>Subtotal</span>
+                    <span></span>
+                </div>
+
+                @foreach (var item in items)
+                {
+                    var product = item.Product;
+
+                    // Parse selected variations
+                    var varDict = new Dictionary<string, string>();
+                    if (!string.IsNullOrWhiteSpace(item.SelectedVariations)
+                        && item.SelectedVariations != "{}")
+                    {
+                        try {
+                            varDict = JsonSerializer.Deserialize<Dictionary<string, string>>(item.SelectedVariations)
+                                        ?? new();
+                        } catch { }
+                    }
+
+                    <div class="cart-item">
+
+                        <!-- Product -->
+                        <div class="cart-item-product">
+                            @if (!string.IsNullOrWhiteSpace(product?.ImagePath))
+                            {
+                                <img src="@product.ImagePath"
+                                     alt="@product.Name"
+                                     class="cart-item-img" />
+                            }
+                            else
+                            {
+                                <div class="cart-item-img-placeholder">
+                                    <i class="ti ti-photo"></i>
+                                </div>
+                            }
+
+                            <div class="cart-item-details">
+                                <span class="cart-item-name">@(product?.Name ?? "Product")</span>
+                                <span class="cart-item-shop">
+                                    @(product?.Seller?.ShopName ?? "Unknown Shop")
+                                </span>
+
+                                @if (varDict.Any())
+                                {
+                                    <div class="cart-item-variations">
+                                        @foreach (var kv in varDict)
+                                        {
+                                            <span class="variation-tag">@kv.Key: @kv.Value</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Unit price -->
+                        <div class="cart-item-price">
+                            RM @item.Price.ToString("0.00")
+                        </div>
+
+                        <!-- Quantity stepper -->
+                        <div class="cart-item-qty">
+                            <form asp-action="UpdateQuantity" method="post" class="qty-form">
+                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
+                                <div class="qty-control">
+                                    <button type="submit"
+                                            name="quantity"
+                                            value="@Math.Max(1, item.Quantity - 1)"
+                                            class="qty-btn">−</button>
+                                    <input type="number"
+                                           class="qty-value"
+                                           value="@item.Quantity"
+                                           min="1"
+                                           readonly />
+                                    <button type="submit"
+                                            name="quantity"
+                                            value="@(item.Quantity + 1)"
+                                            class="qty-btn">+</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Subtotal -->
+                        <div class="cart-item-subtotal">
+                            RM @((item.Price * item.Quantity).ToString("0.00"))
+                        </div>
+
+                        <!-- Remove -->
+                        <div class="cart-item-remove">
+                            <form asp-action="RemoveItem" method="post">
+                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
+                                <button type="submit" class="remove-btn" title="Remove item">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                    </div>
+                }
+
+            </div>
+
+            <!-- ── Summary card ── -->
+            <div class="cart-summary">
+
+                <div class="summary-header">Order Summary</div>
+
+                <div class="summary-body">
+
+                    <div class="summary-row">
+                        <span class="label">Subtotal (@itemCount @(itemCount == 1 ? "item" : "items"))</span>
+                        <span class="value">RM @subtotal.ToString("0.00")</span>
+                    </div>
+
+                    @if (shipping == 0)
+                    {
+                        <div class="summary-row free">
+                            <span class="label">Shipping</span>
+                            <span class="value">Free</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="summary-row">
+                            <span class="label">Shipping</span>
+                            <span class="value">RM @shipping.ToString("0.00")</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="label" style="font-size:11px;color:#bbb;">
+                                Add RM @((100 - subtotal).ToString("0.00")) more for free shipping
+                            </span>
+                        </div>
+                    }
+
+                    <div class="summary-divider"></div>
+
+                    <div class="summary-row total">
+                        <span class="label">Total</span>
+                        <span class="value">RM @total.ToString("0.00")</span>
+                    </div>
+
+                    <!-- Promo code -->
+                    <div class="promo-row">
+                        <input type="text"
+                               class="promo-input"
+                               placeholder="Promo code" />
+                        <button class="promo-btn">Apply</button>
+                    </div>
+
+                </div>
+
+                <div class="summary-footer">
+                    <a asp-action="Checkout" class="btn-checkout">
+                        <i class="ti ti-lock"></i> Checkout
+                    </a>
+                    <a asp-action="Home" class="btn-continue">
+                        <i class="ti ti-arrow-left"></i> Continue shopping
+                    </a>
+                </div>
+
+                <div class="summary-trust">
+                    <div class="trust-item">
+                        <i class="ti ti-shield-check"></i>
+                        <span>Secure</span>
+                    </div>
+                    <div class="trust-item">
+                        <i class="ti ti-truck-delivery"></i>
+                        <span>Fast delivery</span>
+                    </div>
+                    <div class="trust-item">
+                        <i class="ti ti-refresh"></i>
+                        <span>7-day returns</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    }
+
+</div>
