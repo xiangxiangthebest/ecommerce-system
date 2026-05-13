@@ -8,14 +8,33 @@
 <link rel="stylesheet" href="~/css/admin/manage-users.css" />
 
 <div class="glass-container">
-    <div class="dashboard-header">
+   <div class="dashboard-header">
         <div class="header-text">
             <h1 class="gradient-text">Seller Directory</h1>
             <p class="subtitle">Manage seller partnerships</p>
         </div>
-        <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
-            <i class="fas fa-arrow-left"></i> <span>Dashboard</span>
-        </a>
+        
+        <div class="header-actions">
+            <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
+                <i class="fas fa-arrow-left"></i> <span>Dashboard</span>
+            </a>
+
+            <form asp-action="ManageSellers" method="get" class="filter-form">
+                <input type="text" name="searchTerm" value="@ViewBag.SearchTerm" 
+                    placeholder="Search keywords..." class="filter-input" />
+
+                <select name="statusFilter" class="filter-select" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    <option value="Active" selected="@(ViewBag.StatusFilter == "Active")">Active</option>
+                    <option value="Pending" selected="@(ViewBag.StatusFilter == "Pending")">Pending Review</option>
+                    <option value="Banned" selected="@(ViewBag.StatusFilter == "Banned")">Banned</option>
+                </select>
+
+                <button type="submit" class="filter-btn">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </form>
+        </div>
     </div>
 
     <div class="table-wrapper">

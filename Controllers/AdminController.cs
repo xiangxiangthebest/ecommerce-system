@@ -34,10 +34,34 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("ManageSellers");
         }
 
-        public async Task<IActionResult> ManageSellers()
+        public async Task<IActionResult> ManageSellers(string searchTerm, string statusFilter)
         {
-            // Fetch all sellers in one list
-            var sellers = await _context.Seller.ToListAsync();
+            var query = _context.Seller.AsQueryable();
+
+            // 1. Keyword Search (Shop Name or Email)
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                query = query.Where(s => s.ShopName.Contains(searchTerm) || s.Email.Contains(searchTerm));
+            }
+
+            // 2. Status Filter
+            if (!string.IsNullOrEmpty(statusFilter))
+            {
+                query = statusFilter switch
+                {
+                    "Active" => query.Where(s => s.IsActive && s.IsApproved),
+                    "Pending" => query.Where(s => s.IsActive && !s.IsApproved),
+                    "Banned" => query.Where(s => !s.IsActive),
+                    _ => query
+                };
+            }
+
+            var sellers = await query.ToListAsync();
+            
+            // Pass values back to keep the form state
+            ViewBag.SearchTerm = searchTerm;
+            ViewBag.StatusFilter = statusFilter;
+            
             return View(sellers);
         }
 
