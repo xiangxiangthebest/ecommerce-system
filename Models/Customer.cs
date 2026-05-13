@@ -8,7 +8,6 @@ public class Customer : User
     public string Address { get; set; } = string.Empty;
     [Required]
     public string Gender { get; set; } = string.Empty;
-    [Required]
     public DateTime? Birthday { get; set; }
     public string? ProfilePicture { get; set; }
 }
