@@ -241,13 +241,9 @@
 <script>
 // ════════════════════════════════════════════════════════════
 // IMAGE MANAGEMENT
-// Slots hold: { src: string|null, type: 'existing'|'new', path: string|null, file: File|null }
 // ════════════════════════════════════════════════════════════
 
-// Initialise slots from server-rendered saved paths
-const _savedPaths = @Html.Raw(
-    System.Text.Json.JsonSerializer.Serialize(savedImagePaths)
-);
+const _savedPaths = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(savedImagePaths));
 
 const slots = Array.from({ length: 5 }, (_, i) => {
     if (i < _savedPaths.length && _savedPaths[i]) {
@@ -257,7 +253,7 @@ const slots = Array.from({ length: 5 }, (_, i) => {
 });
 
 let activeThumb = _savedPaths.length > 0 ? 0 : -1;
-let newFileCounter = 0; // counts new uploads to assign unique index
+let newFileCounter = 0;
 
 function onFileSelected(input, slotIdx) {
     if (!input.files || !input.files[0]) return;
@@ -292,7 +288,6 @@ function removeThumb(event, slotIdx) {
 }
 
 function setMainDisplay(slotIdx) {
-    // Update the cover slot (slot 0) to show selected image when clicked on content thumbs
     activeThumb = slotIdx;
     renderThumbs();
 }
@@ -356,20 +351,10 @@ function dragDrop(event, toSlot) {
 
     renderThumbs();
     updateSlotAssignment();
-
-    // Update main display to follow the swap if active thumb was involved
-    const current = slots[activeThumb];
-    if (current && current.src) {
-        document.getElementById('img-main-display').src = current.src;
-    }
     dragFromSlot = -1;
 }
 
 // ── SLOT ASSIGNMENT ────────────────────────────────────────────
-// Tells the backend: for each position, whether it's an existing image (keep path)
-// or a new upload (use newIndex to match upload order)
-let _newUploadOrder = []; // tracks order of new file uploads for index mapping
-
 function updateSlotAssignment() {
     const assignment = [];
     let newIdx = 0;
@@ -406,12 +391,13 @@ let groups = {};
 
 function addVariationGroup(existingName = '', existingValues = []) {
     const id = groupCount++;
+    // Normalise incoming values — accept both 'imagePath' and 'image' as source keys
     groups[id] = {
         name: existingName,
         values: existingValues.map(v => ({
-            ...v,
-            imageSrc:  v.imagePath || null,
-            imageFile: null
+            label:     v.label     || '',
+            stock:     typeof v.stock === 'number' ? v.stock : (parseInt(v.stock) || 0),
+            imagePath: v.imagePath || v.image || ''
         }))
     };
 
@@ -458,7 +444,8 @@ function addChip(groupId) {
     const label = valInput.value.trim();
     const stock = parseInt(stockInput.value) || 0;
     if (!label) { valInput.focus(); return; }
-    groups[groupId].values.push({ label, stock, imageSrc: null, imageFile: null });
+    // FIX: always use 'imagePath' key, never 'image' or 'imageSrc'
+    groups[groupId].values.push({ label, stock, imagePath: '' });
     renderChips(groupId);
     valInput.value = ''; stockInput.value = '';
     valInput.focus();
@@ -479,8 +466,8 @@ function onVariationImageSelected(input, groupId, valueIdx) {
     if (!input.files || !input.files[0]) return;
     const reader = new FileReader();
     reader.onload = e => {
-        groups[groupId].values[valueIdx].imageSrc  = e.target.result;
-        groups[groupId].values[valueIdx].imageFile = input.files[0];
+        // FIX: store under imagePath (not imageSrc)
+        groups[groupId].values[valueIdx].imagePath = e.target.result;
         renderChips(groupId);
         serializeVariations();
     };
@@ -488,8 +475,7 @@ function onVariationImageSelected(input, groupId, valueIdx) {
 }
 
 function removeVariationImage(groupId, valueIdx) {
-    groups[groupId].values[valueIdx].imageSrc  = null;
-    groups[groupId].values[valueIdx].imageFile = null;
+    groups[groupId].values[valueIdx].imagePath = '';
     const inp = document.getElementById(`var-img-input-${groupId}-${valueIdx}`);
     if (inp) inp.value = '';
     renderChips(groupId);
@@ -502,9 +488,10 @@ function renderChips(groupId) {
     groups[groupId].values.forEach((v, i) => {
         const chip = document.createElement('div');
         chip.className = 'chip-card';
-        const imgSection = v.imageSrc
+        // FIX: read v.imagePath (not v.imageSrc)
+        const imgSection = v.imagePath
             ? `<div class="chip-img-wrap">
-                   <img src="${v.imageSrc}" class="chip-img-preview" />
+                   <img src="${v.imagePath}" class="chip-img-preview" />
                    <button type="button" class="chip-img-remove" onclick="removeVariationImage(${groupId},${i})">
                        <i class="fas fa-times"></i>
                    </button>
@@ -533,15 +520,17 @@ function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// FIX: serializeVariations — always output { label, stock (as number), imagePath }
+// No longer uses v.type or v.path — those are only for image slots, not variation values
 function serializeVariations() {
     const data = Object.values(groups)
         .filter(g => g.name || g.values.length > 0)
         .map(g => ({
             name: g.name,
             values: g.values.map(v => ({
-                label:     v.label,
-                stock:     v.stock,
-                imagePath: v.type === 'existing' ? (v.path || '') : (v.imageSrc || '')
+                label:     v.label     || '',
+                stock:     typeof v.stock === 'number' ? v.stock : (parseInt(v.stock) || 0),
+                imagePath: v.imagePath || ''
             }))
         }));
     document.getElementById('variations-json').value = JSON.stringify(data);
@@ -605,9 +594,6 @@ function submitForm(type) {
     document.getElementById('editForm').submit();
 }
 
-// ════════════════════════════════════════════════════════════
-// CUSTOMER PREVIEW
-// ════════════════════════════════════════════════════════════
 function openPreview() {
     const imgSrcs = slots.map(s => s.src).filter(Boolean);
     buildPreviewModal(imgSrcs);
@@ -615,4 +601,3 @@ function openPreview() {
     document.body.style.overflow = 'hidden';
 }
 </script>
-

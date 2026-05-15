@@ -14,40 +14,77 @@ namespace EcommerceSystem.Controllers
     {
         private readonly AppDbContext _context; 
 
-        // allow controller read and write the database
         public SellerController(AppDbContext context)
         {
             _context = context;
         } 
 
-        // helper to get current logged-in seller based on the email 
         private async Task<Seller?> GetCurrentSellerAsync()
         {
             var email = User.FindFirst(ClaimTypes.Email)?.Value;
             return await _context.Seller.FirstOrDefaultAsync(x => x.Email == email);
         }
 
-        // helper to save uploaded images and return the paths 
         private async Task<List<string>> SaveImagesAsync(List<IFormFile> files)
         {
             var paths = new List<string>();
-            var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images"); // create a folder name as wwwroot/images(if not exist) else continue 
+            var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images");
             if (!Directory.Exists(folderPath))
                 Directory.CreateDirectory(folderPath);
 
-            foreach (var file in files) // handle multiple file one by one 
+            foreach (var file in files)
             {
-                if (file == null || file.Length == 0) continue; 
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName); // change the file name into random text from cake.png into ajdh1iu171.png
+                if (file == null || file.Length == 0) continue;
+                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
                 var filePath = Path.Combine(folderPath, fileName);
                 using (var stream = new FileStream(filePath, FileMode.Create))
-                    await file.CopyToAsync(stream); // then save to folder 
-                paths.Add("/images/" + fileName); //show the final (ajdh1iu171.png) into AddProduct/ EditProduct
+                    await file.CopyToAsync(stream);
+                paths.Add("/images/" + fileName);
             }
             return paths;
         }
 
-        // if seller is not approve by admin, they can only see/ stay at general page, cnt move to products or orders page
+        // ── Safe int parser: handles Number/String/Double JSON values ──
+        private static int SafeGetInt(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.Number => element.TryGetInt32(out var i) ? i : (int)element.GetDouble(),
+                JsonValueKind.String => int.TryParse(element.GetString(), out var s) ? s : 0,
+                _ => 0
+            };
+        }
+
+        // ── Sum all variation stocks from VariationsJson ──
+        // Format: [{name:"Size", values:[{label:"S", stock:10, imagePath:""}]}]
+        // Returns 0 if no variations or variations is empty "[]"
+        private static int SumVariationStock(string variationsJson)
+        {
+            if (string.IsNullOrWhiteSpace(variationsJson) || variationsJson == "[]")
+                return 0;
+            try
+            {
+                var groups = JsonSerializer.Deserialize<List<JsonElement>>(variationsJson);
+                if (groups == null || groups.Count == 0) return 0;
+
+                int total = 0;
+                foreach (var g in groups)
+                {
+                    if (!g.TryGetProperty("values", out var vals)) continue;
+                    foreach (var v in vals.EnumerateArray())
+                    {
+                        if (v.TryGetProperty("stock", out var s))
+                            total += SafeGetInt(s);
+                    }
+                }
+                return total;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         public async Task<IActionResult> Home(string tab = "General")
         {
             var seller = await GetCurrentSellerAsync();
@@ -82,8 +119,6 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // sellet that not yet approve by admin couldnt access to the + Add New Product
-        // and show the message Your account is pending admin approval. You cannot add products yet.
         [HttpGet]
         public async Task<IActionResult> AddProduct()
         {
@@ -100,11 +135,9 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // add product 
         [HttpPost]
         public async Task<IActionResult> AddProduct(Product model, List<IFormFile> ImageFiles, string actionType)
         {
-            // 1. verify seller identity and approval status 
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
 
@@ -114,10 +147,8 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "General" });
             }
              
-            // 2. seller can save as draft without filling all the fields (empty the Description, SKu.. )
             bool isDraft = actionType == "Draft"; 
 
-            // 3. but if seller want to Save & Publish, seller need to fill ALL the fields, else show error and remain the same page
             if (!isDraft)
             {
                 if (string.IsNullOrWhiteSpace(model.Name))
@@ -131,7 +162,6 @@ namespace EcommerceSystem.Controllers
                 }
             }
 
-            // check if there is category in database, if no, add back these category in database to prevent null 
             if (!await _context.Category.AnyAsync())
             {
                 _context.Category.AddRange(new List<Category>
@@ -152,12 +182,11 @@ namespace EcommerceSystem.Controllers
             model.SKU         = model.SKU         ?? string.Empty;
             model.IsDraft     = isDraft;
 
-            // 1. Get variation data and ensure it's not null
+            // Read VariationsJson from the hidden form field
             model.VariationsJson = Request.Form["VariationsJson"].ToString();
             if (string.IsNullOrWhiteSpace(model.VariationsJson))
                 model.VariationsJson = "[]";
 
-            // 2. Link the product to the correct Category ID
             var categoryName = Request.Form["Category"].ToString();
             if (!string.IsNullOrEmpty(categoryName))
             {
@@ -167,7 +196,6 @@ namespace EcommerceSystem.Controllers
             if (model.CategoryId == 0)
                 model.CategoryId = (await _context.Category.FirstAsync()).CategoryId;
 
-            // 3. Save uploaded images and set the main cover photo
             var savedPaths = await SaveImagesAsync(ImageFiles ?? new List<IFormFile>());
 
             if (savedPaths.Count > 0)
@@ -181,7 +209,13 @@ namespace EcommerceSystem.Controllers
                 model.ImagePathsJson = "[]";
             }
 
+            // Process variation images — strips base64 from imagePath, saves real files
             model.VariationsJson = await ProcessVariationImagesAsync(model.VariationsJson, Request.Form.Files);
+
+            // Auto-sum StockQuantity from variation stocks when variations are present
+            var variationStockSum = SumVariationStock(model.VariationsJson);
+            if (variationStockSum > 0)
+                model.StockQuantity = variationStockSum;
 
             _context.Products.Add(model);
             await _context.SaveChangesAsync();
@@ -248,6 +282,7 @@ namespace EcommerceSystem.Controllers
                     existing.CategoryId = category.CategoryId;
             }
 
+            // Rebuild image list from slot assignment
             var existingOrderJson = Request.Form["ExistingImageOrder"].ToString();
             var keptPaths = new List<string>();
             if (!string.IsNullOrWhiteSpace(existingOrderJson))
@@ -257,7 +292,6 @@ namespace EcommerceSystem.Controllers
             }
 
             var newPaths = await SaveImagesAsync(ImageFiles ?? new List<IFormFile>());
-
             var slotAssignmentJson = Request.Form["SlotAssignment"].ToString();
             var mergedPaths = BuildMergedImageList(slotAssignmentJson, keptPaths, newPaths, existing.ImagePathsJson);
 
@@ -269,11 +303,18 @@ namespace EcommerceSystem.Controllers
 
             existing.VariationsJson = await ProcessVariationImagesAsync(existing.VariationsJson, Request.Form.Files);
 
+            // Auto-sum StockQuantity from variation stocks when variations are present
+            var editVariationStockSum = SumVariationStock(existing.VariationsJson);
+            if (editVariationStockSum > 0)
+                existing.StockQuantity = editVariationStockSum;
+
             TempData["Success"] = existing.IsDraft ? "Product saved as draft." : "Product updated successfully.";
             await _context.SaveChangesAsync();
             return RedirectToAction("Home", new { tab = "Product" });
         }
 
+        // ── FIX: ProcessVariationImagesAsync ─────────────────────────
+        // Uses SafeGetInt so stock never throws; handles both 'imagePath' and 'image' keys
         private async Task<string> ProcessVariationImagesAsync(string variationsJson, IFormFileCollection allFiles)
         {
             try
@@ -295,10 +336,21 @@ namespace EcommerceSystem.Controllers
                     {
                         var v = values[vi];
                         var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
-                        var stock = v.TryGetProperty("stock", out var s) ? s.GetInt32() : 0;
-                        var existingImg = v.TryGetProperty("imagePath", out var ip) ? ip.GetString() ?? "" : "";
 
-                        // Check if a new file was uploaded for this variation value
+                        // FIX: use SafeGetInt — GetInt32() throws if value is a JSON double or string
+                        var stock = v.TryGetProperty("stock", out var s) ? SafeGetInt(s) : 0;
+
+                        // Accept both 'imagePath' and legacy 'image' key names
+                        string existingImg = "";
+                        if (v.TryGetProperty("imagePath", out var ip)) existingImg = ip.GetString() ?? "";
+                        else if (v.TryGetProperty("image", out var img)) existingImg = img.GetString() ?? "";
+
+                        // If the stored imagePath is a base64 data URL (from client preview),
+                        // discard it — only real server paths should be stored
+                        if (existingImg.StartsWith("data:")) existingImg = "";
+                        if (existingImg.StartsWith("blob:"))  existingImg = "";
+
+                        // Check if a real image file was uploaded for this variation value
                         var fileKey = $"VarImg_{gi}_{vi}";
                         var file = allFiles[fileKey];
                         string imagePath = existingImg;
@@ -317,8 +369,11 @@ namespace EcommerceSystem.Controllers
 
                 return JsonSerializer.Serialize(result);
             }
-            catch
+            catch (Exception ex)
             {
+                // Log the real exception so you can debug it — don't silently swallow
+                Console.Error.WriteLine($"[ProcessVariationImagesAsync] ERROR: {ex.Message}");
+                Console.Error.WriteLine(ex.StackTrace);
                 return variationsJson;
             }
         }
@@ -369,7 +424,6 @@ namespace EcommerceSystem.Controllers
             return result;
         }
 
-        // completely remove the product(images, recorded information) from database once the seller decide to Delete 
         [HttpPost]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -408,7 +462,6 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("Home", new { tab = "Product" });
         }
 
-        // update the order status in the admin and relavant customer and seller  (Observer Design Pattern)
         [HttpPost]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, OrderStatus newStatus)
         {

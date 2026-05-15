@@ -220,7 +220,7 @@
 </style>
 
 <script>
-// Cover image
+// ── Cover image ───────────────────────────────────────────────
 function setCover(input) {
     if (!input.files[0]) return;
     const reader = new FileReader();
@@ -242,7 +242,7 @@ function removeCover(event) {
     document.getElementById('cover-remove').style.display = 'none';
 }
 
-// Content images
+// ── Content images ────────────────────────────────────────────
 function setContent(input, i) {
     if (!input.files[0]) return;
     const reader = new FileReader();
@@ -273,7 +273,7 @@ function hasImage() {
     return false;
 }
 
-// Drag to reorder content images
+// ── Drag to reorder content images ───────────────────────────
 let dragIdx = null;
 function dragStart(e, i) { dragIdx = i; e.currentTarget.style.opacity = '0.4'; }
 function dragOver(e, i)  { e.preventDefault(); document.getElementById('content-slot-' + i).classList.add('drag-over'); }
@@ -283,34 +283,28 @@ function dragDrop(e, i) {
     const slot = document.getElementById('content-slot-' + i);
     slot.classList.remove('drag-over');
     if (dragIdx === null || dragIdx === i) { dragIdx = null; return; }
-    // Swap file inputs by swapping preview srcs and file inputs
     swapSlots(dragIdx, i);
     dragIdx = null;
 }
 
 function swapSlots(a, b) {
     const slotA = document.getElementById('content-slot-' + a);
-    const slotB = document.getElementById('content-slot-' + b);
     slotA.style.opacity = '';
-    // Swap preview images
     const previewA = document.getElementById('content-preview-' + a);
     const previewB = document.getElementById('content-preview-' + b);
     const srcA = previewA.src, showA = previewA.style.display;
     previewA.src = previewB.src; previewA.style.display = previewB.style.display;
     previewB.src = srcA; previewB.style.display = showA;
-    // Swap empty state visibility
     const emptyA = document.getElementById('content-empty-' + a);
     const emptyB = document.getElementById('content-empty-' + b);
     const emptyDispA = emptyA.style.display;
     emptyA.style.display = emptyB.style.display;
     emptyB.style.display = emptyDispA;
-    // Swap remove buttons
     const removeA = document.getElementById('content-remove-' + a);
     const removeB = document.getElementById('content-remove-' + b);
     const removeDispA = removeA.style.display;
     removeA.style.display = removeB.style.display;
     removeB.style.display = removeDispA;
-    // Swap actual file inputs by transferring files
     const fileA = document.getElementById('content-file-' + a);
     const fileB = document.getElementById('content-file-' + b);
     const dtA = new DataTransfer(), dtB = new DataTransfer();
@@ -320,13 +314,23 @@ function swapSlots(a, b) {
     fileB.files = dtB.files;
 }
 
-// Variations with chip-card style (matches add-product.css)
+// ════════════════════════════════════════════════════════════
+// VARIATIONS
+// ════════════════════════════════════════════════════════════
 let groupCount = 0;
 let groups = {};
 
 function addVariationGroup(existingName = '', existingValues = []) {
     const id = groupCount++;
-    groups[id] = { name: existingName, values: JSON.parse(JSON.stringify(existingValues)) };
+    // FIX: normalise incoming values so we always use 'imagePath' internally
+    groups[id] = {
+        name: existingName,
+        values: existingValues.map(v => ({
+            label:     v.label     || '',
+            stock:     v.stock     || 0,
+            imagePath: v.imagePath || v.image || ''   // accept both key names
+        }))
+    };
 
     const wrapper = document.getElementById('variation-wrapper');
     const div = document.createElement('div');
@@ -355,7 +359,12 @@ function addVariationGroup(existingName = '', existingValues = []) {
     updateGlobalStockVisibility();
 }
 
-function removeGroup(id) { document.getElementById('vg-' + id).remove(); delete groups[id]; serializeVariations(); updateGlobalStockVisibility(); }
+function removeGroup(id) {
+    document.getElementById('vg-' + id).remove();
+    delete groups[id];
+    serializeVariations();
+    updateGlobalStockVisibility();
+}
 
 function addChip(groupId) {
     const valInput   = document.getElementById('val-input-' + groupId);
@@ -363,15 +372,11 @@ function addChip(groupId) {
     const label = valInput.value.trim();
     const stock = parseInt(stockInput.value) || 0;
     if (!label) { valInput.focus(); return; }
-    // Check for a pending variation image
-    const imgFile = document.getElementById('var-pending-img-' + groupId);
-    const image   = imgFile?.dataset.preview || '';
-    groups[groupId].values.push({ label, stock, image });
+
+    // FIX: use 'imagePath' not 'image' so serializeVariations sends the right key
+    groups[groupId].values.push({ label, stock, imagePath: '' });
     renderChips(groupId);
     valInput.value = ''; stockInput.value = '';
-    if (imgFile) { imgFile.dataset.preview = ''; imgFile.value = ''; }
-    const pendingWrap = document.getElementById('var-pending-img-wrap-' + groupId);
-    if (pendingWrap) pendingWrap.innerHTML = renderPendingImgLabel(groupId);
     valInput.focus();
     serializeVariations();
 }
@@ -399,13 +404,16 @@ function setPendingVarImg(input, groupId) {
     document.getElementById('var-pending-img-' + groupId).dataset.preview = url;
 }
 
-function removeChip(groupId, index) { groups[groupId].values.splice(index, 1); renderChips(groupId); serializeVariations(); }
+function removeChip(groupId, index) {
+    groups[groupId].values.splice(index, 1);
+    renderChips(groupId);
+    serializeVariations();
+}
 
 function renderChips(groupId) {
     const area = document.getElementById('chips-' + groupId);
     area.innerHTML = '';
 
-    // Pending image row above chip area
     let pendingRow = document.getElementById('var-pending-img-wrap-' + groupId);
     if (!pendingRow) {
         pendingRow = document.createElement('div');
@@ -418,9 +426,10 @@ function renderChips(groupId) {
     groups[groupId].values.forEach((v, i) => {
         const card = document.createElement('div');
         card.className = 'chip-card';
-        const imgHtml = v.image
+        // FIX: read v.imagePath (not v.image)
+        const imgHtml = v.imagePath
             ? `<div class="chip-img-wrap">
-                   <img class="chip-img-preview" src="${v.image}" />
+                   <img class="chip-img-preview" src="${v.imagePath}" />
                    <button type="button" class="chip-img-remove" onclick="removeChipImg(${groupId},${i})">
                        <i class="fas fa-times"></i>
                    </button>
@@ -452,13 +461,15 @@ function triggerChipImg(groupId, index) {
 function setChipImg(input, groupId, index) {
     if (!input.files[0]) return;
     const url = URL.createObjectURL(input.files[0]);
-    groups[groupId].values[index].image = url;
+    // FIX: store as imagePath
+    groups[groupId].values[index].imagePath = url;
     renderChips(groupId);
     serializeVariations();
 }
 
 function removeChipImg(groupId, index) {
-    groups[groupId].values[index].image = '';
+    // FIX: clear imagePath
+    groups[groupId].values[index].imagePath = '';
     renderChips(groupId);
     serializeVariations();
 }
@@ -467,8 +478,18 @@ function escHtml(str) {
     return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// FIX: serializeVariations now outputs { label, stock, imagePath } — matching the controller
 function serializeVariations() {
-    const data = Object.values(groups).filter(g => g.name || g.values.length > 0);
+    const data = Object.values(groups)
+        .filter(g => g.name || g.values.length > 0)
+        .map(g => ({
+            name: g.name,
+            values: g.values.map(v => ({
+                label:     v.label     || '',
+                stock:     typeof v.stock === 'number' ? v.stock : (parseInt(v.stock) || 0),
+                imagePath: v.imagePath || ''
+            }))
+        }));
     document.getElementById('variations-json').value = JSON.stringify(data);
 }
 
@@ -507,7 +528,7 @@ function submitForm(type) {
     document.getElementById('productForm').submit();
 }
 
-// Variation image label style (inline, reused in addVariationGroup)
+// Variation image label style
 const varImgLabelStyle = `
     .var-img-label {
         display: inline-flex; align-items: center; gap: 5px;
