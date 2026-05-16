@@ -17,25 +17,50 @@ namespace EcommerceSystem.Models
         public string ImagePath { get; set; } = string.Empty;
 
         // JSON array of all image paths in display order
-        // e.g. ["/images/a.jpg", "/images/b.jpg", "/images/c.jpg"]
+        // e.g. ["/images/a.jpg", "/images/b.jpg"]
         public string ImagePathsJson { get; set; } = "[]";
 
         public int SellerId { get; set; }
         public int CategoryId { get; set; }
 
-        // Track if product is a draft or published
         public bool IsDraft { get; set; } = false;
 
-        // Stores variation groups as JSON string
-        // e.g. [{name:"Flavour", values:[{label:"Original", stock:10, imagePath:"/images/x.jpg"}]}]
+        // ── VARIATION GROUPS ─────────────────────────────────────────────────
+        // Stores the group names and their option labels (+ optional image per option).
+        // Stock is NOT stored here — it lives in VariationCombosJson below.
+        //
+        // Schema (1 or 2 groups allowed):
+        // [
+        //   { "name": "Colour", "values": [{ "label": "Black", "imagePath": "" }, ...] },
+        //   { "name": "Size",   "values": [{ "label": "M",     "imagePath": "" }, ...] }
+        // ]
+        //
+        // When there are NO variations this stays "[]" and StockQuantity is used directly.
         public string VariationsJson { get; set; } = "[]";
+
+        // ── VARIATION COMBINATIONS ───────────────────────────────────────────
+        // Stores stock per combination of option labels.
+        // "keys" order matches the group order in VariationsJson.
+        //
+        // Single-group example  (only Size):
+        // [{ "keys": ["M"], "stock": 50 }, { "keys": ["L"], "stock": 20 }]
+        //
+        // Two-group example  (Colour × Size):
+        // [
+        //   { "keys": ["Black", "M"], "stock": 10 },
+        //   { "keys": ["Black", "L"], "stock": 5  },
+        //   { "keys": ["Yellow","M"], "stock": 8  },
+        //   { "keys": ["Yellow","L"], "stock": 0  }
+        // ]
+        public string VariationCombosJson { get; set; } = "[]";
 
         public Category? Category { get; set; }
         public Seller? Seller { get; set; }
 
         public Product() { }
 
-        public Product(int productId, string name, string description, double price, int stockQuantity, Category category, Seller seller)
+        public Product(int productId, string name, string description, double price,
+                       int stockQuantity, Category category, Seller seller)
         {
             ProductId = productId;
             Name = name;
@@ -46,26 +71,33 @@ namespace EcommerceSystem.Models
             Seller = seller;
         }
 
-        public bool IsInStock()
-        {
-            return StockQuantity > 0;
-        }
+        public bool IsInStock() => StockQuantity > 0;
 
         public double OriginalPrice { get; set; } = 0;
         public double AverageRating { get; set; } = 0;
-        public double ReviewCount { get; set; } = 0;
+        public double ReviewCount   { get; set; } = 0;
 
+        // ── Nested types ─────────────────────────────────────────────────────
+
+        /// <summary>One variation group, e.g. { name:"Colour", values:[...] }</summary>
         public class VariationGroup
         {
             public string Name { get; set; } = "";
             public List<VariationValue> Values { get; set; } = new();
         }
 
+        /// <summary>One option within a group, e.g. { label:"Black", imagePath:"" }</summary>
         public class VariationValue
         {
-            public string Label { get; set; } = "";
-            public int Stock { get; set; }
+            public string Label     { get; set; } = "";
             public string ImagePath { get; set; } = "";
+        }
+
+        /// <summary>Stock entry for one combination, e.g. { keys:["Black","M"], stock:10 }</summary>
+        public class VariationCombo
+        {
+            public List<string> Keys { get; set; } = new();
+            public int Stock { get; set; }
         }
     }
 }

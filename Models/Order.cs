@@ -69,7 +69,7 @@ using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Models;
 
-public class Order : Subject
+public class Order : OrderStatusSubject
 {
     public int OrderId { get; set; }
     public int CustomerUserId { get; set; }
@@ -85,10 +85,10 @@ public class Order : Subject
     public List<CartProduct> Products { get; set; } = new();
 
     [NotMapped]
-    private List<Observer> _observers = new List<Observer>();
+    private List<OrderStatusObserver> _observers = new List<OrderStatusObserver>();
 
-    public void Attach(Observer observer) => _observers.Add(observer);
-    public void Detach(Observer observer) => _observers.Remove(observer);
+    public void Attach(OrderStatusObserver observer) => _observers.Add(observer);
+    public void Detach(OrderStatusObserver observer) => _observers.Remove(observer);
 
     public void NotifyObservers()
     {

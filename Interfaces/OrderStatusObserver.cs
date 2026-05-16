@@ -2,7 +2,7 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Interfaces;
 
-public interface Observer
+public interface OrderStatusObserver
 {
     void Update(Order order);
 }
