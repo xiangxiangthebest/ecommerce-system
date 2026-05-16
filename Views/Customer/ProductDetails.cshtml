@@ -10,18 +10,38 @@
     var firstImage  = images.Count > 0 ? images[0] : Model.ImagePath;
     var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
 
+    // ── Parse combos for Razor-side use (not used directly in markup, but kept for reference)
+    var combos = new List<Product.VariationCombo>();
+    try {
+        combos = JsonSerializer.Deserialize<List<Product.VariationCombo>>(Model.VariationCombosJson ?? "[]")
+                 ?? new List<Product.VariationCombo>();
+    } catch { }
+
+    bool hasVariations = variations.Count > 0;
+
+    // For no-variation products, stock badge is fixed
     string stockClass, stockLabel;
-    if (Model.StockQuantity <= 0) {
-        stockClass = "out-of-stock"; stockLabel = "Out of Stock";
-    } else if (Model.StockQuantity <= 5) {
-        stockClass = "low-stock";    stockLabel = "Low Stock";
+    if (!hasVariations) {
+        if (Model.StockQuantity <= 0) {
+            stockClass = "out-of-stock"; stockLabel = "Out of Stock";
+        } else if (Model.StockQuantity <= 5) {
+            stockClass = "low-stock";    stockLabel = "Low Stock";
+        } else {
+            stockClass = "in-stock";     stockLabel = "In Stock";
+        }
     } else {
-        stockClass = "in-stock";     stockLabel = "In Stock";
+        // Variation products: badge starts neutral, JS will update it
+        stockClass = "select-options"; stockLabel = "Select Options";
     }
 
     // Star rendering helpers
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
+
+    // Total stock across all combos (used as the overall max for qty input before selection)
+    int totalVariationStock = hasVariations
+        ? combos.Sum(c => c.Stock)
+        : Model.StockQuantity;
 }
 
 <div class="pd-page">
@@ -64,7 +84,7 @@
             <div class="pd-top-row">
                 <span class="pd-category">@(Model.Category?.Name ?? "Uncategorised")</span>
                 <div class="pd-badges">
-                    <span class="pd-badge @stockClass">@stockLabel</span>
+                    <span id="pdStockBadge" class="pd-badge @stockClass">@stockLabel</span>
                 </div>
             </div>
 
@@ -113,14 +133,17 @@
                     : Model.Description)
             </p>
 
-            <!-- Variations -->
-            @if (variations.Count > 0)
+            <!-- ── Variations ── -->
+            @if (hasVariations)
             {
                 <div class="pd-variations">
-                    @foreach (var group in variations)
+                    @for (int gi = 0; gi < variations.Count; gi++)
                     {
-                        <div class="pd-variation-group">
-                            <div class="pd-variation-label">@group.Name</div>
+                        var group = variations[gi];
+                        <div class="pd-variation-group" data-group-index="@gi">
+                            <div class="pd-variation-label">
+                                @group.Name: <span class="pd-variation-selected-label" id="pdSelectedLabel_@gi"></span>
+                            </div>
                             <div class="pd-variation-options">
                                 @foreach (var val in group.Values)
                                 {
@@ -128,15 +151,19 @@
                                     {
                                         <div class="pd-variation-swatch"
                                              title="@val.Label"
-                                             onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                             data-group-index="@gi"
+                                             data-label="@val.Label"
+                                             onclick="selectVariation(this, @gi, '@val.Label')">
                                             <img src="@val.ImagePath" alt="@val.Label" />
                                         </div>
                                     }
                                     else
                                     {
                                         <button class="pd-variation-btn"
-                                                @(val.Stock <= 0 ? "disabled" : "")
-                                                onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                                type="button"
+                                                data-group-index="@gi"
+                                                data-label="@val.Label"
+                                                onclick="selectVariation(this, @gi, '@val.Label')">
                                             @val.Label
                                         </button>
                                     }
@@ -145,6 +172,9 @@
                         </div>
                     }
                 </div>
+
+                <!-- Stock note shown after selection -->
+                <div id="pdVariationStockNote" class="pd-stock-variation-note" style="display:none;"></div>
             }
 
             <!-- Quantity -->
@@ -153,10 +183,10 @@
                 <div class="pd-qty-control">
                     <button class="pd-qty-btn" onclick="adjustQty(-1)" type="button">−</button>
                     <input  id="pdQty" type="number" class="pd-qty-input"
-                            min="1" max="@Model.StockQuantity" value="1" readonly />
+                            min="1" max="@totalVariationStock" value="1" readonly />
                     <button class="pd-qty-btn" onclick="adjustQty(1)"  type="button">+</button>
                 </div>
-                @if (Model.StockQuantity > 0)
+                @if (!hasVariations && Model.StockQuantity > 0)
                 {
                     <span class="pd-stock-note">@Model.StockQuantity left</span>
                 }
@@ -164,10 +194,12 @@
 
             <!-- Actions -->
             <div class="pd-actions">
-                <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                <button id="pdBtnCart" class="pd-btn-cart"
+                        @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : "")>
                     <i class="ti ti-shopping-cart-plus"></i> Add to Cart
                 </button>
-                <button class="pd-btn-buy" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                <button id="pdBtnBuy" class="pd-btn-buy"
+                        @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : "")>
                     <i class="ti ti-bolt"></i> Buy Now
                 </button>
             </div>
@@ -199,12 +231,14 @@
 </div>
 
 <script>
+    // ── Gallery ───────────────────────────────────────────────────────────────
     function switchImage(src, el) {
         document.getElementById('pdMainImg').src = src;
         document.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
         el.classList.add('active');
     }
 
+    // ── Qty ───────────────────────────────────────────────────────────────────
     function adjustQty(delta) {
         const input = document.getElementById('pdQty');
         const max   = parseInt(input.max) || 999;
@@ -212,11 +246,147 @@
         input.value = val;
     }
 
-    function selectVariation(el, groupName, label) {
-        // Deselect siblings in same group
-        const parent = el.closest('.pd-variation-options');
-        parent.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
-              .forEach(b => b.classList.remove('active'));
+    // ── Variation stock logic ─────────────────────────────────────────────────
+
+    // All combos from the server — keys order matches variation group order
+    // Single group:  [{ keys: ["Black"], stock: 10 }, ...]
+    // Double group:  [{ keys: ["Black", "M"], stock: 10 }, ...]
+    const allCombos      = @Html.Raw(Model.VariationCombosJson ?? "[]");
+    const totalGroups    = @variations.Count;
+
+    // Tracks what the user has selected per group index
+    // e.g. selectedKeys[0] = "Black",  selectedKeys[1] = "M"
+    const selectedKeys   = new Array(totalGroups).fill(null);
+
+    function selectVariation(el, groupIndex, label) {
+        // ── 1. Mark button active within its group
+        const optionsRow = el.closest('.pd-variation-options');
+        optionsRow.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
+                  .forEach(b => b.classList.remove('active'));
         el.classList.add('active');
+
+        // ── 2. Show selected label next to group name
+        const labelSpan = document.getElementById('pdSelectedLabel_' + groupIndex);
+        if (labelSpan) labelSpan.textContent = label;
+
+        // ── 3. Store selection
+        selectedKeys[groupIndex] = label;
+
+        // ── 4. Update UI based on current selections
+        updateVariationUI();
     }
+
+    function updateVariationUI() {
+        const badge     = document.getElementById('pdStockBadge');
+        const stockNote = document.getElementById('pdVariationStockNote');
+        const qtyInput  = document.getElementById('pdQty');
+        const btnCart   = document.getElementById('pdBtnCart');
+        const btnBuy    = document.getElementById('pdBtnBuy');
+
+        // Check if all groups have been selected
+        const allSelected = selectedKeys.every(k => k !== null);
+
+        if (!allSelected) {
+            // Not all groups selected yet — keep neutral state
+            badge.className     = 'pd-badge select-options';
+            badge.textContent   = 'Select Options';
+            if (stockNote) stockNote.style.display = 'none';
+            btnCart.disabled    = true;
+            btnBuy.disabled     = true;
+            return;
+        }
+
+        // ── Find the matching combo
+        // For single group:  keys must be ["selectedKeys[0]"]
+        // For double group:  keys must be ["selectedKeys[0]", "selectedKeys[1]"]
+        const match = allCombos.find(combo => {
+            if (combo.keys.length !== totalGroups) return false;
+            return selectedKeys.every((key, i) => combo.keys[i] === key);
+        });
+
+        const stock = match ? match.stock : 0;
+
+        // ── Update stock badge
+        if (stock <= 0) {
+            badge.className   = 'pd-badge out-of-stock';
+            badge.textContent = 'Out of Stock';
+        } else if (stock <= 5) {
+            badge.className   = 'pd-badge low-stock';
+            badge.textContent = 'Low Stock';
+        } else {
+            badge.className   = 'pd-badge in-stock';
+            badge.textContent = 'In Stock';
+        }
+
+        // ── Update stock note below variations
+        if (stockNote) {
+            if (stock > 0) {
+                stockNote.textContent   = stock + ' left for this option';
+                stockNote.style.display = 'block';
+            } else {
+                stockNote.textContent   = 'This combination is out of stock';
+                stockNote.style.display = 'block';
+            }
+        }
+
+        // ── Update qty input max
+        qtyInput.max = stock;
+        // Clamp current value if needed
+        if (parseInt(qtyInput.value) > stock) {
+            qtyInput.value = Math.max(1, stock);
+        }
+
+        // ── Enable/disable action buttons
+        btnCart.disabled = stock <= 0;
+        btnBuy.disabled  = stock <= 0;
+
+        // ── (Optional) Dim out-of-stock buttons in other groups
+        // when one group is selected, grey out sibling options that have 0 total stock
+        if (totalGroups === 2) {
+            greyOutUnavailableOptions();
+        }
+    }
+
+    // For double-variation: after selecting group 0, grey out group 1 options
+    // that have zero stock across all combos with the current group 0 selection.
+    // And vice versa.
+    function greyOutUnavailableOptions() {
+        for (let gi = 0; gi < totalGroups; gi++) {
+            const otherGroupIndex = gi === 0 ? 1 : 0;
+            const otherSelected   = selectedKeys[otherGroupIndex];
+            if (otherSelected === null) continue; // other group not picked yet
+
+            // For each button/swatch in group gi
+            const groupEl = document.querySelector(`.pd-variation-group[data-group-index="${gi}"]`);
+            if (!groupEl) continue;
+
+            groupEl.querySelectorAll('[data-label]').forEach(btn => {
+                const thisLabel = btn.getAttribute('data-label');
+
+                // Build the keys array for this potential combo
+                const keys = new Array(totalGroups);
+                keys[gi]              = thisLabel;
+                keys[otherGroupIndex] = otherSelected;
+
+                const combo = allCombos.find(c =>
+                    c.keys.length === totalGroups &&
+                    keys.every((k, i) => c.keys[i] === k)
+                );
+
+                const available = combo && combo.stock > 0;
+                btn.classList.toggle('unavailable', !available);
+                if (btn.tagName === 'BUTTON') {
+                    btn.disabled = !available;
+                }
+            });
+        }
+    }
+
+    // ── On page load: disable action buttons if product has variations ────────
+    (function init() {
+        if (totalGroups > 0) {
+            document.getElementById('pdBtnCart').disabled = true;
+            document.getElementById('pdBtnBuy').disabled  = true;
+        }
+    })();
 </script>

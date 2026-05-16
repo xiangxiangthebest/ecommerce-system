@@ -510,3 +510,7 @@
 
   .pd-trust-item { flex-direction: row; justify-content: flex-start; gap: 10px; text-align: left; }
 }
+
+.pd-badge.select-options { background: #e0e0e0; color: #666; }
+.pd-variation-btn.unavailable { opacity: 0.35; text-decoration: line-through; cursor: not-allowed; }
+.pd-stock-variation-note { font-size: 0.85rem; color: #888; margin-top: 6px; }

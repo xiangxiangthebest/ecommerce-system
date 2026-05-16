@@ -12,12 +12,12 @@ namespace EcommerceSystem.Controllers
     [Authorize(Roles = "Seller")]
     public class SellerController : Controller
     {
-        private readonly AppDbContext _context; 
+        private readonly AppDbContext _context;
 
         public SellerController(AppDbContext context)
         {
             _context = context;
-        } 
+        }
 
         private async Task<Seller?> GetCurrentSellerAsync()
         {
@@ -55,9 +55,33 @@ namespace EcommerceSystem.Controllers
             };
         }
 
-        // ── Sum all variation stocks from VariationsJson ──
-        // Format: [{name:"Size", values:[{label:"S", stock:10, imagePath:""}]}]
-        // Returns 0 if no variations or variations is empty "[]"
+        // ── Sum all combination stocks from VariationCombosJson ──
+        // Returns 0 if no combinations defined.
+        private static int SumComboStock(string combosJson)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
+                return 0;
+            try
+            {
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null || combos.Count == 0) return 0;
+
+                int total = 0;
+                foreach (var c in combos)
+                {
+                    if (c.TryGetProperty("stock", out var s))
+                        total += SafeGetInt(s);
+                }
+                return total;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        // ── Fallback: sum stocks from the old flat VariationsJson format ──
+        // Used only for backward-compatibility with products saved before the combo system.
         private static int SumVariationStock(string variationsJson)
         {
             if (string.IsNullOrWhiteSpace(variationsJson) || variationsJson == "[]")
@@ -65,8 +89,7 @@ namespace EcommerceSystem.Controllers
             try
             {
                 var groups = JsonSerializer.Deserialize<List<JsonElement>>(variationsJson);
-                if (groups == null || groups.Count == 0) return 0;
-
+                if (groups == null) return 0;
                 int total = 0;
                 foreach (var g in groups)
                 {
@@ -79,10 +102,7 @@ namespace EcommerceSystem.Controllers
                 }
                 return total;
             }
-            catch
-            {
-                return 0;
-            }
+            catch { return 0; }
         }
 
         public async Task<IActionResult> Home(string tab = "General")
@@ -146,8 +166,8 @@ namespace EcommerceSystem.Controllers
                 TempData["Error"] = "Your account is pending admin approval. You cannot add products yet.";
                 return RedirectToAction("Home", new { tab = "General" });
             }
-             
-            bool isDraft = actionType == "Draft"; 
+
+            bool isDraft = actionType == "Draft";
 
             if (!isDraft)
             {
@@ -182,10 +202,15 @@ namespace EcommerceSystem.Controllers
             model.SKU         = model.SKU         ?? string.Empty;
             model.IsDraft     = isDraft;
 
-            // Read VariationsJson from the hidden form field
+            // ── Read variation groups (names + option labels + optional images) ──
             model.VariationsJson = Request.Form["VariationsJson"].ToString();
             if (string.IsNullOrWhiteSpace(model.VariationsJson))
                 model.VariationsJson = "[]";
+
+            // ── Read variation combinations (stock per combo) ──
+            model.VariationCombosJson = Request.Form["VariationCombosJson"].ToString();
+            if (string.IsNullOrWhiteSpace(model.VariationCombosJson))
+                model.VariationCombosJson = "[]";
 
             var categoryName = Request.Form["Category"].ToString();
             if (!string.IsNullOrEmpty(categoryName))
@@ -209,13 +234,13 @@ namespace EcommerceSystem.Controllers
                 model.ImagePathsJson = "[]";
             }
 
-            // Process variation images — strips base64 from imagePath, saves real files
+            // Process variation option images (strips base64, saves real files)
             model.VariationsJson = await ProcessVariationImagesAsync(model.VariationsJson, Request.Form.Files);
 
-            // Auto-sum StockQuantity from variation stocks when variations are present
-            var variationStockSum = SumVariationStock(model.VariationsJson);
-            if (variationStockSum > 0)
-                model.StockQuantity = variationStockSum;
+            // Auto-sum StockQuantity from combination stocks when combinations are present
+            var comboStockSum = SumComboStock(model.VariationCombosJson);
+            if (comboStockSum > 0)
+                model.StockQuantity = comboStockSum;
 
             _context.Products.Add(model);
             await _context.SaveChangesAsync();
@@ -271,8 +296,13 @@ namespace EcommerceSystem.Controllers
             existing.StockQuantity = model.StockQuantity;
             existing.IsDraft       = actionType == "Draft";
 
+            // ── Variation groups ──
             var variationsJson = Request.Form["VariationsJson"].ToString();
             existing.VariationsJson = string.IsNullOrWhiteSpace(variationsJson) ? "[]" : variationsJson;
+
+            // ── Variation combinations ──
+            var combosJson = Request.Form["VariationCombosJson"].ToString();
+            existing.VariationCombosJson = string.IsNullOrWhiteSpace(combosJson) ? "[]" : combosJson;
 
             var categoryName = Request.Form["Category"].ToString();
             if (!string.IsNullOrEmpty(categoryName))
@@ -303,18 +333,19 @@ namespace EcommerceSystem.Controllers
 
             existing.VariationsJson = await ProcessVariationImagesAsync(existing.VariationsJson, Request.Form.Files);
 
-            // Auto-sum StockQuantity from variation stocks when variations are present
-            var editVariationStockSum = SumVariationStock(existing.VariationsJson);
-            if (editVariationStockSum > 0)
-                existing.StockQuantity = editVariationStockSum;
+            // Auto-sum StockQuantity from combination stocks when combinations are present
+            var comboStockSum = SumComboStock(existing.VariationCombosJson);
+            if (comboStockSum > 0)
+                existing.StockQuantity = comboStockSum;
 
             TempData["Success"] = existing.IsDraft ? "Product saved as draft." : "Product updated successfully.";
             await _context.SaveChangesAsync();
             return RedirectToAction("Home", new { tab = "Product" });
         }
 
-        // ── FIX: ProcessVariationImagesAsync ─────────────────────────
-        // Uses SafeGetInt so stock never throws; handles both 'imagePath' and 'image' keys
+        // ── ProcessVariationImagesAsync ───────────────────────────────────────
+        // Variation groups no longer carry stock — only label + imagePath.
+        // Stock lives in VariationCombosJson.
         private async Task<string> ProcessVariationImagesAsync(string variationsJson, IFormFileCollection allFiles)
         {
             try
@@ -325,34 +356,28 @@ namespace EcommerceSystem.Controllers
                 var result = new List<object>();
                 for (int gi = 0; gi < groups.Count; gi++)
                 {
-                    var g = groups[gi];
+                    var g    = groups[gi];
                     var name = g.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-                    var values = g.TryGetProperty("values", out var vs)
+                    var vals = g.TryGetProperty("values", out var vs)
                         ? vs.EnumerateArray().ToList()
                         : new List<JsonElement>();
 
                     var newValues = new List<object>();
-                    for (int vi = 0; vi < values.Count; vi++)
+                    for (int vi = 0; vi < vals.Count; vi++)
                     {
-                        var v = values[vi];
+                        var v     = vals[vi];
                         var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
 
-                        // FIX: use SafeGetInt — GetInt32() throws if value is a JSON double or string
-                        var stock = v.TryGetProperty("stock", out var s) ? SafeGetInt(s) : 0;
-
-                        // Accept both 'imagePath' and legacy 'image' key names
                         string existingImg = "";
                         if (v.TryGetProperty("imagePath", out var ip)) existingImg = ip.GetString() ?? "";
                         else if (v.TryGetProperty("image", out var img)) existingImg = img.GetString() ?? "";
 
-                        // If the stored imagePath is a base64 data URL (from client preview),
-                        // discard it — only real server paths should be stored
+                        // Discard blob/base64 preview URLs — only real server paths are stored
                         if (existingImg.StartsWith("data:")) existingImg = "";
                         if (existingImg.StartsWith("blob:"))  existingImg = "";
 
-                        // Check if a real image file was uploaded for this variation value
                         var fileKey = $"VarImg_{gi}_{vi}";
-                        var file = allFiles[fileKey];
+                        var file    = allFiles[fileKey];
                         string imagePath = existingImg;
 
                         if (file != null && file.Length > 0)
@@ -361,7 +386,8 @@ namespace EcommerceSystem.Controllers
                             if (saved.Count > 0) imagePath = saved[0];
                         }
 
-                        newValues.Add(new { label, stock, imagePath });
+                        // NOTE: no 'stock' field here — stock is in combos
+                        newValues.Add(new { label, imagePath });
                     }
 
                     result.Add(new { name, values = newValues });
@@ -371,14 +397,14 @@ namespace EcommerceSystem.Controllers
             }
             catch (Exception ex)
             {
-                // Log the real exception so you can debug it — don't silently swallow
                 Console.Error.WriteLine($"[ProcessVariationImagesAsync] ERROR: {ex.Message}");
                 Console.Error.WriteLine(ex.StackTrace);
                 return variationsJson;
             }
         }
 
-        private List<string> BuildMergedImageList(string slotAssignmentJson, List<string> keptPaths, List<string> newPaths, string existingImagePathsJson)
+        private List<string> BuildMergedImageList(string slotAssignmentJson, List<string> keptPaths,
+                                                   List<string> newPaths, string existingImagePathsJson)
         {
             if (!string.IsNullOrWhiteSpace(slotAssignmentJson))
             {

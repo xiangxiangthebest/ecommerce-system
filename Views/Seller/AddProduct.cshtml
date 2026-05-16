@@ -30,6 +30,9 @@
         <div class="add-product-container">
             <div class="page-header-row">
                 <h1 class="section-title" style="margin:0;">Add New Product</h1>
+                <button type="button" class="btn-preview-trigger" onclick="openPreview()">
+                    <i class="fas fa-eye"></i> Customer Preview
+                </button>
             </div>
 
             <div id="val-banner" class="val-banner" style="display:none;"></div>
@@ -57,11 +60,9 @@
 
                     <!-- IMAGES -->
                     <div class="form-section-label">
-                        Cover Image
-                        <span class="desc-hint">first image customers see</span>
+                        Cover Image <span class="desc-hint">first image customers see</span>
                     </div>
 
-                    <!-- Cover image slot -->
                     <div class="cover-image-wrap">
                         <div class="cover-slot" id="cover-slot" onclick="document.getElementById('cover-file').click()">
                             <input type="file" id="cover-file" name="ImageFiles" accept="image/*"
@@ -80,11 +81,9 @@
                     </div>
 
                     <div class="form-section-label" style="margin-top:24px;">
-                        Content Images
-                        <span class="desc-hint">up to 4 additional images · customers swipe through these</span>
+                        Content Images <span class="desc-hint">up to 4 additional images · customers swipe through these</span>
                     </div>
 
-                    <!-- Content image slots -->
                     <div class="img-thumb-strip" id="content-strip">
                         @for (int i = 0; i < 4; i++)
                         {
@@ -143,13 +142,38 @@
                         </div>
                     </div>
 
-                    <!-- VARIATIONS -->
-                    <div class="form-section-label">Variations</div>
-                    <div id="variation-wrapper"></div>
-                    <button type="button" class="btn-add-variation" onclick="addVariationGroup()">
+                    <!-- ══ VARIATIONS ══════════════════════════════════════════ -->
+                    <div class="form-section-label">
+                        Variations
+                        <span class="desc-hint">up to 2 groups (e.g. Colour + Size)</span>
+                    </div>
+
+                    <div id="variation-groups-wrapper"></div>
+
+                    <button type="button" class="btn-add-variation" id="btn-add-var-group"
+                            onclick="addVariationGroup()">
                         <i class="fas fa-plus"></i> Add Variation Group
                     </button>
-                    <input type="hidden" name="VariationsJson" id="variations-json" value="[]" />
+
+                    <!-- Combination stock matrix — shown when 2+ groups defined -->
+                    <div id="combo-section" style="display:none;margin-top:24px;">
+                        <div class="form-section-label" style="margin-top:0;">
+                            Stock per Combination
+                            <span class="desc-hint">enter stock for each combination</span>
+                        </div>
+                        <div id="combo-set-all-row" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <input type="number" id="combo-fill-val" min="0" placeholder="e.g. 100"
+                                   style="width:120px;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;" />
+                            <button type="button" class="btn-add-chip" onclick="fillAllCombos()"
+                                    style="white-space:nowrap;">Fill All</button>
+                            <span style="font-size:12px;color:#9a98b6;">Set same stock for every combination at once</span>
+                        </div>
+                        <div id="combo-table-wrap"></div>
+                    </div>
+
+                    <!-- Hidden fields submitted to server -->
+                    <input type="hidden" name="VariationsJson"      id="variations-json"  value="[]" />
+                    <input type="hidden" name="VariationCombosJson" id="combos-json"       value="[]" />
 
                 </div>
 
@@ -167,60 +191,99 @@
     </main>
 </div>
 
+@await Html.PartialAsync("_ProductPreviewModal")
+
 <style>
 /* Cover image */
 .cover-image-wrap { margin-bottom: 8px; }
-
 .cover-slot {
-    width: 100%;
-    max-width: 400px;
-    aspect-ratio: 1 / 1;
-    border: 2px dashed #c5cae9;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #f8f9ff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    position: relative;
-    transition: border-color 0.2s;
+    width: 100%; max-width: 400px; aspect-ratio: 1 / 1;
+    border: 2px dashed #c5cae9; border-radius: 14px; overflow: hidden;
+    background: #f8f9ff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative; transition: border-color 0.2s;
 }
 .cover-slot:hover { border-color: #4f46e5; }
-
 .cover-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    color: #9a98b6;
-    font-size: 13px;
-    font-weight: 600;
-    pointer-events: none;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; color: #9a98b6; font-size: 13px; font-weight: 600; pointer-events: none;
 }
 .cover-empty i { font-size: 40px; color: #c5cae9; }
-
-.cover-preview-img {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    position: absolute; top: 0; left: 0;
+.cover-preview-img { width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0; }
+.cover-remove-btn {
+    position:absolute;top:10px;right:10px;width:28px;height:28px;
+    background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;
+    font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;
 }
 
-.cover-remove-btn {
-    position: absolute;
-    top: 10px; right: 10px;
-    width: 28px; height: 28px;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    border: none; border-radius: 50%;
-    font-size: 12px; cursor: pointer;
+/* Variation option chips (image + label only — no stock input here) */
+.var-option-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; border: 1.5px solid #e8eaf6;
+    border-radius: 20px; padding: 5px 10px 5px 6px;
+    font-size: 13px; font-weight: 600; color: #1e1b4b;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative;
+    cursor: default; user-select: none;
+}
+.var-option-chip img {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+}
+.var-option-chip .chip-img-placeholder {
+    width: 26px; height: 26px; border-radius: 50%; background: #eef0ff;
+    border: 1.5px dashed #c5cae9; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    z-index: 10;
+    font-size: 11px; color: #9a98b6;
+}
+.var-option-chip .chip-img-placeholder:hover { background: #e0e0ff; }
+.var-option-chip .chip-del {
+    background: none; border: none; cursor: pointer;
+    color: #c5cae9; font-size: 12px; padding: 0; line-height:1;
+}
+.var-option-chip .chip-del:hover { color: #c62828; }
+
+/* Combination stock table */
+.combo-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    background: #fff;
+    border: 1px solid #e8eaf6;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.combo-table th {
+    background: #f8f9ff;
+    color: #5b587d;
+    font-weight: 700;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid #e8eaf6;
+}
+.combo-table td {
+    padding: 8px 14px;
+    border-bottom: 1px solid #f0f0f8;
+    vertical-align: middle;
+}
+.combo-table tr:last-child td { border-bottom: none; }
+.combo-table .combo-img {
+    width: 32px; height: 32px; border-radius: 6px; object-fit: cover;
+    vertical-align: middle; margin-right: 6px;
+}
+.combo-stock-input {
+    width: 90px; padding: 6px 10px; border: 1px solid #c5cae9;
+    border-radius: 6px; font-size: 13px; font-weight: 600; color: #1e1b4b;
+    text-align: center;
+}
+.combo-stock-input:focus { outline: none; border-color: #1e1b4b; }
+.combo-stock-badge {
+    display: inline-block; padding: 2px 10px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; background: #f0f0ff; color: #5b587d;
 }
 </style>
 
 <script>
-// ── Cover image ───────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// COVER IMAGE
+// ════════════════════════════════════════════════════════════
 function setCover(input) {
     if (!input.files[0]) return;
     const reader = new FileReader();
@@ -232,7 +295,6 @@ function setCover(input) {
     };
     reader.readAsDataURL(input.files[0]);
 }
-
 function removeCover(event) {
     event.stopPropagation();
     document.getElementById('cover-file').value = '';
@@ -242,7 +304,9 @@ function removeCover(event) {
     document.getElementById('cover-remove').style.display = 'none';
 }
 
-// ── Content images ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// CONTENT IMAGES
+// ════════════════════════════════════════════════════════════
 function setContent(input, i) {
     if (!input.files[0]) return;
     const reader = new FileReader();
@@ -255,7 +319,6 @@ function setContent(input, i) {
     };
     reader.readAsDataURL(input.files[0]);
 }
-
 function removeContent(event, i) {
     event.stopPropagation();
     document.getElementById('content-file-' + i).value = '';
@@ -264,7 +327,6 @@ function removeContent(event, i) {
     document.getElementById('content-empty-' + i).style.display = 'flex';
     document.getElementById('content-remove-' + i).style.display = 'none';
 }
-
 function hasImage() {
     if (document.getElementById('cover-file').files.length > 0) return true;
     for (let i = 0; i < 4; i++) {
@@ -273,242 +335,351 @@ function hasImage() {
     return false;
 }
 
-// ── Drag to reorder content images ───────────────────────────
+// Drag reorder
 let dragIdx = null;
 function dragStart(e, i) { dragIdx = i; e.currentTarget.style.opacity = '0.4'; }
 function dragOver(e, i)  { e.preventDefault(); document.getElementById('content-slot-' + i).classList.add('drag-over'); }
 function dragLeave(e, i) { document.getElementById('content-slot-' + i).classList.remove('drag-over'); }
 function dragDrop(e, i) {
     e.preventDefault();
-    const slot = document.getElementById('content-slot-' + i);
-    slot.classList.remove('drag-over');
+    document.getElementById('content-slot-' + i).classList.remove('drag-over');
     if (dragIdx === null || dragIdx === i) { dragIdx = null; return; }
-    swapSlots(dragIdx, i);
-    dragIdx = null;
+    swapSlots(dragIdx, i); dragIdx = null;
 }
-
 function swapSlots(a, b) {
     const slotA = document.getElementById('content-slot-' + a);
     slotA.style.opacity = '';
-    const previewA = document.getElementById('content-preview-' + a);
-    const previewB = document.getElementById('content-preview-' + b);
-    const srcA = previewA.src, showA = previewA.style.display;
-    previewA.src = previewB.src; previewA.style.display = previewB.style.display;
-    previewB.src = srcA; previewB.style.display = showA;
-    const emptyA = document.getElementById('content-empty-' + a);
-    const emptyB = document.getElementById('content-empty-' + b);
-    const emptyDispA = emptyA.style.display;
-    emptyA.style.display = emptyB.style.display;
-    emptyB.style.display = emptyDispA;
-    const removeA = document.getElementById('content-remove-' + a);
-    const removeB = document.getElementById('content-remove-' + b);
-    const removeDispA = removeA.style.display;
-    removeA.style.display = removeB.style.display;
-    removeB.style.display = removeDispA;
-    const fileA = document.getElementById('content-file-' + a);
-    const fileB = document.getElementById('content-file-' + b);
+    const pA = document.getElementById('content-preview-' + a);
+    const pB = document.getElementById('content-preview-' + b);
+    const srcA = pA.src, showA = pA.style.display;
+    pA.src = pB.src; pA.style.display = pB.style.display;
+    pB.src = srcA;  pB.style.display = showA;
+    const eA = document.getElementById('content-empty-' + a);
+    const eB = document.getElementById('content-empty-' + b);
+    const edA = eA.style.display; eA.style.display = eB.style.display; eB.style.display = edA;
+    const rA = document.getElementById('content-remove-' + a);
+    const rB = document.getElementById('content-remove-' + b);
+    const rdA = rA.style.display; rA.style.display = rB.style.display; rB.style.display = rdA;
+    const fA = document.getElementById('content-file-' + a);
+    const fB = document.getElementById('content-file-' + b);
     const dtA = new DataTransfer(), dtB = new DataTransfer();
-    if (fileB.files[0]) dtA.items.add(fileB.files[0]);
-    if (fileA.files[0]) dtB.items.add(fileA.files[0]);
-    fileA.files = dtA.files;
-    fileB.files = dtB.files;
+    if (fB.files[0]) dtA.items.add(fB.files[0]);
+    if (fA.files[0]) dtB.items.add(fA.files[0]);
+    fA.files = dtA.files; fB.files = dtB.files;
 }
 
 // ════════════════════════════════════════════════════════════
-// VARIATIONS
+// VARIATION SYSTEM  (max 2 groups, combos for stock)
 // ════════════════════════════════════════════════════════════
+const MAX_GROUPS = 2;
 let groupCount = 0;
+// groups = { id: { name, options: [{label, imagePath}] }, ... }
 let groups = {};
 
-function addVariationGroup(existingName = '', existingValues = []) {
+// combos = { "Label1|Label2": stock, ... }  (key = option labels joined by |)
+let combos = {};
+
+function addVariationGroup(existingName = '', existingOptions = []) {
+    const activeIds = Object.keys(groups);
+    if (activeIds.length >= MAX_GROUPS) {
+        alert('You can add at most 2 variation groups (e.g. Colour + Size).');
+        return;
+    }
+
     const id = groupCount++;
-    // FIX: normalise incoming values so we always use 'imagePath' internally
     groups[id] = {
         name: existingName,
-        values: existingValues.map(v => ({
-            label:     v.label     || '',
-            stock:     v.stock     || 0,
-            imagePath: v.imagePath || v.image || ''   // accept both key names
+        options: existingOptions.map(o => ({
+            label:     o.label     || '',
+            imagePath: o.imagePath || o.image || ''
         }))
     };
 
-    const wrapper = document.getElementById('variation-wrapper');
+    const wrapper = document.getElementById('variation-groups-wrapper');
     const div = document.createElement('div');
     div.className = 'var-group'; div.id = 'vg-' + id;
     div.innerHTML = `
         <div class="var-group-header">
             <input class="var-name-input" type="text"
-                   placeholder="Variation name (e.g. Flavour, Size)"
+                   placeholder="Variation name (e.g. Colour, Size)"
                    value="${escHtml(existingName)}"
-                   oninput="groups[${id}].name=this.value; serializeVariations()" />
+                   oninput="groups[${id}].name=this.value; serializeAll()" />
             <button type="button" class="btn-remove-group" onclick="removeGroup(${id})">
                 <i class="fas fa-trash"></i> Remove
             </button>
         </div>
-        <div class="chip-area" id="chips-${id}"></div>
-        <div class="add-value-row">
-            <input type="text"   id="val-input-${id}"   placeholder="Value (e.g. Original, Chicken, S)" />
-            <input type="number" id="stock-input-${id}" placeholder="Stock" min="0" class="stock-input" />
-            <button type="button" class="btn-add-chip" onclick="addChip(${id})">+ Add</button>
+        <div class="chip-area" id="chips-${id}" style="min-height:44px;"></div>
+        <div class="add-value-row" style="margin-top:8px;">
+            <input type="text" id="val-input-${id}" placeholder="Option label (e.g. Black, M)" style="flex:2;" />
+            <button type="button" class="btn-add-chip" onclick="addOption(${id})">+ Add</button>
         </div>`;
     wrapper.appendChild(div);
+
     div.querySelector('#val-input-' + id).addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); addChip(id); }
+        if (e.key === 'Enter') { e.preventDefault(); addOption(id); }
     });
-    if (existingValues.length > 0) renderChips(id);
-    updateGlobalStockVisibility();
+
+    if (existingOptions.length > 0) renderOptions(id);
+    updateGroupAddButton();
+    rebuildComboTable();
+    serializeAll();
 }
 
 function removeGroup(id) {
     document.getElementById('vg-' + id).remove();
     delete groups[id];
-    serializeVariations();
-    updateGlobalStockVisibility();
+    // When a group is removed, clear combos so they're rebuilt fresh
+    combos = {};
+    updateGroupAddButton();
+    rebuildComboTable();
+    serializeAll();
 }
 
-function addChip(groupId) {
-    const valInput   = document.getElementById('val-input-' + groupId);
-    const stockInput = document.getElementById('stock-input-' + groupId);
-    const label = valInput.value.trim();
-    const stock = parseInt(stockInput.value) || 0;
-    if (!label) { valInput.focus(); return; }
-
-    // FIX: use 'imagePath' not 'image' so serializeVariations sends the right key
-    groups[groupId].values.push({ label, stock, imagePath: '' });
-    renderChips(groupId);
-    valInput.value = ''; stockInput.value = '';
-    valInput.focus();
-    serializeVariations();
+function updateGroupAddButton() {
+    const count = Object.keys(groups).length;
+    const btn = document.getElementById('btn-add-var-group');
+    btn.style.display = count >= MAX_GROUPS ? 'none' : '';
+    document.getElementById('global-stock-wrap').style.opacity = count > 0 ? '0.4' : '1';
+    document.getElementById('field-stock').disabled = count > 0;
+    if (count > 0) document.getElementById('field-stock').value = 0;
 }
 
-function renderPendingImgLabel(groupId) {
-    return `<input type="file" id="var-pending-img-${groupId}" accept="image/*"
-                   style="display:none;" onchange="setPendingVarImg(this,${groupId})" />
-            <span class="var-img-label" onclick="document.getElementById('var-pending-img-${groupId}').click()">
-                <i class="fas fa-image"></i> Add Image
-            </span>`;
+function addOption(groupId) {
+    const inp = document.getElementById('val-input-' + groupId);
+    const label = inp.value.trim();
+    if (!label) { inp.focus(); return; }
+    // Prevent duplicate labels within a group
+    if (groups[groupId].options.some(o => o.label.toLowerCase() === label.toLowerCase())) {
+        inp.focus(); inp.select(); return;
+    }
+    groups[groupId].options.push({ label, imagePath: '' });
+    renderOptions(groupId);
+    inp.value = ''; inp.focus();
+    rebuildComboTable();
+    serializeAll();
 }
 
-function setPendingVarImg(input, groupId) {
-    if (!input.files[0]) return;
-    const url = URL.createObjectURL(input.files[0]);
-    input.dataset.preview = url;
-    const wrap = document.getElementById('var-pending-img-wrap-' + groupId);
-    wrap.innerHTML = `
-        <input type="file" id="var-pending-img-${groupId}" accept="image/*"
-               style="display:none;" onchange="setPendingVarImg(this,${groupId})" />
-        <span class="var-img-label" onclick="document.getElementById('var-pending-img-${groupId}').click()" style="padding:4px;">
-            <img src="${url}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;" />
-            <span>Change</span>
-        </span>`;
-    document.getElementById('var-pending-img-' + groupId).dataset.preview = url;
+function removeOption(groupId, idx) {
+    groups[groupId].options.splice(idx, 1);
+    renderOptions(groupId);
+    // Remove combos involving this option
+    pruneInvalidCombos();
+    rebuildComboTable();
+    serializeAll();
 }
 
-function removeChip(groupId, index) {
-    groups[groupId].values.splice(index, 1);
-    renderChips(groupId);
-    serializeVariations();
-}
-
-function renderChips(groupId) {
+function renderOptions(groupId) {
     const area = document.getElementById('chips-' + groupId);
     area.innerHTML = '';
+    groups[groupId].options.forEach((opt, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'var-option-chip';
 
-    let pendingRow = document.getElementById('var-pending-img-wrap-' + groupId);
-    if (!pendingRow) {
-        pendingRow = document.createElement('div');
-        pendingRow.id = 'var-pending-img-wrap-' + groupId;
-        pendingRow.style.cssText = 'margin-bottom:8px;';
-        pendingRow.innerHTML = renderPendingImgLabel(groupId);
-        area.parentNode.insertBefore(pendingRow, area);
-    }
+        // Image part
+        if (opt.imagePath && !opt.imagePath.startsWith('blob:') && !opt.imagePath.startsWith('data:')) {
+            chip.innerHTML += `<img src="${opt.imagePath}" title="Option image" />`;
+        } else if (opt.imagePath) {
+            chip.innerHTML += `<img src="${opt.imagePath}" title="Option image (preview)" />`;
+        } else {
+            chip.innerHTML += `
+                <span class="chip-img-placeholder" title="Add image"
+                      onclick="triggerOptImg(${groupId},${i})">
+                    <i class="fas fa-image"></i>
+                </span>`;
+        }
 
-    groups[groupId].values.forEach((v, i) => {
-        const card = document.createElement('div');
-        card.className = 'chip-card';
-        // FIX: read v.imagePath (not v.image)
-        const imgHtml = v.imagePath
-            ? `<div class="chip-img-wrap">
-                   <img class="chip-img-preview" src="${v.imagePath}" />
-                   <button type="button" class="chip-img-remove" onclick="removeChipImg(${groupId},${i})">
-                       <i class="fas fa-times"></i>
-                   </button>
-               </div>`
-            : `<div class="chip-img-wrap">
-                   <div class="chip-img-empty" onclick="triggerChipImg(${groupId},${i})">
-                       <input type="file" id="chip-img-${groupId}-${i}" accept="image/*" style="display:none;"
-                              onchange="setChipImg(this,${groupId},${i})" />
-                       <i class="fas fa-image"></i>
-                       <span>Add</span>
-                   </div>
-               </div>`;
-        card.innerHTML = `${imgHtml}
-            <div class="chip-info">
-                <span class="chip-label">${escHtml(v.label)}</span>
-                <span class="chip-stock">Qty: ${v.stock}</span>
-            </div>
-            <button type="button" class="chip-remove" onclick="removeChip(${groupId},${i})">
+        chip.innerHTML += `
+            <input type="file" id="opt-img-${groupId}-${i}" name="VarImg_${groupId}_${i}"
+                   accept="image/*" style="display:none;"
+                   onchange="setOptImg(this,${groupId},${i})" />
+            <span>${escHtml(opt.label)}</span>
+            <button type="button" class="chip-del" onclick="removeOption(${groupId},${i})">
                 <i class="fas fa-times"></i>
             </button>`;
-        area.appendChild(card);
+        area.appendChild(chip);
     });
 }
 
-function triggerChipImg(groupId, index) {
-    document.getElementById('chip-img-' + groupId + '-' + index)?.click();
+function triggerOptImg(groupId, idx) {
+    document.getElementById(`opt-img-${groupId}-${idx}`)?.click();
 }
-
-function setChipImg(input, groupId, index) {
+function setOptImg(input, groupId, idx) {
     if (!input.files[0]) return;
     const url = URL.createObjectURL(input.files[0]);
-    // FIX: store as imagePath
-    groups[groupId].values[index].imagePath = url;
-    renderChips(groupId);
-    serializeVariations();
+    groups[groupId].options[idx].imagePath = url;
+    renderOptions(groupId);
+    serializeAll();
 }
 
-function removeChipImg(groupId, index) {
-    // FIX: clear imagePath
-    groups[groupId].values[index].imagePath = '';
-    renderChips(groupId);
-    serializeVariations();
+// ════════════════════════════════════════════════════════════
+// COMBINATION TABLE
+// Builds stock rows for every option × option (or just option) combo
+// ════════════════════════════════════════════════════════════
+function getAllGroupsArray() {
+    // Return in insertion order
+    return Object.entries(groups)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, g]) => g);
 }
 
+function getComboKey(labels) {
+    return labels.join('|');
+}
+
+function pruneInvalidCombos() {
+    const allGroupsArr = getAllGroupsArray();
+    const valid = new Set();
+    const generated = generateCombinations(allGroupsArr);
+    generated.forEach(labels => valid.add(getComboKey(labels)));
+    for (const k of Object.keys(combos)) {
+        if (!valid.has(k)) delete combos[k];
+    }
+}
+
+function generateCombinations(groupsArr) {
+    // Returns array of label-arrays, one per combo
+    if (groupsArr.length === 0) return [];
+    if (groupsArr.length === 1) {
+        return groupsArr[0].options.map(o => [o.label]);
+    }
+    // Two groups
+    const result = [];
+    for (const a of groupsArr[0].options) {
+        for (const b of groupsArr[1].options) {
+            result.push([a.label, b.label]);
+        }
+    }
+    return result;
+}
+
+function rebuildComboTable() {
+    const allGroupsArr = getAllGroupsArray();
+    const section = document.getElementById('combo-section');
+    const tableWrap = document.getElementById('combo-table-wrap');
+
+    // Only show combo table when there are variation groups with options
+    const totalOptions = allGroupsArr.reduce((s, g) => s + g.options.length, 0);
+    if (allGroupsArr.length === 0 || totalOptions === 0) {
+        section.style.display = 'none';
+        tableWrap.innerHTML = '';
+        return;
+    }
+
+    section.style.display = '';
+
+    const combinations = generateCombinations(allGroupsArr);
+    if (combinations.length === 0) {
+        tableWrap.innerHTML = '<p style="color:#9a98b6;font-size:13px;">Add options to the variation groups above to see the stock table.</p>';
+        return;
+    }
+
+    // Build table
+    let html = '<table class="combo-table"><thead><tr>';
+
+    if (allGroupsArr.length === 2) {
+        html += `<th>${escHtml(allGroupsArr[0].name || 'Group 1')}</th>`;
+        html += `<th>${escHtml(allGroupsArr[1].name || 'Group 2')}</th>`;
+    } else {
+        html += `<th>${escHtml(allGroupsArr[0].name || 'Variation')}</th>`;
+    }
+    html += '<th style="width:130px;">Stock</th>';
+    html += '</tr></thead><tbody>';
+
+    combinations.forEach(labels => {
+        const key = getComboKey(labels);
+        const stock = combos[key] ?? 0;
+        html += '<tr>';
+
+        if (allGroupsArr.length === 2) {
+            // Group 1 option — may have image
+            const g0opt = allGroupsArr[0].options.find(o => o.label === labels[0]);
+            const imgHtml0 = g0opt?.imagePath
+                ? `<img class="combo-img" src="${g0opt.imagePath}" />`
+                : '';
+            html += `<td>${imgHtml0}<strong>${escHtml(labels[0])}</strong></td>`;
+
+            // Group 2 option
+            const g1opt = allGroupsArr[1].options.find(o => o.label === labels[1]);
+            const imgHtml1 = g1opt?.imagePath
+                ? `<img class="combo-img" src="${g1opt.imagePath}" />`
+                : '';
+            html += `<td>${imgHtml1}${escHtml(labels[1])}</td>`;
+        } else {
+            const g0opt = allGroupsArr[0].options.find(o => o.label === labels[0]);
+            const imgHtml0 = g0opt?.imagePath
+                ? `<img class="combo-img" src="${g0opt.imagePath}" />`
+                : '';
+            html += `<td>${imgHtml0}<strong>${escHtml(labels[0])}</strong></td>`;
+        }
+
+        html += `<td>
+            <input type="number" class="combo-stock-input" min="0" value="${stock}"
+                   data-key="${escHtml(key)}"
+                   oninput="combos[this.dataset.key]=parseInt(this.value)||0;serializeAll();" />
+        </td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    tableWrap.innerHTML = html;
+}
+
+function fillAllCombos() {
+    const val = parseInt(document.getElementById('combo-fill-val').value) || 0;
+    document.querySelectorAll('.combo-stock-input').forEach(inp => {
+        inp.value = val;
+        combos[inp.dataset.key] = val;
+    });
+    serializeAll();
+}
+
+// ════════════════════════════════════════════════════════════
+// SERIALIZE to hidden inputs
+// ════════════════════════════════════════════════════════════
+function serializeAll() {
+    // VariationsJson — groups with option labels + imagePaths (no stock)
+    const allGroupsArr = getAllGroupsArray();
+    const varData = allGroupsArr.map(g => ({
+        name: g.name,
+        values: g.options.map(o => ({
+            label:     o.label     || '',
+            imagePath: o.imagePath || ''
+        }))
+    }));
+    document.getElementById('variations-json').value = JSON.stringify(varData);
+
+    // VariationCombosJson — [{ keys:[...], stock:N }, ...]
+    const combosArr = [];
+    const combinations = generateCombinations(allGroupsArr);
+    combinations.forEach(labels => {
+        const key   = getComboKey(labels);
+        const stock = combos[key] ?? 0;
+        combosArr.push({ keys: labels, stock });
+    });
+    document.getElementById('combos-json').value = JSON.stringify(combosArr);
+}
+
+// ════════════════════════════════════════════════════════════
+// UTILITY
+// ════════════════════════════════════════════════════════════
 function escHtml(str) {
-    return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// FIX: serializeVariations now outputs { label, stock, imagePath } — matching the controller
-function serializeVariations() {
-    const data = Object.values(groups)
-        .filter(g => g.name || g.values.length > 0)
-        .map(g => ({
-            name: g.name,
-            values: g.values.map(v => ({
-                label:     v.label     || '',
-                stock:     typeof v.stock === 'number' ? v.stock : (parseInt(v.stock) || 0),
-                imagePath: v.imagePath || ''
-            }))
-        }));
-    document.getElementById('variations-json').value = JSON.stringify(data);
-}
-
-function updateGlobalStockVisibility() {
-    const hasGroups = Object.keys(groups).length > 0;
-    const stockWrap  = document.getElementById('global-stock-wrap');
-    const stockField = document.getElementById('field-stock');
-    if (hasGroups) { stockWrap.style.opacity = '0.4'; stockField.disabled = true; stockField.value = 0; }
-    else           { stockWrap.style.opacity = '1';   stockField.disabled = false; }
-}
-
+// ════════════════════════════════════════════════════════════
+// FORM SUBMIT
+// ════════════════════════════════════════════════════════════
 function submitForm(type) {
-    serializeVariations();
-    const banner = document.getElementById('val-banner'); banner.style.display = 'none';
+    serializeAll();
+    const banner = document.getElementById('val-banner');
+    banner.style.display = 'none';
+
     const name     = document.getElementById('field-name').value.trim();
     const price    = parseFloat(document.getElementById('field-price').value) || 0;
     const category = document.getElementById('field-category').value;
     const imgPresent = hasImage();
     const errors = [];
+
     if (type === 'Publish') {
         if (!name)       errors.push('Product Name is required.');
         if (price <= 0)  errors.push('Price must be greater than 0.');
@@ -518,6 +689,7 @@ function submitForm(type) {
         if (!name && !imgPresent && !category)
             errors.push('Please fill in at least one field before saving as draft.');
     }
+
     if (errors.length > 0) {
         banner.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + errors.join('<br>');
         banner.style.display = 'block';
@@ -528,17 +700,19 @@ function submitForm(type) {
     document.getElementById('productForm').submit();
 }
 
-// Variation image label style
-const varImgLabelStyle = `
-    .var-img-label {
-        display: inline-flex; align-items: center; gap: 5px;
-        background: #f8f9ff; border: 1px solid #c5cae9; border-radius: 6px;
-        padding: 7px 10px; cursor: pointer; font-size: 12px;
-        color: #5b587d; font-weight: 600; white-space: nowrap;
+// ════════════════════════════════════════════════════════════
+// PREVIEW
+// ════════════════════════════════════════════════════════════
+function openPreview() {
+    const imgs = [];
+    const coverSrc = document.getElementById('cover-preview').src;
+    if (coverSrc && document.getElementById('cover-preview').style.display !== 'none') imgs.push(coverSrc);
+    for (let i = 0; i < 4; i++) {
+        const p = document.getElementById('content-preview-' + i);
+        if (p && p.src && p.style.display !== 'none') imgs.push(p.src);
     }
-    .var-img-label:hover { border-color: #4f46e5; color: #4f46e5; }
-`;
-const styleEl = document.createElement('style');
-styleEl.textContent = varImgLabelStyle;
-document.head.appendChild(styleEl);
+    buildPreviewModal(imgs, getAllGroupsArray(), combos);
+    document.getElementById('preview-overlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
 </script>
