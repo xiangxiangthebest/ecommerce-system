@@ -138,16 +138,19 @@
                                 </div>
                             </div>
 
-                            @if (item.StockQuantity > 0) {
-                                <button class="add-btn"
-                                        title="Add to cart"
-                                        onclick="event.preventDefault(); addToCart(@item.ProductId)">
-                                    <i class="ti ti-shopping-cart-plus"></i>
-                                </button>
-                            } else {
-                                <button class="add-btn" disabled title="Out of stock">
-                                    <i class="ti ti-shopping-cart-off"></i>
-                                </button>
+                            @if (item.StockQuantity > 0 || true) 
+                            {
+                                @if (item.StockQuantity > 0) {
+                                    <button class="add-btn"
+                                            title="Add to cart"
+                                            onclick="event.preventDefault(); openQuickAdd(@item.ProductId)">
+                                        <i class="ti ti-shopping-cart-plus"></i>
+                                    </button>
+                                } else {
+                                    <button class="add-btn" disabled title="Out of stock">
+                                        <i class="ti ti-shopping-cart-off"></i>
+                                    </button>
+                                }
                             }
                         </div>
 
@@ -160,3 +163,5 @@
     }
 
 </div>
+
+@await Html.PartialAsync("QuickAddModal")

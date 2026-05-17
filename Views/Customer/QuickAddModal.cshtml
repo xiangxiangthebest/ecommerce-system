@@ -1,0 +1,439 @@
+
+<link rel="stylesheet" href="~/css/customer/quick-add-modal.css" asp-append-version="true" />
+
+<!-- ── Backdrop ── -->
+<div id="qaBackdrop" class="qa-backdrop" aria-hidden="true"></div>
+
+<!-- ── Main drawer ── -->
+<div id="qaDrawer"
+     class="qa-drawer"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="qaProductName"
+     style="display:none;">
+
+    <button class="qa-close" id="qaClose" aria-label="Close">&times;</button>
+
+    <div class="qa-body">
+
+        <!-- LEFT: Gallery -->
+        <div class="qa-gallery">
+            <div class="qa-img-wrap">
+                <img id="qaMainImg" src="" alt="" class="qa-main-img" />
+            </div>
+            <div class="qa-thumbs" id="qaThumbs"></div>
+        </div>
+
+        <!-- RIGHT: Info -->
+        <div class="qa-info">
+
+            <div class="qa-meta-row">
+                <span id="qaShopName" class="qa-shop"></span>
+                <span id="qaStockBadge" class="qa-badge"></span>
+            </div>
+
+            <h2 id="qaProductName" class="qa-name"></h2>
+            <div id="qaPrice" class="qa-price"></div>
+            <div class="qa-price-note">Price includes SST where applicable</div>
+
+            <div class="qa-divider"></div>
+
+            <p id="qaDescription" class="qa-desc"></p>
+
+            <!-- Variation groups — injected by JS -->
+            <div id="qaVariations" class="qa-variations"></div>
+            <div id="qaVariationNote" class="qa-variation-note" style="display:none;"></div>
+
+            <!-- Quantity row -->
+            <div class="qa-qty-row">
+                <span class="qa-qty-label">Qty</span>
+                <div class="qa-qty-ctrl">
+                    <button id="qaQtyMinus" class="qa-qty-btn" type="button">&#8722;</button>
+                    <input  id="qaQtyInput" class="qa-qty-input" type="number"
+                            min="1" max="1" value="1" readonly />
+                    <button id="qaQtyPlus"  class="qa-qty-btn" type="button">+</button>
+                </div>
+                <span id="qaStockNote" class="qa-stock-note"></span>
+            </div>
+
+            <!-- Add to Cart form -->
+            <form id="qaForm" method="post" action="/Customer/AddToCart">
+                <input type="hidden" id="qaProductId" name="productId"          value="" />
+                <input type="hidden" id="qaSelVars"   name="selectedVariations" value="{}" />
+                <input type="hidden" id="qaQtyHidden" name="quantity"           value="1" />
+
+                <div class="qa-actions">
+                    <button id="qaSubmit" type="submit" class="qa-btn-cart" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true">
+                            <circle cx="9" cy="21" r="1"/>
+                            <circle cx="20" cy="21" r="1"/>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                        </svg>
+                        Add to Cart
+                    </button>
+                </div>
+            </form>
+
+            <a id="qaViewFull" href="#" class="qa-view-full">View full details &#8594;</a>
+
+        </div><!-- /.qa-info -->
+    </div><!-- /.qa-body -->
+</div><!-- /#qaDrawer -->
+
+<!-- ── Skeleton drawer (shown while fetching) ── -->
+<div id="qaDrawerSkeleton"
+     class="qa-drawer"
+     aria-hidden="true"
+     style="display:none;">
+
+    <div class="qa-body">
+        <div class="qa-gallery">
+            <div class="qa-img-wrap"></div>
+        </div>
+        <div class="qa-info" style="justify-content:center; gap:14px;">
+            <div class="sk-line sk-short"></div>
+            <div class="sk-line sk-long"></div>
+            <div class="sk-line sk-mid"></div>
+            <div class="sk-line sk-short"></div>
+            <div class="sk-line sk-long"></div>
+            <div class="sk-line sk-mid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    /* ── State ────────────────────────────────────────── */
+    let allCombos    = [];
+    let groupNames   = [];
+    let selectedKeys = [];
+
+    /* ── DOM refs ─────────────────────────────────────── */
+    const backdrop    = document.getElementById('qaBackdrop');
+    const drawer      = document.getElementById('qaDrawer');
+    const skeleton    = document.getElementById('qaDrawerSkeleton');
+    const closeBtn    = document.getElementById('qaClose');
+    const mainImg     = document.getElementById('qaMainImg');
+    const thumbsWrap  = document.getElementById('qaThumbs');
+    const shopEl      = document.getElementById('qaShopName');
+    const badge       = document.getElementById('qaStockBadge');
+    const nameEl      = document.getElementById('qaProductName');
+    const priceEl     = document.getElementById('qaPrice');
+    const descEl      = document.getElementById('qaDescription');
+    const varWrap     = document.getElementById('qaVariations');
+    const varNote     = document.getElementById('qaVariationNote');
+    const qtyInput    = document.getElementById('qaQtyInput');
+    const qtyMinus    = document.getElementById('qaQtyMinus');
+    const qtyPlus     = document.getElementById('qaQtyPlus');
+    const stockNote   = document.getElementById('qaStockNote');
+    const form        = document.getElementById('qaForm');
+    const productIdEl = document.getElementById('qaProductId');
+    const selVarsEl   = document.getElementById('qaSelVars');
+    const qtyHiddenEl = document.getElementById('qaQtyHidden');
+    const submitBtn   = document.getElementById('qaSubmit');
+    const viewFullLink = document.getElementById('qaViewFull');
+
+    /* ── Toast ────────────────────────────────────────── */
+    function toast(msg, type = 'success') {
+        const t = document.createElement('div');
+        t.className = 'qa-toast ' + type;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => {
+            t.classList.add('out');
+            setTimeout(() => t.remove(), 350);
+        }, 2800);
+    }
+
+    /* ── Panel open / close ───────────────────────────── */
+    function openPanel(el) {
+        el.style.display = 'flex';
+        requestAnimationFrame(() => el.classList.add('open'));
+    }
+    function closePanel(el) {
+        el.classList.remove('open');
+        setTimeout(() => { el.style.display = 'none'; }, 340);
+    }
+    function closeAll() {
+        backdrop.classList.remove('open');
+        closePanel(drawer);
+        closePanel(skeleton);
+        document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeAll);
+    backdrop.addEventListener('click', closeAll);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+
+    /* ── Quantity ─────────────────────────────────────── */
+    function clampQty(v) {
+        const max = Math.max(1, parseInt(qtyInput.max || '1', 10));
+        return Math.min(max, Math.max(1, v));
+    }
+    function setQty(v) {
+        const c = clampQty(v);
+        qtyInput.value = c;
+        qtyHiddenEl.value = c;
+    }
+    qtyMinus.addEventListener('click', () => setQty(parseInt(qtyInput.value, 10) - 1));
+    qtyPlus .addEventListener('click', () => setQty(parseInt(qtyInput.value, 10) + 1));
+
+    /* ── Badge ────────────────────────────────────────── */
+    function setBadge(cls, text) {
+        badge.className = 'qa-badge ' + cls;
+        badge.textContent = text;
+    }
+
+    /* ── Combo helpers (mirrors ProductDetails.cshtml JS) ── */
+    function findComboStock() {
+        const m = allCombos.find(c =>
+            Array.isArray(c.keys) &&
+            c.keys.length === groupNames.length &&
+            selectedKeys.every((k, i) => c.keys[i] === k)
+        );
+        return m ? (m.stock || 0) : 0;
+    }
+
+    function comboReachable(partialKeys) {
+        return allCombos.some(c => {
+            if (!Array.isArray(c.keys) || c.keys.length !== groupNames.length) return false;
+            for (let i = 0; i < groupNames.length; i++) {
+                if (partialKeys[i] !== null && c.keys[i] !== partialKeys[i]) return false;
+            }
+            return (c.stock || 0) > 0;
+        });
+    }
+
+    function updateHidden() {
+        const obj = {};
+        groupNames.forEach((n, i) => { if (selectedKeys[i] !== null) obj[n] = selectedKeys[i]; });
+        selVarsEl.value = JSON.stringify(obj);
+    }
+
+    function updateOptionAvailability() {
+        groupNames.forEach((_, gi) => {
+            const gEl = varWrap.querySelector('[data-qa-gi="' + gi + '"]');
+            if (!gEl) return;
+            gEl.querySelectorAll('[data-qa-label]').forEach(opt => {
+                const label = opt.getAttribute('data-qa-label');
+                const trial = selectedKeys.slice();
+                trial[gi] = label;
+                const avail = comboReachable(trial);
+                opt.classList.toggle('unavailable', !avail);
+                if (opt.tagName === 'BUTTON') {
+                    opt.disabled = !avail;
+                } else {
+                    opt.setAttribute('aria-disabled', String(!avail));
+                    opt.style.pointerEvents = avail ? 'auto' : 'none';
+                }
+            });
+        });
+    }
+
+    function updateVariationUI() {
+        const allSel = selectedKeys.every(v => v !== null);
+        updateHidden();
+
+        if (groupNames.length === 0) return;
+
+        updateOptionAvailability();
+
+        if (!allSel) {
+            setBadge('select-options', 'Select Options');
+            varNote.style.display = 'none';
+            submitBtn.disabled = true;
+            qtyMinus.disabled  = true;
+            qtyPlus.disabled   = true;
+            return;
+        }
+
+        const stock = findComboStock();
+        if (stock <= 0)      setBadge('out-of-stock', 'Out of Stock');
+        else if (stock <= 5) setBadge('low-stock', 'Low Stock');
+        else                 setBadge('in-stock', 'In Stock');
+
+        varNote.style.display = 'block';
+        varNote.textContent = stock > 0
+            ? stock + ' left for this option'
+            : 'This combination is out of stock';
+
+        qtyInput.max = Math.max(1, stock);
+        setQty(parseInt(qtyInput.value, 10));
+
+        const ok = stock > 0;
+        submitBtn.disabled = !ok;
+        qtyMinus.disabled  = !ok;
+        qtyPlus.disabled   = !ok;
+    }
+
+    function handleVarClick(el) {
+        const gi    = parseInt(el.getAttribute('data-qa-gi'), 10);
+        const label = el.getAttribute('data-qa-label');
+        if (isNaN(gi) || !label) return;
+
+        const gEl = varWrap.querySelector('[data-qa-gi="' + gi + '"]');
+        gEl.querySelectorAll('.qa-var-btn, .qa-var-swatch').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+
+        selectedKeys[gi] = label;
+        updateVariationUI();
+    }
+
+    /* ── Build variation DOM ──────────────────────────── */
+    function buildVariations(variations) {
+        varWrap.innerHTML = '';
+        varNote.style.display = 'none';
+
+        variations.forEach((grp, gi) => {
+            const gEl = document.createElement('div');
+            gEl.className = 'qa-var-group';
+            gEl.setAttribute('data-qa-gi', gi);
+
+            const lEl = document.createElement('div');
+            lEl.className = 'qa-var-label';
+            lEl.textContent = grp.name;
+            gEl.appendChild(lEl);
+
+            const oEl = document.createElement('div');
+            oEl.className = 'qa-var-options';
+
+            (grp.values || []).forEach(val => {
+                if (val.imagePath) {
+                    const sw = document.createElement('div');
+                    sw.className = 'qa-var-swatch';
+                    sw.setAttribute('data-qa-gi', gi);
+                    sw.setAttribute('data-qa-label', val.label);
+                    sw.setAttribute('tabindex', '0');
+                    sw.setAttribute('title', val.label);
+                    sw.innerHTML = '<img src="' + val.imagePath + '" alt="' + val.label + '" />';
+                    sw.addEventListener('click', () => handleVarClick(sw));
+                    sw.addEventListener('keydown', e => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVarClick(sw); }
+                    });
+                    oEl.appendChild(sw);
+                } else {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'qa-var-btn';
+                    btn.setAttribute('data-qa-gi', gi);
+                    btn.setAttribute('data-qa-label', val.label);
+                    btn.textContent = val.label;
+                    btn.addEventListener('click', () => handleVarClick(btn));
+                    oEl.appendChild(btn);
+                }
+            });
+
+            gEl.appendChild(oEl);
+            varWrap.appendChild(gEl);
+        });
+    }
+
+    /* ── Populate with API data ───────────────────────── */
+    function populate(p) {
+        allCombos    = JSON.parse(p.variationCombosJson || '[]');
+        groupNames   = (p.variations || []).map(v => v.name);
+        selectedKeys = new Array(groupNames.length).fill(null);
+
+        /* Images */
+        const imgs = (p.images && p.images.length) ? p.images : [];
+        mainImg.src = imgs[0] || '/images/placeholder.png';
+        mainImg.alt = p.name;
+
+        thumbsWrap.innerHTML = '';
+        if (imgs.length > 1) {
+            imgs.forEach((src, i) => {
+                const d = document.createElement('div');
+                d.className = 'qa-thumb' + (i === 0 ? ' active' : '');
+                d.innerHTML = '<img src="' + src + '" alt="' + p.name + ' view ' + (i + 1) + '" />';
+                d.addEventListener('click', () => {
+                    mainImg.style.opacity = '0';
+                    setTimeout(() => { mainImg.src = src; mainImg.style.opacity = '1'; }, 180);
+                    thumbsWrap.querySelectorAll('.qa-thumb').forEach(t => t.classList.remove('active'));
+                    d.classList.add('active');
+                });
+                thumbsWrap.appendChild(d);
+            });
+        }
+
+        /* Text fields */
+        shopEl.textContent   = 'Sold by ' + (p.shopName || 'Unknown Shop');
+        nameEl.textContent   = p.name;
+        priceEl.textContent  = 'RM ' + parseFloat(p.price).toFixed(2);
+        descEl.textContent   = p.description || 'No description provided.';
+        viewFullLink.href    = '/Customer/ProductDetails/' + p.productId;
+        productIdEl.value    = p.productId;
+
+        /* Variations or plain stock */
+        if (groupNames.length > 0) {
+            buildVariations(p.variations);
+            setBadge('select-options', 'Select Options');
+            submitBtn.disabled = true;
+            qtyMinus.disabled  = true;
+            qtyPlus.disabled   = true;
+            stockNote.textContent = '';
+            updateOptionAvailability();
+        } else {
+            varWrap.innerHTML = '';
+            const stock = p.stockQuantity || 0;
+            if (stock <= 0)      setBadge('out-of-stock', 'Out of Stock');
+            else if (stock <= 5) setBadge('low-stock', 'Low Stock');
+            else                 setBadge('in-stock', 'In Stock');
+
+            qtyInput.max = Math.max(1, stock);
+            setQty(1);
+            stockNote.textContent = stock > 0 ? stock + ' left' : '';
+            submitBtn.disabled = stock <= 0;
+            qtyMinus.disabled  = false;
+            qtyPlus.disabled   = false;
+            selVarsEl.value    = '{}';
+        }
+    }
+
+    /* ── Form validation ──────────────────────────────── */
+    form.addEventListener('submit', function (e) {
+        if (groupNames.length > 0) {
+            if (!selectedKeys.every(v => v !== null)) {
+                e.preventDefault();
+                toast('Please select all product variations.', 'error');
+                return;
+            }
+            if (findComboStock() <= 0) {
+                e.preventDefault();
+                toast('This combination is out of stock.', 'error');
+                return;
+            }
+        }
+        updateHidden();
+        setQty(parseInt(qtyInput.value, 10));
+        // Normal form submit → controller → TempData redirect
+    });
+
+    /* ── Public API called by Home.cshtml ─────────────── */
+    window.openQuickAdd = async function (productId) {
+        backdrop.classList.add('open');
+        openPanel(skeleton);
+        drawer.style.display = 'none';
+        drawer.classList.remove('open');
+        document.body.style.overflow = 'hidden';
+
+        try {
+            const res  = await fetch('/Customer/QuickAddData?id=' + productId);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            populate(data);
+
+            closePanel(skeleton);
+            setTimeout(() => openPanel(drawer), 50);
+        } catch {
+            backdrop.classList.remove('open');
+            closePanel(skeleton);
+            document.body.style.overflow = '';
+            toast('Could not load product details. Please try again.', 'error');
+        }
+    };
+})();
+</script>

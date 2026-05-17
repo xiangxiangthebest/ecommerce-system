@@ -64,6 +64,62 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
+        // HOME PAGE (QUICK ADD DATA)
+        // =========================
+        [HttpGet]
+        public async Task<IActionResult> QuickAddData(int id)
+        {
+            var product = await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.Seller)
+                .FirstOrDefaultAsync(p => p.ProductId == id && !p.IsDraft);
+
+            if (product == null)
+                return NotFound();
+
+            var images = string.IsNullOrEmpty(product.ImagePathsJson)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(product.ImagePathsJson) ?? new List<string>();
+
+            // Fall back to single ImagePath if no list
+            if (images.Count == 0 && !string.IsNullOrEmpty(product.ImagePath))
+                images.Add(product.ImagePath);
+
+            var variations = string.IsNullOrEmpty(product.VariationsJson)
+                ? new List<VariationGroupDto>()
+                : JsonSerializer.Deserialize<List<VariationGroupDto>>(
+                    product.VariationsJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? new List<VariationGroupDto>();
+
+            List<Product.VariationCombo> combos;
+            try
+            {
+                combos = JsonSerializer.Deserialize<List<Product.VariationCombo>>(
+                            product.VariationCombosJson ?? "[]")
+                        ?? new List<Product.VariationCombo>();
+            }
+            catch
+            {
+                combos = new List<Product.VariationCombo>();
+            }
+
+            return Json(new
+            {
+                productId    = product.ProductId,
+                name         = product.Name,
+                price        = product.Price,
+                sku          = product.SKU,
+                description  = product.Description,
+                stockQuantity = product.StockQuantity,
+                images,
+                variations,
+                variationCombosJson = product.VariationCombosJson ?? "[]",
+                shopName     = product.Seller?.ShopName ?? "Unknown Shop"
+            });
+        }
+
+        // =========================
         // PRODUCT DETAILS
         // =========================
         public IActionResult ProductDetails(int id)
