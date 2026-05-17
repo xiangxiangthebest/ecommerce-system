@@ -41,6 +41,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
         modelBuilder.Entity<Order>().Property(o => o.CurrentStatus).HasConversion<string>();
+        modelBuilder.Entity<Order>().HasOne(o => o.Address).WithMany().HasForeignKey(o => o.AddressId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Product>().ToTable("Product");
         modelBuilder.Entity<Category>().ToTable("Category");
     }

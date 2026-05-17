@@ -136,15 +136,45 @@ namespace ecommerce_system.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("AddressId")
+                    b.Property<int?>("AddressId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("CurrentStatus")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CustomerMessage")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("CustomerUserId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("DeliveryAddressLine1")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryAddressLine2")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryCity")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryPhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryPostcode")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryRecipientName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryState")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("OrderTime")
                         .HasColumnType("TEXT");
@@ -249,6 +279,10 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("StockQuantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("VariationCombosJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("VariationsJson")
                         .IsRequired()
@@ -415,8 +449,7 @@ namespace ecommerce_system.Migrations
                     b.HasOne("EcommerceSystem.Models.DeliveryField", "Address")
                         .WithMany()
                         .HasForeignKey("AddressId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("EcommerceSystem.Models.Customer", "Customer")
                         .WithMany()

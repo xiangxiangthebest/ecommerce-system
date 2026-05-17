@@ -6,46 +6,50 @@
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
 
 @{
-    var images      = ViewBag.Images as List<string> ?? new List<string>();
-    var variations = ViewBag.Variations as List<VariationGroupDto>
-        ?? new List<VariationGroupDto>();
-    var firstImage  = images.Count > 0 ? images[0] : Model.ImagePath;
+    var images = ViewBag.Images as List<string> ?? new List<string>();
+    var variations = ViewBag.Variations as List<VariationGroupDto> ?? new List<VariationGroupDto>();
+    var firstImage = images.Count > 0 ? images[0] : Model.ImagePath;
     var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
 
+    var combos = new List<Product.VariationCombo>();
+    try {
+        combos = JsonSerializer.Deserialize<List<Product.VariationCombo>>(Model.VariationCombosJson ?? "[]")
+                 ?? new List<Product.VariationCombo>();
+    } catch { }
+
+    bool hasVariations = variations.Count > 0;
+
     string stockClass, stockLabel;
-    if (Model.StockQuantity <= 0) {
-        stockClass = "out-of-stock"; stockLabel = "Out of Stock";
-    } else if (Model.StockQuantity <= 5) {
-        stockClass = "low-stock";    stockLabel = "Low Stock";
+    if (!hasVariations) {
+        if (Model.StockQuantity <= 0) { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
+        else if (Model.StockQuantity <= 5) { stockClass = "low-stock"; stockLabel = "Low Stock"; }
+        else { stockClass = "in-stock"; stockLabel = "In Stock"; }
     } else {
-        stockClass = "in-stock";     stockLabel = "In Stock";
+        stockClass = "select-options"; stockLabel = "Select Options";
     }
 
-    // Star rendering helpers
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
+
+    // Used as initial max before an option is fully selected
+    int totalVariationStock = hasVariations ? combos.Sum(c => c.Stock) : Model.StockQuantity;
+
+    // Used by JS to build { GroupName: SelectedLabel }
+    var variationGroupNamesJson = JsonSerializer.Serialize(variations.Select(v => v.Name).ToList());
 }
 
 @if (TempData["CartSuccess"] != null)
 {
-    <div id="floatingAlert" class="floating-alert">
-        @TempData["CartSuccess"]
-    </div>
+    <div id="floatingAlert" class="floating-alert">@TempData["CartSuccess"]</div>
 }
 
 <div class="pd-page">
-
-    <!-- Main layout -->
     <div class="pd-layout">
 
-        <!-- ── LEFT: Gallery ── -->
+        <!-- LEFT: Gallery -->
         <div class="pd-gallery">
-
             <div class="pd-main-img-wrap">
-                <img id="pdMainImg"
-                     src="@firstImage"
-                     alt="@Model.Name"
-                     class="pd-main-img" />
+                <img id="pdMainImg" src="@firstImage" alt="@Model.Name" class="pd-main-img" />
                 <div class="pd-zoom-hint">
                     <i class="ti ti-zoom-in"></i> Hover to zoom
                 </div>
@@ -56,31 +60,26 @@
                 <div class="pd-thumbnails">
                     @for (int i = 0; i < images.Count; i++)
                     {
-                        <div class="pd-thumb @(i == 0 ? "active" : "")"
-                             onclick="switchImage('@images[i]', this)">
+                        <div class="pd-thumb @(i == 0 ? "active" : "")" data-src="@images[i]">
                             <img src="@images[i]" alt="@Model.Name view @(i + 1)" />
                         </div>
                     }
                 </div>
             }
-
         </div>
 
-        <!-- ── RIGHT: Info ── -->
+        <!-- RIGHT: Info -->
         <div class="pd-info">
 
-            <!-- Category + stock badge -->
             <div class="pd-top-row">
                 <span class="pd-category">@(Model.Category?.Name ?? "Uncategorised")</span>
                 <div class="pd-badges">
-                    <span class="pd-badge @stockClass">@stockLabel</span>
+                    <span id="pdStockBadge" class="pd-badge @stockClass">@stockLabel</span>
                 </div>
             </div>
 
-            <!-- Name -->
             <h1 class="pd-name">@Model.Name</h1>
 
-            <!-- Rating -->
             <div class="pd-rating-row">
                 <div class="pd-stars">
                     @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
@@ -93,7 +92,6 @@
 
             <div class="pd-divider"></div>
 
-            <!-- Shop -->
             <div class="pd-shop-row">
                 <div class="pd-shop-avatar">@shopInitial</div>
                 <span class="pd-shop-name">
@@ -101,13 +99,11 @@
                 </span>
             </div>
 
-            <!-- Price -->
             <div class="pd-price-block">
                 <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
                 <div class="pd-price-note">Price includes SST where applicable</div>
             </div>
 
-            <!-- SKU -->
             @if (!string.IsNullOrWhiteSpace(Model.SKU))
             {
                 <div class="pd-sku">SKU: @Model.SKU</div>
@@ -115,37 +111,40 @@
 
             <div class="pd-divider"></div>
 
-            <!-- Description -->
             <p class="pd-description">
-                @(string.IsNullOrWhiteSpace(Model.Description)
-                    ? "No description provided."
-                    : Model.Description)
+                @(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)
             </p>
 
-            <!-- Variations -->
-            @if (variations.Count > 0)
+            @if (hasVariations)
             {
-                <div class="pd-variations">
-                    @foreach (var group in variations)
+                <div class="pd-variations" id="pdVariations">
+                    @for (int gi = 0; gi < variations.Count; gi++)
                     {
-                        <div class="pd-variation-group">
+                        var group = variations[gi];
+                        <div class="pd-variation-group" data-group-index="@gi">
+                            <!-- IMPORTANT: No “selected label” appended here -->
                             <div class="pd-variation-label">@group.Name</div>
+
                             <div class="pd-variation-options">
                                 @foreach (var val in group.Values)
                                 {
-                                    @if (!string.IsNullOrWhiteSpace(val.ImagePath))
+                                    if (!string.IsNullOrWhiteSpace(val.ImagePath))
                                     {
                                         <div class="pd-variation-swatch"
+                                             role="button"
+                                             tabindex="0"
                                              title="@val.Label"
-                                             onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                             data-group-index="@gi"
+                                             data-label="@val.Label">
                                             <img src="@val.ImagePath" alt="@val.Label" />
                                         </div>
                                     }
                                     else
                                     {
                                         <button class="pd-variation-btn"
-                                                @(val.Stock <= 0 ? "disabled" : "")
-                                                onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                                type="button"
+                                                data-group-index="@gi"
+                                                data-label="@val.Label">
                                             @val.Label
                                         </button>
                                     }
@@ -154,64 +153,57 @@
                         </div>
                     }
                 </div>
+
+                <div id="pdVariationStockNote" class="pd-stock-variation-note" style="display:none;"></div>
             }
 
-            <!-- Quantity -->
             <div class="pd-qty-row">
                 <span class="pd-qty-label">Qty</span>
                 <div class="pd-qty-control">
-                    <button class="pd-qty-btn" onclick="adjustQty(-1)" type="button">−</button>
-                    <input  id="pdQty" type="number" class="pd-qty-input"
-                            min="1" max="@Model.StockQuantity" value="1" readonly />
-                    <button class="pd-qty-btn" onclick="adjustQty(1)"  type="button">+</button>
+                    <button id="pdQtyMinus" class="pd-qty-btn" type="button">−</button>
+                    <input id="pdQty" type="number" class="pd-qty-input"
+                           min="1" max="@totalVariationStock" value="1" readonly />
+                    <button id="pdQtyPlus" class="pd-qty-btn" type="button">+</button>
                 </div>
-                @if (Model.StockQuantity > 0)
+
+                @if (!hasVariations && Model.StockQuantity > 0)
                 {
                     <span class="pd-stock-note">@Model.StockQuantity left</span>
                 }
             </div>
 
-            <!-- Actions -->
             <div class="pd-actions">
-                @* <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
-                    @if (Model.StockQuantity <= 0) {
-                        <i class="ti ti-shopping-cart-off"></i> <text>Out of Stock</text>
-                    }
-                    else {
-                        <i class="ti ti-shopping-cart-plus"></i> <text>Add to Cart</text>
-                    }
-                </button> *@
                 <form asp-controller="Customer"
-                    asp-action="AddToCart"
-                    method="post">
+                      asp-action="AddToCart"
+                      method="post"
+                      onsubmit="return validateVariationsBeforeSubmit();">
 
                     <input type="hidden" name="productId" value="@Model.ProductId" />
-                    <input type="hidden" id="selectedVariations"
-                        name="selectedVariations" value="{}" />
+                    <input type="hidden" id="selectedVariations" name="selectedVariations" value="{}" />
+                    <input type="hidden" id="cartQuantity" name="quantity" value="1" />
 
-                    <input type="hidden"
-                        id="cartQuantity"
-                        name="quantity"
-                        value="1" />
-
-                    <button type="submit" class="pd-btn-cart" onclick="return validateVariations()">
-                        <i class="ti ti-shopping-cart-plus"></i>
-                        Add to Cart
+                    <button id="pdBtnCart"
+                            type="submit"
+                            class="pd-btn-cart"
+                            @( (!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : "") )>
+                        @if (!hasVariations && Model.StockQuantity <= 0)
+                        {
+                            <i class="ti ti-shopping-cart-off"></i> <text>Out of Stock</text>
+                        }
+                        else
+                        {
+                            <i class="ti ti-shopping-cart-plus"></i> <text>Add to Cart</text>
+                        }
                     </button>
                 </form>
 
-                <button class="pd-btn-buy" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                <button id="pdBtnBuy"
+                        class="pd-btn-buy"
+                        @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
                     <i class="ti ti-bolt"></i> Buy Now
                 </button>
             </div>
 
-            <!-- Wishlist -->
-            <div class="pd-wishlist-row">
-                <i class="ti ti-heart"></i>
-                <span>Save to wishlist</span>
-            </div>
-
-            <!-- Trust badges -->
             <div class="pd-trust">
                 <div class="pd-trust-item">
                     <i class="ti ti-truck-delivery"></i>
@@ -232,88 +224,236 @@
 </div>
 
 <script>
-    function switchImage(src, el) {
-        document.getElementById('pdMainImg').src = src;
-        document.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    function adjustQty(delta) {
-        const input = document.getElementById('pdQty');
-        const hiddenQty = document.getElementById('cartQuantity');
-
-        const max = parseInt(input.max) || 999;
-        const val = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
-
-        input.value = val;
-        hiddenQty.value = val;
-    }
-
-    const selected = {};
-
-    function selectVariation(el, groupName, label) {
-        const parent = el.closest('.pd-variation-options');
-
-        parent.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
-              .forEach(b => b.classList.remove('active'));
-
-        el.classList.add('active');
-
-        selected[groupName] = label;
-
-        document.getElementById('selectedVariations').value =
-            JSON.stringify(selected);
-    }
-
-    function validateVariations() {
-
-        // Total variation groups on page
-        const totalGroups =
-            document.querySelectorAll('.pd-variation-group').length;
-
-        // Selected groups count
-        const selectedGroups =
-            Object.keys(selected).length;
-
-        // If product has variations but not all selected
-        if (totalGroups > 0 && selectedGroups < totalGroups) {
-
-            showToast("Please select all product variations before adding to cart.", "error");
-
-            return false;
-        }
-
-        return true;
-    }
+(function () {
+    // ---------- Helpers ----------
+    function qs(sel, root = document) { return root.querySelector(sel); }
+    function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
 
     function showToast(message, type = "success") {
-
         const toast = document.createElement("div");
-
         toast.className = `floating-alert ${type}`;
         toast.textContent = message;
-
         document.body.appendChild(toast);
 
         setTimeout(() => {
             toast.classList.add("hide");
-
             setTimeout(() => toast.remove(), 500);
         }, 3000);
     }
 
+    // Auto-hide server success alert
     document.addEventListener("DOMContentLoaded", function () {
-        const alertBox = document.getElementById("floatingAlert");
-
-        if (alertBox) {
-            setTimeout(() => {
-                alertBox.classList.add("hide");
-
-                setTimeout(() => {
-                    alertBox.remove();
-                }, 500);
-
-            }, 3000);
-        }
+        const alertBox = qs("#floatingAlert");
+        if (!alertBox) return;
+        setTimeout(() => {
+            alertBox.classList.add("hide");
+            setTimeout(() => alertBox.remove(), 500);
+        }, 3000);
     });
+
+    // ---------- Gallery ----------
+    qsa(".pd-thumb").forEach(thumb => {
+        thumb.addEventListener("click", () => {
+            const src = thumb.getAttribute("data-src");
+            qs("#pdMainImg").src = src;
+            qsa(".pd-thumb").forEach(t => t.classList.remove("active"));
+            thumb.classList.add("active");
+        });
+    });
+
+    // ---------- Quantity ----------
+    const qtyInput = qs("#pdQty");
+    const qtyHidden = qs("#cartQuantity");
+    const btnMinus = qs("#pdQtyMinus");
+    const btnPlus = qs("#pdQtyPlus");
+
+    function clampQty(value) {
+        const min = 1;
+        const max = Math.max(1, parseInt(qtyInput.max || "1", 10));
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function setQty(value) {
+        const v = clampQty(value);
+        qtyInput.value = v;
+        qtyHidden.value = v;
+    }
+
+    btnMinus?.addEventListener("click", () => setQty(parseInt(qtyInput.value || "1", 10) - 1));
+    btnPlus ?.addEventListener("click", () => setQty(parseInt(qtyInput.value || "1", 10) + 1));
+
+    // ---------- Variations / Stock ----------
+    const allCombos = @Html.Raw(Model.VariationCombosJson ?? "[]");
+    const groupNames = @Html.Raw(variationGroupNamesJson);
+    const totalGroups = groupNames.length;
+
+    const selectedKeys = new Array(totalGroups).fill(null);
+
+    const badge = qs("#pdStockBadge");
+    const stockNote = qs("#pdVariationStockNote");
+    const btnCart = qs("#pdBtnCart");
+    const btnBuy = qs("#pdBtnBuy");
+    const hiddenSelected = qs("#selectedVariations");
+
+    function setBadge(state, text) {
+        badge.className = "pd-badge " + state;
+        badge.textContent = text;
+    }
+
+    function updateHiddenSelected() {
+        const obj = {};
+        for (let i = 0; i < totalGroups; i++) {
+            if (selectedKeys[i] !== null) obj[groupNames[i]] = selectedKeys[i];
+        }
+        hiddenSelected.value = JSON.stringify(obj);
+    }
+
+    function findMatchingComboStock() {
+        // Only valid when all selected
+        const match = allCombos.find(c => {
+            if (!c || !Array.isArray(c.keys) || c.keys.length !== totalGroups) return false;
+            return selectedKeys.every((k, i) => c.keys[i] === k);
+        });
+        return match ? (match.stock || 0) : 0;
+    }
+
+    function comboHasStockForPartialSelection(partialKeys) {
+        // Partial selection: null means "any"
+        return allCombos.some(c => {
+            if (!c || !Array.isArray(c.keys) || c.keys.length !== totalGroups) return false;
+            for (let i = 0; i < totalGroups; i++) {
+                if (partialKeys[i] !== null && c.keys[i] !== partialKeys[i]) return false;
+            }
+            return (c.stock || 0) > 0;
+        });
+    }
+
+    function setButtonsEnabled(enabled) {
+        if (btnCart) btnCart.disabled = !enabled;
+        if (btnBuy) btnBuy.disabled = !enabled;
+        if (btnMinus) btnMinus.disabled = !enabled;
+        if (btnPlus) btnPlus.disabled = !enabled;
+    }
+
+    function updateOptionAvailability() {
+        // For each group, disable options that cannot lead to any in-stock combo
+        for (let gi = 0; gi < totalGroups; gi++) {
+            const groupEl = qs(`.pd-variation-group[data-group-index="${gi}"]`);
+            if (!groupEl) continue;
+
+            const options = qsa("[data-label]", groupEl);
+
+            options.forEach(opt => {
+                const label = opt.getAttribute("data-label");
+                const trial = selectedKeys.slice();
+                trial[gi] = label;
+
+                const available = comboHasStockForPartialSelection(trial);
+
+                opt.classList.toggle("unavailable", !available);
+
+                if (opt.tagName === "BUTTON") {
+                    opt.disabled = !available;
+                } else {
+                    // Swatches are divs — simulate disable
+                    opt.setAttribute("aria-disabled", String(!available));
+                    opt.style.pointerEvents = available ? "auto" : "none";
+                }
+            });
+        }
+    }
+
+    function updateVariationUI() {
+        const allSelected = selectedKeys.every(v => v !== null);
+
+        updateHiddenSelected();
+        updateOptionAvailability();
+
+        if (!allSelected) {
+            setBadge("select-options", "Select Options");
+            if (stockNote) stockNote.style.display = "none";
+
+            // keep qty max as overall total (already set in HTML), but prevent actions
+            setButtonsEnabled(false);
+            return;
+        }
+
+        const stock = findMatchingComboStock();
+
+        if (stock <= 0) {
+            setBadge("out-of-stock", "Out of Stock");
+        } else if (stock <= 5) {
+            setBadge("low-stock", "Low Stock");
+        } else {
+            setBadge("in-stock", "In Stock");
+        }
+
+        if (stockNote) {
+            stockNote.style.display = "block";
+            stockNote.textContent = stock > 0
+                ? `${stock} left for this option`
+                : "This combination is out of stock";
+        }
+
+        qtyInput.max = Math.max(1, stock);
+        setQty(parseInt(qtyInput.value || "1", 10)); // clamp + sync hidden qty
+
+        setButtonsEnabled(stock > 0);
+    }
+
+    function handleVariationClick(el) {
+        const groupIndex = parseInt(el.getAttribute("data-group-index"), 10);
+        const label = el.getAttribute("data-label");
+        if (Number.isNaN(groupIndex) || !label) return;
+
+        const groupEl = el.closest(".pd-variation-group");
+        if (!groupEl) return;
+
+        // Toggle active within the group
+        qsa(".pd-variation-btn, .pd-variation-swatch", groupEl).forEach(x => x.classList.remove("active"));
+        el.classList.add("active");
+
+        selectedKeys[groupIndex] = label;
+        updateVariationUI();
+    }
+
+    // Bind variation clicks (buttons + swatches)
+    qsa(".pd-variation-btn, .pd-variation-swatch").forEach(el => {
+        el.addEventListener("click", () => handleVariationClick(el));
+        el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleVariationClick(el);
+            }
+        });
+    });
+
+    // Expose validation for form submit
+    window.validateVariationsBeforeSubmit = function () {
+        if (totalGroups <= 0) return true;
+
+        const allSelected = selectedKeys.every(v => v !== null);
+        if (!allSelected) {
+            showToast("Please select all product variations before adding to cart.", "error");
+            return false;
+        }
+
+        const stock = findMatchingComboStock();
+        if (stock <= 0) {
+            showToast("This variation combination is out of stock.", "error");
+            return false;
+        }
+
+        // Ensure hidden selection + qty are correct at submit time
+        updateHiddenSelected();
+        setQty(parseInt(qtyInput.value || "1", 10));
+        return true;
+    };
+
+    // Initial state for variation products
+    if (totalGroups > 0) {
+        setButtonsEnabled(false);
+        updateOptionAvailability();
+    }
+})();
 </script>

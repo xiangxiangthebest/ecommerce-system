@@ -111,6 +111,44 @@
   margin: 0;
 }
 
+/* ── Empty address message ───────────────────────── */
+.empty-address {
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(163,45,45,0.35);
+  background: rgba(163,45,45,0.05);
+  border-radius: 12px;
+  color: #7a1f1f;
+  font-size: 13px;
+  align-items: flex-start;
+}
+
+.empty-address i {
+  font-size: 18px;
+  margin-top: 2px;
+  color: #a32d2d;
+}
+
+.empty-address-title {
+  margin: 0;
+  font-weight: 700;
+  color: #7a1f1f;
+}
+
+.empty-address-sub {
+  margin: 2px 0 0;
+  color: #8b3a3a;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.empty-address a {
+  color: #1a1a2e;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 /* ─── Saved address pills ────────────────────────────── */
 .saved-address-row {
   display: flex;
@@ -188,6 +226,37 @@
   border: 0.5px solid rgba(59,109,17,0.2);
   white-space: nowrap;
 }
+
+/* ── Manage address link ─────────────────────────── */
+.address-manage-link {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.address-manage-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #1a1a2e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.address-manage-link a:hover {
+  text-decoration: underline;
+}
+
+/* ── Place order guard message ───────────────────── */
+.checkout-guard-msg {
+  margin: 2px 2px 0;
+  font-size: 12px;
+  color: #a32d2d;
+  text-align: center;
+  min-height: 16px;
+  display: none;
+}
+
+.checkout-guard-msg.show { display: block; }
 
 /* ─── Form elements ──────────────────────────────────── */
 .form-row               { display: grid; gap: 14px; }
@@ -662,6 +731,13 @@
   font-family: 'Playfair Display', serif;
   font-size: 16px;
   font-weight: 700;
+}
+
+.btn-place-order:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none;
 }
 
 /* ─── Utility ────────────────────────────────────────── */

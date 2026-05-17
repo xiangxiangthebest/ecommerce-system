@@ -36,6 +36,7 @@
         items = o.OrderItems.Select(item => new {
             name        = item.Product?.Name ?? "",
             image       = item.Product?.ImagePath ?? "",
+            images      = ParseImagePaths(item.Product?.ImagePathsJson, item.Product?.ImagePath),
             price       = item.Price.ToString("0.00"),
             qty         = item.Quantity,
             subtotal    = (item.Price * item.Quantity).ToString("0.00"),
@@ -43,7 +44,8 @@
             description = item.Product?.Description ?? "",
             sku         = item.Product?.SKU ?? "",
             rating      = item.Product?.AverageRating ?? 0,
-            variation   = ParseVariationToString(item.SelectedVariation)
+            selectedVariation = ParseVariationToString(item.SelectedVariation),
+            allVariations     = ParseAllVariations(item.Product?.VariationsJson)
         }).ToList()
     }).ToList();
 
@@ -68,6 +70,56 @@
         }
         catch { }
         return "";
+    }
+
+    // Parse ImagePathsJson → list of image URLs, fallback to mainImage
+    List<string> ParseImagePaths(string? json, string? mainImage)
+    {
+        var list = new List<string>();
+        if (!string.IsNullOrWhiteSpace(json) && json != "[]")
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    foreach (var el in doc.RootElement.EnumerateArray())
+                        if (!string.IsNullOrWhiteSpace(el.GetString()))
+                            list.Add(el.GetString()!);
+            }
+            catch { }
+        }
+        if (list.Count == 0 && !string.IsNullOrWhiteSpace(mainImage))
+            list.Add(mainImage);
+        return list;
+    }
+
+    // Parse VariationsJson → list of {name, values:[{label,stock}]}
+    List<object> ParseAllVariations(string? json)
+    {
+        var groups = new List<object>();
+        if (string.IsNullOrWhiteSpace(json) || json == "[]") return groups;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var group in doc.RootElement.EnumerateArray())
+                {
+                    var name   = group.TryGetProperty("name",   out var n) ? n.GetString() ?? "" : "";
+                    var values = new List<object>();
+                    if (group.TryGetProperty("values", out var vals) && vals.ValueKind == JsonValueKind.Array)
+                        foreach (var v in vals.EnumerateArray())
+                        {
+                            var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
+                            var stock = v.TryGetProperty("stock", out var s) ? s.GetInt32() : 0;
+                            values.Add(new { label, stock });
+                        }
+                    groups.Add(new { name, values });
+                }
+            }
+        }
+        catch { }
+        return groups;
     }
 
     // Same helper for display tags in the card
@@ -135,7 +187,7 @@
                 <span class="summary-cell-value">@pendingCnt</span>
             </div>
             <div class="summary-cell">
-                <span class="summary-cell-label">Cancelled</span>
+                <span class="summary-cell-label">Canceled</span>
                 <span class="summary-cell-value red">@canceledCnt</span>
             </div>
         </div>
@@ -156,7 +208,7 @@
                     Delivered <span class="ph-tab-count">@deliveredCnt</span>
                 </button>
                 <button class="ph-tab" onclick="filterOrders('CANCELED', this)">
-                    Cancelled <span class="ph-tab-count">@canceledCnt</span>
+                    Canceled <span class="ph-tab-count">@canceledCnt</span>
                 </button>
             </div>
             <div class="ph-search">
@@ -218,10 +270,6 @@
                                     <img src="@item.Product?.ImagePath"
                                          alt="@item.Product?.Name"
                                          onerror="this.src='/images/placeholder.png'" />
-                                    @if (item.Quantity > 1)
-                                    {
-                                        <span class="item-qty-badge">×@item.Quantity</span>
-                                    }
                                 </div>
                                 <div class="item-info">
                                     <div class="item-name">@item.Product?.Name</div>
@@ -238,6 +286,14 @@
                                 </div>
                                 <div class="item-price">RM @((item.Price * item.Quantity).ToString("0.00"))</div>
                             </div>
+                            
+                            @if (!string.IsNullOrWhiteSpace(order.CustomerMessage))
+                            {
+                                <div class="order-message">
+                                    <i class="ti ti-message-circle"></i>
+                                    <span>@order.CustomerMessage</span>
+                                </div>
+                            }
                         }
                     </div>
 
@@ -250,36 +306,22 @@
                     <!-- Collapsible Delivery Info -->
                     <div class="items-collapse" style="max-height:0; transition: max-height .3s ease;">
                         <div class="delivery-panel">
-                            @if (order.Address != null)
-                            {
+                            <div class="delivery-panel">
                                 <div class="delivery-row">
                                     <span class="delivery-label"><i class="ti ti-user"></i> Recipient</span>
-                                    <span class="delivery-value">@order.Address.RecipientName</span>
+                                    <span class="delivery-value">@order.DeliveryRecipientName</span>
                                 </div>
                                 <div class="delivery-row">
                                     <span class="delivery-label"><i class="ti ti-phone"></i> Phone</span>
-                                    <span class="delivery-value">@order.Address.PhoneNumber</span>
+                                    <span class="delivery-value">@order.DeliveryPhoneNumber</span>
                                 </div>
                                 <div class="delivery-row">
                                     <span class="delivery-label"><i class="ti ti-map-pin"></i> Address</span>
                                     <span class="delivery-value">
-                                        @order.Address.AddressLine1
-                                        @if (!string.IsNullOrWhiteSpace(order.Address.AddressLine2))
-                                        {
-                                            <br />@order.Address.AddressLine2
-                                        }
-                                        <br />@order.Address.City, @order.Address.Postcode
-                                        <br />@order.Address.State
+                                        @order.DeliveryAddressLine1@(!string.IsNullOrWhiteSpace(order.DeliveryAddressLine2) ? ", " + order.DeliveryAddressLine2 : ""), @order.DeliveryCity, @order.DeliveryPostcode, @order.DeliveryState
                                     </span>
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="delivery-row">
-                                    <span class="delivery-label"><i class="ti ti-map-pin"></i> Address</span>
-                                    <span class="delivery-value muted">Address #@order.AddressId</span>
-                                </div>
-                            }
+                            </div>
                         </div>
                     </div>
 
@@ -391,88 +433,129 @@
         badge.className = 'status-badge status-' + order.status;
         document.getElementById('odStatusLabel').textContent = order.statusLabel;
 
-        // Build body HTML
+        // Build body HTML — product details only, one card per item
         let html = '';
 
-        // Shop strip
-        html += `<div class="od-shop-strip">
-            <div class="od-shop-avatar">${esc(order.shopInitial)}</div>
-            <span>Sold by <strong>${esc(order.shopName)}</strong></span>
-        </div>`;
-
-        // Items
-        order.items.forEach(item => {
+        order.items.forEach((item, idx) => {
+            const shopInit   = order.shopInitial || (order.shopName ? order.shopName[0].toUpperCase() : 'S');
             const fullStars  = Math.floor(item.rating);
             const emptyStars = 5 - fullStars;
-            const stars = '★'.repeat(fullStars).split('').map(() => `<span class="star">★</span>`).join('')
-                        + '★'.repeat(emptyStars).split('').map(() => `<span class="star empty">★</span>`).join('');
+            const stars = Array(fullStars).fill(`<span class="star">★</span>`).join('')
+                        + Array(emptyStars).fill(`<span class="star empty">★</span>`).join('');
 
-            const variation = item.variation
-                ? `<div class="od-item-variation"><i class="ti ti-tag"></i> ${esc(item.variation)}</div>` : '';
-            const desc = item.description
-                ? `<div class="od-item-desc">${esc(item.description)}</div>` : '';
-            const sku = item.sku
-                ? `<div class="od-item-sku">SKU: ${esc(item.sku)}</div>` : '';
+            // ── Gallery ──────────────────────────────────────
+            const imgs = (item.images && item.images.length > 0) ? item.images : [item.image];
+            const mainImg = imgs[0] || item.image;
 
-            html += `<div class="od-item-detail">
-                <div class="od-item-img-wrap">
-                    <img src="${esc(item.image)}" alt="${esc(item.name)}"
-                         onerror="this.src='/images/placeholder.png'" />
+            const thumbsHtml = imgs.length > 1
+                ? `<div class="od-pd-thumbs">
+                    ${imgs.map((src, i) => `
+                        <div class="od-pd-thumb ${i === 0 ? 'active' : ''}"
+                             onclick="odSwitchImg(this, '${src.replace(/'/g,"\\'")}')">
+                            <img src="${esc(src)}" onerror="this.src='/images/placeholder.png'" />
+                        </div>`).join('')}
+                   </div>`
+                : '';
+
+            // ── All variations (read-only) ────────────────────
+            // Figure out which value was selected per group
+            const selectedMap = {};
+            if (item.selectedVariation) {
+                item.selectedVariation.split(' · ').forEach(pair => {
+                    const colonIdx = pair.indexOf(': ');
+                    if (colonIdx > -1) {
+                        selectedMap[pair.substring(0, colonIdx).trim()] = pair.substring(colonIdx + 2).trim();
+                    }
+                });
+            }
+
+            let variationsHtml = '';
+            if (item.allVariations && item.allVariations.length > 0) {
+                variationsHtml = item.allVariations.map(group => {
+                    const btns = group.values.map(v => {
+                        const isSelected = selectedMap[group.name] === v.label;
+                        const isOos      = v.stock <= 0;
+                        const cls = isSelected ? 'od-var-btn od-var-selected'
+                                  : isOos      ? 'od-var-btn od-var-oos'
+                                  :              'od-var-btn';
+                        return `<button class="${cls}" disabled>${esc(v.label)}</button>`;
+                    }).join('');
+                    return `<div class="od-var-group">
+                        <div class="od-var-label">${esc(group.name)}</div>
+                        <div class="od-var-options">${btns}</div>
+                    </div>`;
+                }).join('');
+            }
+
+            const sep = idx > 0 ? `<div class="od-item-sep"></div>` : '';
+
+            html += `
+            ${sep}
+            <div class="od-pd-wrap">
+
+                <!-- Gallery -->
+                <div class="od-pd-gallery">
+                    <div class="od-pd-img-wrap">
+                        <img id="odMainImg_${idx}" src="${esc(mainImg)}"
+                             alt="${esc(item.name)}"
+                             onerror="this.src='/images/placeholder.png'" />
+                    </div>
+                    ${thumbsHtml}
                 </div>
-                <div class="od-item-body">
-                    ${item.category ? `<div class="od-item-category">${esc(item.category)}</div>` : ''}
-                    <div class="od-item-name">${esc(item.name)}</div>
-                    <div class="od-item-rating">
+
+                <!-- Info -->
+                <div class="od-pd-info">
+
+                    <div class="od-pd-top-row">
+                        ${item.category ? `<span class="od-pd-category">${esc(item.category)}</span>` : ''}
+                    </div>
+
+                    <div class="od-pd-name">${esc(item.name)}</div>
+
+                    <div class="od-pd-rating-row">
                         <span class="od-stars">${stars}</span>
-                        <span class="od-item-rating-val">${item.rating}</span>
+                        <span class="od-pd-rating-num">${item.rating}</span>
+                        <span class="od-pd-rating-sep"></span>
+                        <span class="od-pd-rating-num">0 reviews</span>
                     </div>
-                    ${variation}${desc}${sku}
-                    <div class="od-item-price-row">
-                        <span class="od-item-unit">RM ${esc(item.price)} × ${item.qty}</span>
-                        <span class="od-item-subtotal">RM ${esc(item.subtotal)}</span>
+
+                    <div class="od-pd-divider"></div>
+
+                    <div class="od-pd-shop-row">
+                        <div class="od-pd-shop-avatar">${esc(shopInit)}</div>
+                        <span class="od-pd-shop-name">Sold by <strong>${esc(order.shopName)}</strong></span>
                     </div>
+
+                    <div class="od-pd-price-block">
+                        <div class="od-pd-price">RM ${esc(item.price)}</div>
+                        <div class="od-pd-price-note">Price includes SST where applicable</div>
+                    </div>
+
+                    ${item.sku ? `<div class="od-pd-sku">SKU: ${esc(item.sku)}</div>` : ''}
+
+                    <div class="od-pd-divider"></div>
+
+                    ${item.description ? `<p class="od-pd-desc">${esc(item.description)}</p>` : ''}
+
+                    ${variationsHtml}
+
                 </div>
             </div>`;
         });
-
-        // Delivery
-        if (order.address) {
-            const a = order.address;
-            const line2 = a.line2 ? `<br>${esc(a.line2)}` : '';
-            html += `<div class="od-section-label">Delivery Information</div>
-            <div class="od-info-grid">
-                <div class="od-info-row">
-                    <span class="od-info-label"><i class="ti ti-user"></i> Recipient</span>
-                    <span class="od-info-value">${esc(a.recipientName)}</span>
-                </div>
-                <div class="od-info-row">
-                    <span class="od-info-label"><i class="ti ti-phone"></i> Phone</span>
-                    <span class="od-info-value">${esc(a.phoneNumber)}</span>
-                </div>
-                <div class="od-info-row">
-                    <span class="od-info-label"><i class="ti ti-map-pin"></i> Address</span>
-                    <span class="od-info-value">${esc(a.line1)}${line2},<br>${esc(a.city)}, ${esc(a.postcode)},<br>${esc(a.state)}</span>
-                </div>
-            </div>`;
-        }
-
-        // Payment summary
-        html += `<div class="od-section-label">Payment Summary</div>
-        <div class="od-info-grid">
-            <div class="od-info-row">
-                <span class="od-info-label"><i class="ti ti-credit-card"></i> Method</span>
-                <span class="od-info-value">${esc(order.paymentMethod)}</span>
-            </div>
-            <div class="od-info-row od-total-row">
-                <span class="od-info-label">Order Total</span>
-                <span class="od-total-amount">RM ${esc(order.totalAmount)}</span>
-            </div>
-        </div>`;
 
         document.getElementById('odModalBody').innerHTML = html;
         document.getElementById('odBackdrop').classList.add('active');
         document.getElementById('odModal').classList.add('active');
         document.body.style.overflow = 'hidden';
+    }
+
+    function odSwitchImg(thumbEl, src) {
+        // Find the main image in the same od-pd-gallery
+        const gallery = thumbEl.closest('.od-pd-gallery');
+        const mainImg = gallery.querySelector('.od-pd-img-wrap img');
+        mainImg.src = src;
+        gallery.querySelectorAll('.od-pd-thumb').forEach(t => t.classList.remove('active'));
+        thumbEl.classList.add('active');
     }
 
     function closeOrderDetail() {

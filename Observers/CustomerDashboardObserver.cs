@@ -3,7 +3,7 @@ using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Observers;
 
-public class CustomerDashboardObserver : Observer
+public class CustomerDashboardObserver : OrderStatusObserver
 {
     private Order? _order; 
 

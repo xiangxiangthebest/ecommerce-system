@@ -283,6 +283,7 @@ namespace EcommerceSystem.Controllers
 
             var cartItems = await _context.CartItem
                 .Include(c => c.Product)
+                .ThenInclude(p => p.Seller)
                 .Include(c => c.Cart)
                 .Where(c =>
                     selectedItemIds.Contains(c.CartItemId) &&
@@ -299,34 +300,63 @@ namespace EcommerceSystem.Controllers
                 c.Quantity * (decimal)c.Price
             );
 
-            var order = new Order
-            {
-                CustomerUserId = customer.UserId,
-                SellerUserId = cartItems.First().Product.SellerId,
-                AddressId = selectedAddressId,
-                TotalAmount = totalPayment,
-                PaymentMethod = paymentMethod,
-                CurrentStatus = OrderStatus.PENDING,
-                OrderTime = DateTime.Now
-            };
+            var address = await _context.DeliveryField
+                .FirstOrDefaultAsync(a => a.AddressId == selectedAddressId);
 
-            _context.Order.Add(order);
-            await _context.SaveChangesAsync();
-
-            foreach (var item in cartItems)
+            if (address == null)
             {
-                var orderItem = new OrderItem
+                TempData["OrderError"] = "Address not found.";
+                return RedirectToAction("Cart");
+            }
+
+            var groupedBySeller = cartItems
+                .GroupBy(c => new { c.Product.SellerId, c.Product.Seller.ShopName });
+
+            foreach (var group in groupedBySeller)
+            {
+                var sellerId = group.Key.SellerId;
+                var sellerName = group.Key.ShopName;
+                var messageKey = $"SellerMessage_{sellerName.Replace(" ", "_")}";
+                var customerMessage = Request.Form[messageKey].ToString();
+                var orderTotal = group.Sum(c => c.Quantity * (decimal)c.Price);
+                
+                var order = new Order
                 {
-                    OrderId = order.OrderId,
-                    ProductId = item.ProductId,
-                    Quantity = item.Quantity,
-                    Price = (decimal)item.Price,
-                    SelectedVariation = item.SelectedVariations
+                    CustomerUserId = customer.UserId,
+                    SellerUserId = sellerId,
+                    AddressId = selectedAddressId,
+                    DeliveryRecipientName = address.RecipientName,
+                    DeliveryPhoneNumber = address.PhoneNumber,
+                    DeliveryAddressLine1 = address.AddressLine1,
+                    DeliveryAddressLine2 = address.AddressLine2,
+                    DeliveryCity = address.City,
+                    DeliveryPostcode = address.Postcode,
+                    DeliveryState = address.State,
+                    TotalAmount = orderTotal,
+                    PaymentMethod = paymentMethod,
+                    CurrentStatus = OrderStatus.PENDING,
+                    OrderTime = DateTime.Now,
+                    CustomerMessage = customerMessage
                 };
 
-                _context.OrderItems.Add(orderItem);
+                _context.Order.Add(order);
+                await _context.SaveChangesAsync();
 
-                item.Product.StockQuantity -= item.Quantity;
+                foreach (var item in group)
+                {
+                    var orderItem = new OrderItem
+                    {
+                        OrderId = order.OrderId,
+                        ProductId = item.ProductId,
+                        Quantity = item.Quantity,
+                        Price = (decimal)item.Price,
+                        SelectedVariation = item.SelectedVariations
+                    };
+
+                    _context.OrderItems.Add(orderItem);
+
+                    item.Product.StockQuantity -= item.Quantity;
+                }
             }
 
             _context.CartItem.RemoveRange(cartItems);

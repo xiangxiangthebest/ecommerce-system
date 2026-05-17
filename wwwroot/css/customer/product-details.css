@@ -414,7 +414,12 @@
   margin-bottom: 20px;
 }
 
+.pd-actions form {
+  width: 100%;
+}
+
 .pd-btn-cart {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -482,22 +487,6 @@
 .pd-btn-cart i,
 .pd-btn-buy i { font-size: 16px; }
 
-/* wishlist row */
-.pd-wishlist-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #aaa;
-  cursor: pointer;
-  width: fit-content;
-  margin-bottom: 20px;
-  transition: color 0.15s;
-}
-
-.pd-wishlist-row:hover { color: #e25c5c; }
-.pd-wishlist-row i { font-size: 16px; }
-
 /* trust badges */
 .pd-trust {
   display: grid;
@@ -556,4 +545,23 @@
   }
 
   .pd-trust-item { flex-direction: row; justify-content: flex-start; gap: 10px; text-align: left; }
+}
+
+.pd-badge.select-options { background: #e0e0e0; color: #666; }
+
+.pd-variation-btn.unavailable,
+.pd-variation-swatch.unavailable {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+}
+
+.pd-variation-btn.unavailable {
+  text-decoration: line-through;
+}
+
+.pd-stock-variation-note {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 6px;
 }

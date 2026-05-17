@@ -1,279 +1,383 @@
-<!-- _ProductPreviewModal.cshtml
-     Shared partial included by both AddProduct and EditProduct.
-     Requires: buildPreviewModal(imgSrcs), groups, escHtml() to be defined in the host page.
--->
+@* Customer Preview Modal — no @model needed, pure HTML + JS *@
 
-<div id="preview-overlay"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;overflow-y:auto;padding:40px 16px;">
-    <div id="preview-modal"
-         style="max-width:960px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
+<!-- ══ PREVIEW OVERLAY ══ -->
+<div id="preview-overlay" style="
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,0.55); overflow-y:auto;">
 
-        <!-- Header -->
-        <div style="background:#1e1b4b;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:700;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">
-                Customer View Preview
-            </span>
-            <button onclick="closePreview()"
-                    style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;">&times;</button>
-        </div>
+    <div style="
+        min-height:100%; display:flex;
+        align-items:flex-start; justify-content:center; padding:40px 16px;">
 
-        <!-- Product body -->
-        <div style="display:flex;flex-wrap:wrap;">
+        <div id="preview-modal" style="
+            background:#f4f6fb; border-radius:18px; width:100%; max-width:980px;
+            padding:32px; position:relative; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
 
-            <!-- LEFT: image gallery -->
-            <div style="width:420px;min-width:280px;flex-shrink:0;padding:28px;background:#fafafa;display:flex;flex-direction:column;gap:12px;">
-                <!-- Large main image -->
-                <div style="width:100%;aspect-ratio:1;border:1px solid #eee;border-radius:10px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;">
-                    <img id="pv-main-img" src="" alt=""
-                         style="width:100%;height:100%;object-fit:contain;" />
-                </div>
-                <!-- Thumbnail row -->
-                <div id="pv-thumb-row"
-                     style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+            <!-- Close button -->
+            <button onclick="closePreview()" style="
+                position:absolute; top:16px; right:18px;
+                background:#fff; border:1.5px solid #e0e0e0; border-radius:50%;
+                width:36px; height:36px; font-size:18px; cursor:pointer;
+                display:flex; align-items:center; justify-content:center;
+                color:#555; line-height:1;">✕</button>
+
+            <div style="font-size:12px; font-weight:700; color:#9a98b6; letter-spacing:1px; margin-bottom:18px;">
+                CUSTOMER PREVIEW
             </div>
 
-            <!-- RIGHT: product details -->
-            <div style="flex:1;min-width:260px;padding:28px 28px 28px 20px;">
+            <div id="preview-body" style="display:flex; gap:32px; flex-wrap:wrap;">
 
-                <div id="pv-name"
-                     style="font-size:18px;font-weight:700;color:#111;margin-bottom:12px;line-height:1.4;"></div>
-
-                <div style="margin-bottom:16px;">
-                    <span id="pv-price"
-                          style="font-size:28px;font-weight:800;color:#ee4d2d;"></span>
-                </div>
-
-                <!-- Info table -->
-                <div style="border-top:1px solid #f0f0f0;padding-top:14px;margin-bottom:14px;">
-                    <table style="font-size:13px;width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="color:#aaa;padding:5px 0;width:100px;vertical-align:top;">Category</td>
-                            <td id="pv-category" style="color:#333;font-weight:600;"></td>
-                        </tr>
-                        <tr>
-                            <td style="color:#aaa;padding:5px 0;vertical-align:top;">SKU</td>
-                            <td id="pv-sku" style="color:#333;"></td>
-                        </tr>
-                        <tr id="pv-stock-row">
-                            <td style="color:#aaa;padding:5px 0;vertical-align:top;">Stock</td>
-                            <td id="pv-stock" style="color:#333;"></td>
-                        </tr>
-                    </table>
-                </div>
-
-                <!-- Variations -->
-                <div id="pv-variations-section" style="display:none;margin-bottom:16px;">
-                    <div id="pv-variations-container"></div>
-                </div>
-
-                <!-- Mock action buttons -->
-                <div style="display:flex;gap:10px;margin-top:20px;">
-                    <div style="flex:1;text-align:center;border:1.5px solid #ee4d2d;color:#ee4d2d;
-                                padding:11px;border-radius:6px;font-weight:700;font-size:14px;">
-                        <i class="fas fa-shopping-cart"></i> Add to Cart
+                <!-- Gallery -->
+                <div id="preview-gallery" style="flex:0 0 340px; max-width:340px;">
+                    <div style="
+                        width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden;
+                        background:#fff; border:1.5px solid #e8eaf6; margin-bottom:12px;">
+                        <img id="preview-main-img" src="" alt="preview"
+                             style="width:100%; height:100%; object-fit:cover; display:none;" />
+                        <div id="preview-img-placeholder" style="
+                            width:100%; height:100%; display:flex; align-items:center;
+                            justify-content:center; color:#ccc; font-size:14px;">
+                            No image uploaded
+                        </div>
                     </div>
-                    <div style="flex:1;text-align:center;background:#ee4d2d;color:#fff;
-                                padding:11px;border-radius:6px;font-weight:700;font-size:14px;">
-                        Buy Now
-                    </div>
+                    <div id="preview-thumbs" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
                 </div>
-                <div style="margin-top:10px;font-size:11px;color:#ccc;text-align:center;">
-                    Preview only — buttons are not functional
-                </div>
-            </div>
-        </div>
 
-        <!-- Description section -->
-        <div style="border-top:8px solid #f5f5f5;padding:24px 28px;">
-            <div style="font-size:13px;font-weight:700;color:#222;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">
-                Product Description
+                <!-- Info -->
+                <div style="flex:1; min-width:260px;">
+
+                    <!-- Category + badge -->
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                        <span id="pv-category" style="
+                            font-size:11px; font-weight:700; color:#7c6af7;
+                            background:#ede9ff; border-radius:20px; padding:3px 12px;
+                            letter-spacing:.5px; text-transform:uppercase;"></span>
+                        <span id="pv-stock-badge" style="
+                            font-size:11px; font-weight:700; border-radius:20px;
+                            padding:3px 12px; letter-spacing:.5px;"></span>
+                    </div>
+
+                    <!-- Name -->
+                    <div id="pv-name" style="
+                        font-size:22px; font-weight:800; color:#1e1b4b; margin-bottom:8px;
+                        line-height:1.3;">Product Name</div>
+
+                    <!-- Stars placeholder -->
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+                        <span style="color:#f59e0b; font-size:15px;">★★★★★</span>
+                        <span style="font-size:12px; color:#9a98b6;">No reviews yet</span>
+                    </div>
+
+                    <hr style="border:none; border-top:1px solid #e8eaf6; margin:12px 0;" />
+
+                    <!-- Price -->
+                    <div id="pv-price" style="
+                        font-size:28px; font-weight:900; color:#4f46e5; margin-bottom:4px;">
+                        RM 0.00
+                    </div>
+                    <div style="font-size:12px; color:#9a98b6; margin-bottom:16px;">
+                        Price includes SST where applicable
+                    </div>
+
+                    <!-- SKU -->
+                    <div id="pv-sku" style="font-size:12px; color:#aaa; margin-bottom:12px;"></div>
+
+                    <hr style="border:none; border-top:1px solid #e8eaf6; margin:12px 0;" />
+
+                    <!-- Description -->
+                    <div id="pv-desc" style="
+                        font-size:14px; color:#5b587d; line-height:1.7; margin-bottom:18px;
+                        white-space:pre-wrap;"></div>
+
+                    <!-- Variations -->
+                    <div id="pv-variations" style="margin-bottom:18px;"></div>
+
+                    <!-- Stock note -->
+                    <div id="pv-stock-note" style="
+                        font-size:13px; color:#888; margin-bottom:14px; display:none;"></div>
+
+                    <!-- Qty -->
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+                        <span style="font-size:13px; font-weight:600; color:#5b587d;">Qty</span>
+                        <div style="display:flex; align-items:center; border:1.5px solid #e8eaf6; border-radius:8px; overflow:hidden;">
+                            <button onclick="pvAdjustQty(-1)" style="
+                                width:36px; height:36px; background:#f8f9ff; border:none;
+                                font-size:18px; cursor:pointer; color:#1e1b4b;">−</button>
+                            <input id="pv-qty" type="number" value="1" min="1" readonly style="
+                                width:48px; text-align:center; border:none; font-size:15px;
+                                font-weight:700; color:#1e1b4b; background:#fff;" />
+                            <button onclick="pvAdjustQty(1)" style="
+                                width:36px; height:36px; background:#f8f9ff; border:none;
+                                font-size:18px; cursor:pointer; color:#1e1b4b;">+</button>
+                        </div>
+                        <span id="pv-stock-left" style="font-size:12px; color:#9a98b6;"></span>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div style="display:flex; gap:12px; margin-bottom:14px;">
+                        <button id="pv-btn-cart" style="
+                            flex:1; padding:13px; background:#1e1b4b; color:#fff;
+                            border:none; border-radius:10px; font-size:14px;
+                            font-weight:700; cursor:pointer;">🛒 Add to Cart</button>
+                        <button id="pv-btn-buy" style="
+                            flex:1; padding:13px; background:#4f46e5; color:#fff;
+                            border:none; border-radius:10px; font-size:14px;
+                            font-weight:700; cursor:pointer;">⚡ Buy Now</button>
+                    </div>
+
+                    <!-- Trust -->
+                    <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+                        <span style="font-size:12px; color:#9a98b6;">🚚 Free shipping over RM100</span>
+                        <span style="font-size:12px; color:#9a98b6;">🔒 Secure checkout</span>
+                        <span style="font-size:12px; color:#9a98b6;">🔄 7-day returns</span>
+                    </div>
+
+                </div>
             </div>
-            <div id="pv-desc-full"
-                 style="font-size:14px;color:#444;white-space:pre-wrap;line-height:1.8;"></div>
         </div>
     </div>
 </div>
 
 <script>
-// ════════════════════════════════════════════════════════════
-// SHARED PREVIEW MODAL LOGIC
-// Called by openPreview() in the host page
-// ════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// PREVIEW MODAL
+// ═══════════════════════════════════════════════════════════
+let _pvCombos      = {};
+let _pvGroups      = [];
+let _pvSelected    = [];
+let _pvTotalGroups = 0;
+let _pvProductImgs = [];
 
-let _pvImgSrcs = [];        // all image srcs in order
-let _pvCurrentImg = 0;      // which image is shown large
-
-function buildPreviewModal(imgSrcs) {
-    _pvImgSrcs = imgSrcs;
-    _pvCurrentImg = 0;
-
-    // ── Main image
-    const mainImg = document.getElementById('pv-main-img');
-    if (imgSrcs.length > 0) {
-        mainImg.src = imgSrcs[0];
+function pvSetMainImg(src) {
+    const mainImg     = document.getElementById('preview-main-img');
+    const placeholder = document.getElementById('preview-img-placeholder');
+    if (src) {
+        mainImg.src = src;
         mainImg.style.display = 'block';
+        placeholder.style.display = 'none';
     } else {
-        mainImg.src = '/images/placeholder.png';
-        mainImg.onerror = () => { mainImg.style.display = 'none'; };
+        mainImg.style.display = 'none';
+        placeholder.style.display = 'flex';
     }
+}
 
-    // ── Thumbnail row
-    const thumbRow = document.getElementById('pv-thumb-row');
-    thumbRow.innerHTML = '';
-    imgSrcs.forEach((src, idx) => {
+function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
+    _pvGroups      = groupsArr || [];
+    _pvCombos      = combosMap || {};
+    _pvTotalGroups = _pvGroups.length;
+    _pvSelected    = new Array(_pvTotalGroups).fill(null);
+    _pvProductImgs = imgSrcs || [];
+
+    // ── Gallery thumbnails
+    const thumbsDiv = document.getElementById('preview-thumbs');
+    pvSetMainImg(_pvProductImgs.length > 0 ? _pvProductImgs[0] : null);
+
+    thumbsDiv.innerHTML = '';
+    _pvProductImgs.forEach((src, i) => {
         const t = document.createElement('div');
-        t.style.cssText = `width:60px;height:60px;border-radius:6px;overflow:hidden;cursor:pointer;
-                           border:2px solid ${idx === 0 ? '#ee4d2d' : '#eee'};flex-shrink:0;`;
-        t.id = 'pv-thumb-' + idx;
-        t.onclick = () => pvSelectThumb(idx);
-        const img = document.createElement('img');
-        img.src = src;
-        img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-        t.appendChild(img);
-        thumbRow.appendChild(t);
+        t.style.cssText = `width:60px;height:60px;border-radius:8px;overflow:hidden;
+            border:2px solid ${i===0?'#4f46e5':'#e8eaf6'};cursor:pointer;flex-shrink:0;`;
+        t.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;" />`;
+        t.onclick = () => {
+            pvSetMainImg(src);
+            thumbsDiv.querySelectorAll('div').forEach(d => d.style.borderColor = '#e8eaf6');
+            t.style.borderColor = '#4f46e5';
+        };
+        thumbsDiv.appendChild(t);
     });
 
-    // ── Name
+    // ── Text fields (read live from the seller form)
+    const nameEl = document.getElementById('field-name');
     document.getElementById('pv-name').textContent =
-        document.getElementById('field-name')?.value.trim() || '(No name yet)';
+        (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'Product Name';
 
-    // ── Price
-    const price = parseFloat(document.getElementById('field-price')?.value) || 0;
-    document.getElementById('pv-price').textContent = 'RM ' + price.toFixed(2);
+    const priceEl = document.getElementById('field-price');
+    document.getElementById('pv-price').textContent =
+        'RM ' + (priceEl ? parseFloat(priceEl.value) || 0 : 0).toFixed(2);
 
-    // ── Category
+    const descEl = document.getElementById('desc-field');
+    document.getElementById('pv-desc').textContent =
+        (descEl && descEl.value.trim()) ? descEl.value.trim() : 'No description provided.';
+
+    const skuEl  = document.querySelector('[name="SKU"]');
+    const skuVal = skuEl ? skuEl.value.trim() : '';
+    const skuDiv = document.getElementById('pv-sku');
+    skuDiv.textContent  = skuVal ? 'SKU: ' + skuVal : '';
+    skuDiv.style.display = skuVal ? 'block' : 'none';
+
     const catEl = document.getElementById('field-category');
     document.getElementById('pv-category').textContent =
-        catEl?.options[catEl.selectedIndex]?.text || '—';
+        (catEl && catEl.value) ? catEl.value : 'Uncategorised';
 
-    // ── SKU
-    document.getElementById('pv-sku').textContent =
-        document.querySelector('input[name="SKU"]')?.value.trim() || '—';
+    // Reset qty
+    const qtyInput = document.getElementById('pv-qty');
+    qtyInput.value = 1;
+    qtyInput.max   = 999;
+    document.getElementById('pv-stock-note').style.display = 'none';
 
-    // ── Stock / Variations
-    const groupArr = Object.values(groups || {}).filter(g => g.name || g.values?.length);
-    if (groupArr.length > 0) {
-        document.getElementById('pv-stock-row').style.display = 'none';
-        buildVariationPicker(groupArr);
-    } else {
-        document.getElementById('pv-stock-row').style.display = '';
-        const stock = parseInt(document.getElementById('field-stock')?.value) || 0;
-        const stockEl = document.getElementById('pv-stock');
-        stockEl.textContent = stock > 0 ? stock + ' available' : 'Out of stock';
-        stockEl.style.color = stock > 0 ? '#2e7d32' : '#c62828';
-        document.getElementById('pv-variations-section').style.display = 'none';
-    }
+    // ── Variations
+    const varDiv = document.getElementById('pv-variations');
+    varDiv.innerHTML = '';
 
-    // ── Description
-    document.getElementById('pv-desc-full').textContent =
-        document.getElementById('desc-field')?.value.trim() || '(No description)';
-}
+    if (_pvTotalGroups > 0) {
+        _pvGroups.forEach((grp, gi) => {
+            const groupWrap = document.createElement('div');
+            groupWrap.style.marginBottom = '14px';
 
-function pvSelectThumb(idx) {
-    _pvCurrentImg = idx;
-    document.getElementById('pv-main-img').src = _pvImgSrcs[idx];
-    // Update border highlight
-    document.querySelectorAll('#pv-thumb-row > div').forEach((el, i) => {
-        el.style.border = i === idx ? '2px solid #ee4d2d' : '2px solid #eee';
-    });
-}
+            // Label row: "FLAVOUR: <selected>"
+            const labelRow = document.createElement('div');
+            labelRow.style.cssText = 'font-size:12px;font-weight:700;color:#5b587d;' +
+                'margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;';
+            labelRow.innerHTML = `${grp.name || 'Variation'}: ` +
+                `<span id="pv-sel-label-${gi}" style="color:#4f46e5;font-weight:800;"></span>`;
+            groupWrap.appendChild(labelRow);
 
-function buildVariationPicker(groupArr) {
-    const section   = document.getElementById('pv-variations-section');
-    const container = document.getElementById('pv-variations-container');
-    container.innerHTML = '';
-    section.style.display = 'block';
+            const optRow = document.createElement('div');
+            optRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
-    groupArr.forEach(g => {
-        const row = document.createElement('div');
-        row.style.marginBottom = '14px';
+            grp.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
 
-        const label = document.createElement('div');
-        label.style.cssText = 'font-size:12px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;';
-        label.textContent = g.name || 'Variation';
-        row.appendChild(label);
+                if (opt.imagePath) {
+                    // Swatch button with image + label
+                    btn.style.cssText = `padding:4px 10px 4px 4px;border:2px solid #e8eaf6;
+                        border-radius:8px;background:#fff;cursor:pointer;
+                        display:inline-flex;align-items:center;gap:6px;
+                        font-size:13px;font-weight:600;color:#1e1b4b;transition:all .15s;`;
+                    btn.innerHTML =
+                        `<img src="${opt.imagePath}"
+                             style="width:32px;height:32px;border-radius:5px;object-fit:cover;" />
+                         <span>${opt.label}</span>`;
+                } else {
+                    // Plain text button
+                    btn.style.cssText = `padding:7px 16px;border:1.5px solid #e8eaf6;
+                        border-radius:8px;background:#fff;font-size:13px;font-weight:600;
+                        color:#1e1b4b;cursor:pointer;transition:all .15s;`;
+                    btn.textContent = opt.label;
+                }
 
-        const chipWrap = document.createElement('div');
-        chipWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
-
-        g.values.forEach((v, vi) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.style.cssText = `display:flex;align-items:center;gap:8px;
-                border:1.5px solid #ddd;background:#fff;border-radius:8px;
-                padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:0.15s;`;
-            btn.onmouseover = () => { btn.style.borderColor = '#ee4d2d'; btn.style.color = '#ee4d2d'; };
-            btn.onmouseout  = () => { btn.style.borderColor = '#ddd';    btn.style.color = '#111'; };
-
-            // If variation has an image, show it as a tiny thumbnail next to the label
-            if (v.imageSrc && v.imageSrc !== '') {
-                const vImg = document.createElement('img');
-                vImg.src = v.imageSrc;
-                vImg.style.cssText = 'width:28px;height:28px;object-fit:cover;border-radius:4px;';
-                btn.appendChild(vImg);
-
-                // Clicking switches the main product image to this variation image
                 btn.onclick = () => {
-                    const thumbRow = document.getElementById('pv-thumb-row');
-                    // Check if this variation image is already in our list
-                    let imgIdx = _pvImgSrcs.indexOf(v.imageSrc);
-                    if (imgIdx < 0) {
-                        // Temporarily inject at start for preview
-                        _pvImgSrcs.unshift(v.imageSrc);
-                        imgIdx = 0;
-                        // Add a temp thumb
-                        const t = document.createElement('div');
-                        t.style.cssText = 'width:60px;height:60px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid #eee;flex-shrink:0;';
-                        t.id = 'pv-thumb-var-' + vi;
-                        t.onclick = () => pvSelectThumb(0);
-                        const tImg = document.createElement('img');
-                        tImg.src = v.imageSrc;
-                        tImg.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-                        t.appendChild(tImg);
-                        thumbRow.prepend(t);
+                    // Deselect all in this group
+                    optRow.querySelectorAll('button').forEach(b => {
+                        b.style.borderColor = '#e8eaf6';
+                        b.style.background  = '#fff';
+                        b.style.color       = '#1e1b4b';
+                    });
+                    // Highlight selected
+                    btn.style.borderColor = '#4f46e5';
+                    if (opt.imagePath) {
+                        btn.style.background = '#eef0ff';
+                    } else {
+                        btn.style.background = '#4f46e5';
+                        btn.style.color      = '#fff';
                     }
-                    pvSelectThumb(imgIdx);
-                    // Highlight this button
-                    chipWrap.querySelectorAll('button').forEach(b => {
-                        b.style.borderColor = '#ddd';
-                        b.style.background  = '#fff';
-                        b.style.color       = '#111';
-                    });
-                    btn.style.borderColor = '#ee4d2d';
-                    btn.style.background  = '#fff5f5';
-                    btn.style.color       = '#ee4d2d';
-                };
-            } else {
-                btn.onclick = () => {
-                    chipWrap.querySelectorAll('button').forEach(b => {
-                        b.style.borderColor = '#ddd';
-                        b.style.background  = '#fff';
-                        b.style.color       = '#111';
-                    });
-                    btn.style.borderColor = '#ee4d2d';
-                    btn.style.background  = '#fff5f5';
-                    btn.style.color       = '#ee4d2d';
-                };
-            }
 
-            const lbl = document.createElement('span');
-            lbl.textContent = v.label;
-            btn.appendChild(lbl);
-            chipWrap.appendChild(btn);
+                    document.getElementById('pv-sel-label-' + gi).textContent = opt.label;
+                    _pvSelected[gi] = opt.label;
+
+                    // Switch main image to this option's image if it has one
+                    if (opt.imagePath) {
+                        pvSetMainImg(opt.imagePath);
+                        // Deselect product gallery thumb highlights
+                        document.getElementById('preview-thumbs')
+                            .querySelectorAll('div')
+                            .forEach(d => d.style.borderColor = '#e8eaf6');
+                    }
+
+                    pvUpdateStock();
+                };
+
+                optRow.appendChild(btn);
+            });
+
+            groupWrap.appendChild(optRow);
+            varDiv.appendChild(groupWrap);
         });
 
-        row.appendChild(chipWrap);
-        container.appendChild(row);
-    });
+        pvSetStockBadge('select-options', 'Select Options');
+        document.getElementById('pv-btn-cart').disabled = true;
+        document.getElementById('pv-btn-buy').disabled  = true;
+        document.getElementById('pv-btn-cart').style.opacity = '0.5';
+        document.getElementById('pv-btn-buy').style.opacity  = '0.5';
+
+    } else {
+        // No variations — read global stock field
+        const stockEl = document.getElementById('field-stock');
+        const stock   = stockEl ? parseInt(stockEl.value) || 0 : 0;
+        pvSetStockFromNumber(stock);
+        qtyInput.max = stock;
+        document.getElementById('pv-btn-cart').disabled = stock <= 0;
+        document.getElementById('pv-btn-buy').disabled  = stock <= 0;
+        document.getElementById('pv-btn-cart').style.opacity = stock > 0 ? '1' : '0.5';
+        document.getElementById('pv-btn-buy').style.opacity  = stock > 0 ? '1' : '0.5';
+    }
+}
+
+function pvUpdateStock() {
+    const allSelected = _pvSelected.every(k => k !== null);
+    if (!allSelected) {
+        pvSetStockBadge('select-options', 'Select Options');
+        document.getElementById('pv-stock-note').style.display = 'none';
+        document.getElementById('pv-btn-cart').disabled = true;
+        document.getElementById('pv-btn-buy').disabled  = true;
+        document.getElementById('pv-btn-cart').style.opacity = '0.5';
+        document.getElementById('pv-btn-buy').style.opacity  = '0.5';
+        return;
+    }
+
+    // Key matches seller form: labels joined by "|"
+    const key   = _pvSelected.join('|');
+    const stock = _pvCombos[key] ?? 0;
+    pvSetStockFromNumber(stock);
+
+    const note = document.getElementById('pv-stock-note');
+    note.textContent   = stock > 0 ? stock + ' left for this option' : 'This combination is out of stock';
+    note.style.display = 'block';
+
+    const qtyInput = document.getElementById('pv-qty');
+    qtyInput.max = stock;
+    if (parseInt(qtyInput.value) > stock) qtyInput.value = Math.max(1, stock);
+
+    document.getElementById('pv-btn-cart').disabled = stock <= 0;
+    document.getElementById('pv-btn-buy').disabled  = stock <= 0;
+    document.getElementById('pv-btn-cart').style.opacity = stock > 0 ? '1' : '0.5';
+    document.getElementById('pv-btn-buy').style.opacity  = stock > 0 ? '1' : '0.5';
+}
+
+function pvSetStockFromNumber(stock) {
+    if (stock <= 0)      pvSetStockBadge('out-of-stock',  'Out of Stock');
+    else if (stock <= 5) pvSetStockBadge('low-stock',     'Low Stock');
+    else                 pvSetStockBadge('in-stock',      'In Stock');
+
+    document.getElementById('pv-stock-left').textContent = stock > 0 ? stock + ' left' : '';
+}
+
+function pvSetStockBadge(type, label) {
+    const b = document.getElementById('pv-stock-badge');
+    b.textContent = label;
+    const styles = {
+        'in-stock':       'background:#e6f4ea;color:#2e7d32;',
+        'low-stock':      'background:#fff8e1;color:#f57c00;',
+        'out-of-stock':   'background:#fdecea;color:#c62828;',
+        'select-options': 'background:#f0f0f0;color:#777;',
+    };
+    b.style.cssText = `font-size:11px;font-weight:700;border-radius:20px;
+        padding:3px 12px;letter-spacing:.5px;${styles[type]||''}`;
+}
+
+function pvAdjustQty(delta) {
+    const input = document.getElementById('pv-qty');
+    const max   = parseInt(input.max) || 999;
+    input.value = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
 }
 
 function closePreview() {
     document.getElementById('preview-overlay').style.display = 'none';
     document.body.style.overflow = '';
-    // Reset any temp-injected variation images
-    _pvImgSrcs = [];
 }
 
+// Close when clicking the dark backdrop
 document.getElementById('preview-overlay').addEventListener('click', function(e) {
     if (e.target === this) closePreview();
 });
