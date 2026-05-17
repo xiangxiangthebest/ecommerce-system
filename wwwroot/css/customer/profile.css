@@ -1,6 +1,6 @@
 /* ─── Profile page ───────────────────────────────────── */
 .profile-page {
-  max-width: 860px;
+  max-width: 950px;
   margin: 0 auto;
   padding: 2.5rem 1.5rem 4rem;
   font-family: 'DM Sans', sans-serif;
@@ -12,6 +12,29 @@
   grid-template-columns: 220px 1fr;
   gap: 20px;
   align-items: start;
+}
+
+/* ─── Floating success alert ─────────────────────────── */
+.floating-alert {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #eaf3de;
+  color: #3b6d11;
+  padding: 10px 30px;
+  border-radius: 10px;
+  border: 2px solid #5faa21;
+  font-size: 13.5px;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  opacity: 1;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.floating-alert.hide {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
 }
 
 /* ─── Sidebar ────────────────────────────────────────── */
@@ -67,22 +90,10 @@
   transition: opacity 0.15s;
 }
 
-.avatar-upload:hover {
-  opacity: 0.85;
-}
+.avatar-upload:hover { opacity: 0.85; }
 
-.avatar-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: #1a1a2e;
-  margin: 0;
-}
-
-.avatar-email {
-  font-size: 12px;
-  color: #999;
-  margin: 0;
-}
+.avatar-name  { font-size: 15px; font-weight: 500; color: #1a1a2e; margin: 0; }
+.avatar-email { font-size: 12px; color: #999; margin: 0; }
 
 .avatar-placeholder {
   width: 88px;
@@ -90,15 +101,14 @@
   border-radius: 50%;
   border: 2px solid rgba(0,0,0,0.08);
   background: #f3f4f6;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   text-align: center;
   font-size: 11px;
   color: #888;
   padding: 8px;
+  box-sizing: border-box;
 }
 
 .status-badge {
@@ -122,9 +132,7 @@
   flex-shrink: 0;
 }
 
-.status-dot.inactive {
-  background: #E24B4A;
-}
+.status-dot.inactive { background: #E24B4A; }
 
 .meta-card {
   background: #ffffff;
@@ -144,21 +152,9 @@
   color: #888;
 }
 
-.meta-row i {
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.meta-row span {
-  font-size: 12.5px;
-  color: #1a1a2e;
-}
-
-.meta-sub {
-  font-size: 11px;
-  color: #bbb;
-  margin-bottom: 1px;
-}
+.meta-row i    { font-size: 16px; flex-shrink: 0; }
+.meta-row span { font-size: 12.5px; color: #1a1a2e; }
+.meta-sub      { font-size: 11px; color: #bbb; margin-bottom: 1px; }
 
 /* ─── Form card ──────────────────────────────────────── */
 .form-card {
@@ -166,15 +162,15 @@
   border: 0.5px solid rgba(0,0,0,0.08);
   border-radius: 18px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: 20px;
 }
 
 .form-section {
   padding: 1.25rem 1.5rem;
   border-bottom: 0.5px solid rgba(0,0,0,0.07);
-}
-
-.form-section:last-of-type {
-  border-bottom: none;
 }
 
 .section-label {
@@ -184,6 +180,7 @@
   text-transform: uppercase;
   color: #bbb;
   margin-bottom: 14px;
+  margin-top: 0;
 }
 
 .field-grid {
@@ -198,9 +195,7 @@
   gap: 5px;
 }
 
-.field.full {
-  grid-column: 1 / -1;
-}
+.field.full { grid-column: 1 / -1; }
 
 .field label {
   font-size: 12px;
@@ -220,6 +215,7 @@
   color: #1a1a2e;
   outline: none;
   width: 100%;
+  box-sizing: border-box;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -231,10 +227,7 @@
   box-shadow: 0 0 0 3px rgba(26,26,46,0.06);
 }
 
-.field input[readonly] {
-  color: #aaa;
-  cursor: not-allowed;
-}
+.field input[readonly] { color: #aaa; cursor: not-allowed; }
 
 .field textarea {
   resize: vertical;
@@ -242,9 +235,7 @@
   line-height: 1.55;
 }
 
-.select-wrap {
-  position: relative;
-}
+.select-wrap { position: relative; }
 
 .select-wrap select {
   appearance: none;
@@ -263,7 +254,300 @@
   pointer-events: none;
 }
 
-/* ─── Form actions ───────────────────────────────────── */
+/* ─── Address pill cards ─────────────────────────────── */
+.address-pills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.addr-pill {
+  border: 1.5px solid rgba(0,0,0,0.09);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+  background: rgba(0,0,0,0.01);
+}
+
+.addr-pill--default {
+  border-color: #1a1a2e;
+  background: rgba(26,26,46,0.03);
+}
+
+.addr-pill-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px;
+}
+
+.addr-pill-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #1a1a2e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.addr-pill--default .addr-pill-icon { background: #1a1a2e; }
+
+.addr-pill:not(.addr-pill--default) .addr-pill-icon {
+  background: #f5f4f0;
+  color: #888;
+}
+
+.addr-pill-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.addr-pill-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.addr-pill-name  { font-size: 13.5px; font-weight: 500; color: #1a1a2e; }
+.addr-pill-phone { font-size: 12px; color: #888; }
+
+.addr-pill-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: #eef4e8;
+  color: #3b6d11;
+  font-weight: 500;
+  border: 0.5px solid rgba(59,109,17,0.2);
+  white-space: nowrap;
+}
+
+.addr-pill-line {
+  font-size: 12.5px;
+  color: #777;
+  line-height: 1.5;
+}
+
+/* ─── Pill action row ────────────────────────────────── */
+.addr-pill-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-top: 0.5px solid rgba(0,0,0,0.06);
+  background: rgba(0,0,0,0.015);
+}
+
+.addr-pill-actions-spacer { flex: 1; }
+
+.addr-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
+}
+
+.addr-action-default { color: #1a1a2e; }
+.addr-action-default:hover {
+  background: rgba(26,26,46,0.06);
+  border-color: rgba(26,26,46,0.2);
+}
+
+.addr-action-remove {
+  color: #a32d2d;
+  border-color: rgba(163,45,45,0.15);
+}
+.addr-action-remove:hover {
+  background: #fcebeb;
+  border-color: rgba(163,45,45,0.25);
+}
+
+/* ─── Add new address button ─────────────────────────── */
+.add-address-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1.5px dashed rgba(0,0,0,0.14);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+
+.add-address-btn:hover {
+  border-color: #1a1a2e;
+  color: #1a1a2e;
+  background: rgba(26,26,46,0.02);
+}
+
+/* ─── Add address inline form ────────────────────────── */
+.add-address-form-wrap {
+  margin-top: 12px;
+  border: 1.5px solid rgba(26,26,46,0.12);
+  border-radius: 14px;
+  background: rgba(0,0,0,0.01);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.add-address-inner-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.addr-form-grid {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.addr-form-grid.two-col   { grid-template-columns: 1fr 1fr; }
+.addr-form-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+
+.addr-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.addr-form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #777;
+}
+
+.req      { color: #c0392b; font-size: 11px; }
+.optional { color: #bbb; font-size: 11px; font-weight: 400; }
+
+.addr-form-input {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 0.5px solid rgba(0,0,0,0.11);
+  background: #fff;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  color: #1a1a2e;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.addr-form-input:focus { border-color: #1a1a2e; }
+.addr-form-input::placeholder { color: #ccc; }
+
+.addr-form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+.default-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+}
+
+.default-check-label span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.default-check-input {
+  width: auto !important;
+  height: 15px;
+  accent-color: #1a1a2e;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ─── Addr form actions row ──────────────────────────── */
+.addr-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 0.5px solid rgba(0,0,0,0.07);
+  margin-top: 2px;
+}
+
+.addr-cancel-btn {
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 0.5px solid rgba(0,0,0,0.11);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: #888;
+  cursor: pointer;
+  transition: background 0.13s;
+}
+.addr-cancel-btn:hover { background: #f5f4f0; }
+
+.addr-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: none;
+  background: #1a1a2e;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.addr-save-btn:hover { opacity: 0.88; }
+
+/* ─── Form actions (Save / Change password) ──────────── */
 .form-actions {
   display: flex;
   align-items: center;
@@ -271,6 +555,7 @@
   padding: 1.25rem 1.5rem;
   background: rgba(0,0,0,0.02);
   border-top: 0.5px solid rgba(0,0,0,0.07);
+  margin-top: auto;
 }
 
 .btn-save {
@@ -288,18 +573,9 @@
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s;
 }
-
-.btn-save:hover {
-  opacity: 0.88;
-}
-
-.btn-save:active {
-  transform: scale(0.97);
-}
-
-.btn-save i {
-  font-size: 15px;
-}
+.btn-save:hover  { opacity: 0.88; }
+.btn-save:active { transform: scale(0.97); }
+.btn-save i      { font-size: 15px; }
 
 .btn-change-pass {
   display: flex;
@@ -316,23 +592,16 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-
 .btn-change-pass:hover {
   background: rgba(0,0,0,0.04);
   text-decoration: none;
   color: #1a1a2e;
 }
+.btn-change-pass i { font-size: 15px; color: #888; }
 
-.btn-change-pass i {
-  font-size: 15px;
-  color: #888;
-}
-
-/* ─── Profile responsive ─────────────────────────────── */
+/* ─── Responsive ─────────────────────────────────────── */
 @media (max-width: 770px) {
-  .profile-layout {
-    grid-template-columns: 1fr;
-  }
+  .profile-layout        { grid-template-columns: 1fr; }
 
   .avatar-card {
     flex-direction: row;
@@ -340,9 +609,10 @@
     padding: 1rem 1.25rem;
   }
 
-  .field-grid {
-    grid-template-columns: 1fr;
-  }
+  .field-grid { grid-template-columns: 1fr; }
+
+  .addr-form-grid.two-col,
+  .addr-form-grid.three-col { grid-template-columns: 1fr; }
 
   .form-actions {
     flex-direction: column-reverse;

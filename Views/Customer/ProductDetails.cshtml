@@ -1,12 +1,14 @@
 @model EcommerceSystem.Models.Product
 @using EcommerceSystem.Models
 @using System.Text.Json
+@using EcommerceSystem.DTOs
 
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
 
 @{
     var images      = ViewBag.Images as List<string> ?? new List<string>();
-    var variations  = ViewBag.Variations as List<Product.VariationGroup> ?? new List<Product.VariationGroup>();
+    var variations = ViewBag.Variations as List<VariationGroupDto>
+        ?? new List<VariationGroupDto>();
     var firstImage  = images.Count > 0 ? images[0] : Model.ImagePath;
     var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
 
@@ -22,6 +24,13 @@
     // Star rendering helpers
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
+}
+
+@if (TempData["CartSuccess"] != null)
+{
+    <div id="floatingAlert" class="floating-alert">
+        @TempData["CartSuccess"]
+    </div>
 }
 
 <div class="pd-page">
@@ -164,9 +173,33 @@
 
             <!-- Actions -->
             <div class="pd-actions">
-                <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
-                    <i class="ti ti-shopping-cart-plus"></i> Add to Cart
-                </button>
+                @* <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                    @if (Model.StockQuantity <= 0) {
+                        <i class="ti ti-shopping-cart-off"></i> <text>Out of Stock</text>
+                    }
+                    else {
+                        <i class="ti ti-shopping-cart-plus"></i> <text>Add to Cart</text>
+                    }
+                </button> *@
+                <form asp-controller="Customer"
+                    asp-action="AddToCart"
+                    method="post">
+
+                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <input type="hidden" id="selectedVariations"
+                        name="selectedVariations" value="{}" />
+
+                    <input type="hidden"
+                        id="cartQuantity"
+                        name="quantity"
+                        value="1" />
+
+                    <button type="submit" class="pd-btn-cart" onclick="return validateVariations()">
+                        <i class="ti ti-shopping-cart-plus"></i>
+                        Add to Cart
+                    </button>
+                </form>
+
                 <button class="pd-btn-buy" @(Model.StockQuantity <= 0 ? "disabled" : "")>
                     <i class="ti ti-bolt"></i> Buy Now
                 </button>
@@ -207,16 +240,80 @@
 
     function adjustQty(delta) {
         const input = document.getElementById('pdQty');
-        const max   = parseInt(input.max) || 999;
-        const val   = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
+        const hiddenQty = document.getElementById('cartQuantity');
+
+        const max = parseInt(input.max) || 999;
+        const val = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
+
         input.value = val;
+        hiddenQty.value = val;
     }
 
+    const selected = {};
+
     function selectVariation(el, groupName, label) {
-        // Deselect siblings in same group
         const parent = el.closest('.pd-variation-options');
+
         parent.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
               .forEach(b => b.classList.remove('active'));
+
         el.classList.add('active');
+
+        selected[groupName] = label;
+
+        document.getElementById('selectedVariations').value =
+            JSON.stringify(selected);
     }
+
+    function validateVariations() {
+
+        // Total variation groups on page
+        const totalGroups =
+            document.querySelectorAll('.pd-variation-group').length;
+
+        // Selected groups count
+        const selectedGroups =
+            Object.keys(selected).length;
+
+        // If product has variations but not all selected
+        if (totalGroups > 0 && selectedGroups < totalGroups) {
+
+            showToast("Please select all product variations before adding to cart.", "error");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    function showToast(message, type = "success") {
+
+        const toast = document.createElement("div");
+
+        toast.className = `floating-alert ${type}`;
+        toast.textContent = message;
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add("hide");
+
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const alertBox = document.getElementById("floatingAlert");
+
+        if (alertBox) {
+            setTimeout(() => {
+                alertBox.classList.add("hide");
+
+                setTimeout(() => {
+                    alertBox.remove();
+                }, 500);
+
+            }, 3000);
+        }
+    });
 </script>

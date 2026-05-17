@@ -1,7 +1,7 @@
 @model EcommerceSystem.Models.Cart
 @using System.Text.Json
 
-<link rel="stylesheet" href="~/css/customer/cart.css" />
+<link rel="stylesheet" href="~/css/customer/cart.css" asp-append-version="true" />
 
 @{
     var items        = Model.CartItems ?? new List<EcommerceSystem.Models.CartItem>();
@@ -16,7 +16,7 @@
     <!-- Header -->
     <div class="cart-header">
         <h1 class="cart-title">Your Cart</h1>
-        <span class="cart-count-badge">@itemCount @(itemCount == 1 ? "item" : "items")</span>
+        <span id="cartItemBadge" class="cart-count-badge">@itemCount @(itemCount == 1 ? "item" : "items")</span>
     </div>
 
     @if (!items.Any())
@@ -40,6 +40,9 @@
 
                 <!-- Column headers (desktop) -->
                 <div class="cart-items-header">
+                    <span class="col-check">
+                        <input type="checkbox" id="selectAll" title="Select all" />
+                    </span>
                     <span>Product</span>
                     <span>Unit Price</span>
                     <span>Quantity</span>
@@ -62,7 +65,12 @@
                         } catch { }
                     }
 
-                    <div class="cart-item">
+                    <div class="cart-item" data-item-id="@item.CartItemId" data-price="@item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+
+                        <!-- Checkbox -->
+                        <div class="cart-item-check">
+                            <input type="checkbox" class="item-checkbox" value="@item.CartItemId" />
+                        </div>
 
                         <!-- Product -->
                         <div class="cart-item-product">
@@ -102,41 +110,36 @@
                             RM @item.Price.ToString("0.00")
                         </div>
 
-                        <!-- Quantity stepper -->
+                        <!-- Quantity stepper (AJAX) -->
                         <div class="cart-item-qty">
-                            <form asp-action="UpdateQuantity" method="post" class="qty-form">
-                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
-                                <div class="qty-control">
-                                    <button type="submit"
-                                            name="quantity"
-                                            value="@Math.Max(1, item.Quantity - 1)"
-                                            class="qty-btn">−</button>
-                                    <input type="number"
-                                           class="qty-value"
-                                           value="@item.Quantity"
-                                           min="1"
-                                           readonly />
-                                    <button type="submit"
-                                            name="quantity"
-                                            value="@(item.Quantity + 1)"
-                                            class="qty-btn">+</button>
-                                </div>
-                            </form>
+                            <div class="qty-control">
+                                <button type="button"
+                                        class="qty-btn qty-minus"
+                                        data-item-id="@item.CartItemId">−</button>
+                                <input type="number"
+                                       class="qty-value"
+                                       value="@item.Quantity"
+                                       min="1"
+                                       readonly />
+                                <button type="button"
+                                        class="qty-btn qty-plus"
+                                        data-item-id="@item.CartItemId">+</button>
+                            </div>
                         </div>
 
                         <!-- Subtotal -->
                         <div class="cart-item-subtotal">
-                            RM @((item.Price * item.Quantity).ToString("0.00"))
+                            RM <span class="item-subtotal-value">@((item.Price * item.Quantity).ToString("0.00"))</span>
                         </div>
 
-                        <!-- Remove -->
+                        <!-- Remove (AJAX) -->
                         <div class="cart-item-remove">
-                            <form asp-action="RemoveItem" method="post">
-                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
-                                <button type="submit" class="remove-btn" title="Remove item">
-                                    <i class="ti ti-trash"></i>
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="remove-btn btn-remove-ajax"
+                                    data-item-id="@item.CartItemId"
+                                    title="Remove item">
+                                <i class="ti ti-trash"></i>
+                            </button>
                         </div>
 
                     </div>
@@ -152,51 +155,36 @@
                 <div class="summary-body">
 
                     <div class="summary-row">
-                        <span class="label">Subtotal (@itemCount @(itemCount == 1 ? "item" : "items"))</span>
-                        <span class="value">RM @subtotal.ToString("0.00")</span>
+                        <span class="label">Subtotal (<span id="summaryItemCount">0</span> <span id="summaryItemWord">items</span>)</span>
+                        <span class="value">RM <span id="summarySubtotal">0.00</span></span>
                     </div>
 
-                    @if (shipping == 0)
-                    {
-                        <div class="summary-row free">
-                            <span class="label">Shipping</span>
-                            <span class="value">Free</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="summary-row">
-                            <span class="label">Shipping</span>
-                            <span class="value">RM @shipping.ToString("0.00")</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="label" style="font-size:11px;color:#bbb;">
-                                Add RM @((100 - subtotal).ToString("0.00")) more for free shipping
-                            </span>
-                        </div>
-                    }
+                    <div class="summary-row" id="shippingRow">
+                        <span class="label">Shipping</span>
+                        <span class="value" id="shippingValue">RM 0.00</span>
+                    </div>
+
+                    <div class="summary-row" id="freeShippingHint" style="display:none;">
+                        <span class="label" style="font-size:11px;color:#bbb;" id="freeShippingHintText"></span>
+                    </div>
 
                     <div class="summary-divider"></div>
 
                     <div class="summary-row total">
                         <span class="label">Total</span>
-                        <span class="value">RM @total.ToString("0.00")</span>
-                    </div>
-
-                    <!-- Promo code -->
-                    <div class="promo-row">
-                        <input type="text"
-                               class="promo-input"
-                               placeholder="Promo code" />
-                        <button class="promo-btn">Apply</button>
+                        <span class="value">RM <span id="summaryTotal">0.00</span></span>
                     </div>
 
                 </div>
 
                 <div class="summary-footer">
-                    <a asp-action="Checkout" class="btn-checkout">
-                        <i class="ti ti-lock"></i> Checkout
-                    </a>
+                    <form id="checkoutForm" method="get" asp-action="Checkout">
+                        <input type="hidden" name="selectedItems" id="selectedItemsInput" />
+
+                        <button type="submit" class="btn-checkout" id="checkoutBtn">
+                            <i class="ti ti-lock"></i> Checkout
+                        </button>
+                    </form>
                     <a asp-action="Home" class="btn-continue">
                         <i class="ti ti-arrow-left"></i> Continue shopping
                     </a>
@@ -223,3 +211,218 @@
     }
 
 </div>
+
+
+@* ── Inline script – no extra file needed ── *@
+<script>
+
+(function () {
+    let totalCartQty = 0;
+
+    totalCartQty = @itemCount;
+
+    function updateHeaderCount() {
+        const badge = document.getElementById('cartItemBadge');
+        if (!badge) return;
+
+        badge.textContent = totalCartQty + (totalCartQty === 1 ? ' item' : ' items');
+    }
+
+    function updateNavCartCount() {
+        const nav = document.getElementById('navCartCount');
+        if (!nav) return;
+
+        nav.textContent = totalCartQty;
+    }
+
+    function validateCheckoutButton() {
+        const anyChecked = document.querySelectorAll('.item-checkbox:checked').length > 0;
+        const btn = document.getElementById('checkoutBtn');
+
+        if (!btn) return;
+
+        if (!anyChecked) {
+            btn.classList.add('disabled');
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.5';
+        } else {
+            btn.classList.remove('disabled');
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
+        }
+    }
+
+    function updateSelectedItemsInput() {
+        const checked = [...document.querySelectorAll('.item-checkbox:checked')]
+            .map(cb => cb.value);
+
+        document.getElementById('selectedItemsInput').value = checked.join(',');
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+
+    async function postForm(url, data) {
+        const body = new URLSearchParams(data);
+        if (token) body.append('__RequestVerificationToken', token);
+        const res = await fetch(url, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+        return res;
+    }
+
+    // ── Summary recalculation ───────────────────────────────────────────────
+    function recalc() {
+        const FREE_SHIP_THRESHOLD = 100;
+        const SHIP_COST           = 10;
+
+        let totalQty = 0;
+        let subtotal = 0;
+
+        document.querySelectorAll('.cart-item').forEach(row => {
+            const cb = row.querySelector('.item-checkbox');
+            if (!cb || !cb.checked) return;
+
+            const price = parseFloat(row.dataset.price) || 0;
+            const qty   = parseInt(row.querySelector('.qty-value').value, 10) || 0;
+            totalQty += qty;
+            subtotal += price * qty;
+        });
+
+        const shipping = subtotal === 0 ? 0
+                       : subtotal >= FREE_SHIP_THRESHOLD ? 0
+                       : SHIP_COST;
+        const total    = subtotal + shipping;
+
+        document.getElementById('summaryItemCount').textContent = totalQty;
+        document.getElementById('summaryItemWord').textContent  = totalQty === 1 ? 'item' : 'items';
+        document.getElementById('summarySubtotal').textContent  = subtotal.toFixed(2);
+        document.getElementById('summaryTotal').textContent     = total.toFixed(2);
+
+        const shippingValueEl   = document.getElementById('shippingValue');
+        const freeShippingHint  = document.getElementById('freeShippingHint');
+        const freeShippingText  = document.getElementById('freeShippingHintText');
+
+        if (subtotal === 0) {
+            shippingValueEl.textContent = 'RM 0.00';
+            freeShippingHint.style.display = 'none';
+        } else if (shipping === 0) {
+            shippingValueEl.textContent = 'Free';
+            freeShippingHint.style.display = 'none';
+        } else {
+            shippingValueEl.textContent = 'RM ' + SHIP_COST.toFixed(2);
+            freeShippingHint.style.display = '';
+            freeShippingText.textContent   =
+                'Add RM ' + (FREE_SHIP_THRESHOLD - subtotal).toFixed(2) + ' more for free shipping';
+        }
+    }
+
+    // ── Select-all checkbox ────────────────────────────────────────────────
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            document.querySelectorAll('.item-checkbox').forEach(cb => {
+                cb.checked = selectAll.checked;
+                validateCheckoutButton();
+            });
+            updateSelectedItemsInput();
+            recalc();
+        });
+    }
+
+    // ── Per-item checkbox ──────────────────────────────────────────────────
+    document.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const allChecked = [...document.querySelectorAll('.item-checkbox')]
+                                 .every(c => c.checked);
+            if (selectAll) selectAll.checked = allChecked;
+            validateCheckoutButton();
+            updateSelectedItemsInput();
+            recalc();
+        });
+    });
+
+    // ── Quantity +/− (AJAX) ────────────────────────────────────────────────
+    document.querySelectorAll('.qty-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const row        = btn.closest('.cart-item');
+            const qtyInput   = row.querySelector('.qty-value');
+            const itemId     = btn.dataset.itemId;
+            const isPlus     = btn.classList.contains('qty-plus');
+            const currentQty = parseInt(qtyInput.value, 10) || 1;
+            const newQty     = isPlus ? currentQty + 1 : Math.max(1, currentQty - 1);
+            const oldQty = parseInt(qtyInput.value, 10) || 1;
+
+            if (newQty === currentQty) return;
+
+            totalCartQty += (newQty - oldQty);
+            updateHeaderCount();
+            updateNavCartCount();
+
+            // Optimistic UI update
+            qtyInput.value = newQty;
+
+            // Update per-row subtotal display
+            const price    = parseFloat(row.dataset.price) || 0;
+            const subtotal = row.querySelector('.item-subtotal-value');
+            if (subtotal) subtotal.textContent = (price * newQty).toFixed(2);
+
+            recalc();
+
+            // Persist to server
+            try {
+                await postForm('/Customer/UpdateQuantity', {
+                    cartItemId: itemId,
+                    quantity  : newQty
+                });
+            } catch (e) {
+                console.error('Failed to update quantity', e);
+            }
+        });
+    });
+
+    // ── Remove item (AJAX) ─────────────────────────────────────────────────
+    document.querySelectorAll('.btn-remove-ajax').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const row    = btn.closest('.cart-item');
+            const itemId = btn.dataset.itemId;
+
+            const qty = parseInt(row.querySelector('.qty-value').value, 10) || 1;
+            totalCartQty -= qty;
+            updateHeaderCount();
+            updateNavCartCount();
+
+            // Animate out
+            row.style.transition = 'opacity 0.25s, transform 0.25s';
+            row.style.opacity    = '0';
+            row.style.transform  = 'translateX(20px)';
+
+            try {
+                await postForm('/Customer/RemoveItem', { cartItemId: itemId });
+            } catch (e) {
+                console.error('Failed to remove item', e);
+                // Revert animation on error
+                row.style.opacity   = '1';
+                row.style.transform = '';
+                return;
+            }
+
+            setTimeout(() => {
+                row.remove();
+                recalc();
+
+                // If no items remain, reload to show empty state
+                if (!document.querySelector('.cart-item')) {
+                    location.reload();
+                }
+            }, 260);
+        });
+    });
+
+    // Initial recalc (nothing selected yet → zeros)
+    recalc();
+    validateCheckoutButton();
+}());
+</script>

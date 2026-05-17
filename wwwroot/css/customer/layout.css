@@ -366,6 +366,14 @@ body {
   gap: 2px;
   padding: 8px 16px 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.07);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  z-index: 199;
 }
 
 .mobile-drawer.open {

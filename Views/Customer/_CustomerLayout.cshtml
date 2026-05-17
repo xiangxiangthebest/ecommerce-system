@@ -1,5 +1,22 @@
 @using System.Security.Claims
 
+@inject EcommerceSystem.Data.AppDbContext _context
+
+@{
+    var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+
+    var customer = _context.Customers.FirstOrDefault(c => c.Email == email);
+
+    int cartCount = 0;
+
+    if (customer != null)
+    {
+        cartCount = _context.CartItem
+            .Where(ci => ci.Cart.UserId == customer.UserId)
+            .Sum(ci => ci.Quantity);
+    }
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,7 +67,9 @@
                 <a class="cart-btn" asp-controller="Customer" asp-action="Cart">
                 <i class="ti ti-shopping-cart"></i>
                 <span>Cart</span>
-                <span class="cart-count">3</span>
+                <span id="navCartCount" class="cart-count">
+                    @cartCount
+                </span>
                 </a>
                 <div class="nav-divider-v"></div>
                 <div class="profile-dropdown">

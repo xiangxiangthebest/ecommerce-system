@@ -20,8 +20,10 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Category { get; set; }
     public DbSet<Cart> Cart { get; set; }
+    public DbSet<CartItem> CartItem { get; set; }
     public DbSet<DeliveryField> DeliveryField { get; set; }
     public DbSet<Order> Order { get; set; }
+    public DbSet<OrderItem> OrderItems { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +40,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Cart>().ToTable("Cart");
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
+        modelBuilder.Entity<Order>().Property(o => o.CurrentStatus).HasConversion<string>();
         modelBuilder.Entity<Product>().ToTable("Product");
         modelBuilder.Entity<Category>().ToTable("Category");
     }

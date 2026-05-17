@@ -54,18 +54,6 @@ namespace EcommerceSystem.Models
         public double OriginalPrice { get; set; } = 0;
         public double AverageRating { get; set; } = 0;
         public double ReviewCount { get; set; } = 0;
-
-        public class VariationGroup
-        {
-            public string Name { get; set; } = "";
-            public List<VariationValue> Values { get; set; } = new();
-        }
-
-        public class VariationValue
-        {
-            public string Label { get; set; } = "";
-            public int Stock { get; set; }
-            public string ImagePath { get; set; } = "";
-        }
+        
     }
 }

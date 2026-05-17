@@ -23,7 +23,8 @@
             <input type="text"
                    name="search"
                    placeholder="Search products…"
-                   class="filter-input" />
+                   class="filter-input"
+                   value="@ViewBag.Search" />
         </div>
 
         <div class="filter-sep"></div>
@@ -34,7 +35,9 @@
                 <option value="">All Categories</option>
                 @foreach (var category in ViewBag.Category)
                 {
-                    <option value="@category.CategoryId">@category.Name</option>
+                    <option value="@category.CategoryId"
+                            selected="@(ViewBag.CategoryId == category.CategoryId)">
+                        @category.Name</option>
                 }
             </select>
             <i class="ti ti-chevron-down filter-chevron"></i>

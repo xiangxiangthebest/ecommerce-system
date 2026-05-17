@@ -7,19 +7,14 @@ namespace EcommerceSystem.Models
     {
         [Key]
         public int CartItemId { get; set; }
-
         public int CartId { get; set; }
         [ForeignKey("CartId")]
         public Cart? Cart { get; set; }
-
         public int ProductId { get; set; }
         [ForeignKey("ProductId")]
         public Product? Product { get; set; }
-
         public int Quantity { get; set; }
         public double Price { get; set; }
-
-        // JSON string: {"Colour":"Red","Size":"M"}
         public string SelectedVariations { get; set; } = "{}";
     }
 }

@@ -3,6 +3,7 @@ using System;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260516131347_AddOrderTables")]
+    partial class AddOrderTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -139,9 +142,8 @@ namespace ecommerce_system.Migrations
                     b.Property<int>("AddressId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("CurrentStatus")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<int>("CurrentStatus")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("CustomerUserId")
                         .HasColumnType("INTEGER");
@@ -160,8 +162,6 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("OrderId");
-
-                    b.HasIndex("AddressId");
 
                     b.HasIndex("CustomerUserId");
 
@@ -412,12 +412,6 @@ namespace ecommerce_system.Migrations
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
-                    b.HasOne("EcommerceSystem.Models.DeliveryField", "Address")
-                        .WithMany()
-                        .HasForeignKey("AddressId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("EcommerceSystem.Models.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerUserId")
@@ -429,8 +423,6 @@ namespace ecommerce_system.Migrations
                         .HasForeignKey("SellerUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Address");
 
                     b.Navigation("Customer");
 
