@@ -177,6 +177,7 @@
                       asp-action="AddToCart"
                       method="post"
                       onsubmit="return validateVariationsBeforeSubmit();">
+                      @Html.AntiForgeryToken()
 
                     <input type="hidden" name="productId" value="@Model.ProductId" />
                     <input type="hidden" id="selectedVariations" name="selectedVariations" value="{}" />
@@ -197,11 +198,23 @@
                     </button>
                 </form>
 
-                <button id="pdBtnBuy"
-                        class="pd-btn-buy"
-                        @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
-                    <i class="ti ti-bolt"></i> Buy Now
-                </button>
+                <form asp-controller="Customer"
+                    asp-action="BuyNow"
+                    method="post"
+                    onsubmit="return prepareBuyNow();">
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <input type="hidden" id="buyNowSelectedVariations" name="selectedVariations" value="{}" />
+                    <input type="hidden" id="buyNowQuantity" name="quantity" value="1" />
+
+                    <button id="pdBtnBuy"
+                            type="submit"
+                            class="pd-btn-buy"
+                            @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
+                        <i class="ti ti-bolt"></i> Buy Now
+                    </button>
+                </form>
             </div>
 
             <div class="pd-trust">
@@ -449,6 +462,18 @@
         setQty(parseInt(qtyInput.value || "1", 10));
         return true;
     };
+
+    window.prepareBuyNow = function () {
+        if (!validateVariationsBeforeSubmit()) {
+            return false;
+        }
+        const qty = document.getElementById("pdQty")?.value || "1";
+        document.getElementById("buyNowQuantity").value = qty;
+        document.getElementById("buyNowSelectedVariations").value =
+            document.getElementById("selectedVariations").value;
+
+        return true;
+    }
 
     // Initial state for variation products
     if (totalGroups > 0) {

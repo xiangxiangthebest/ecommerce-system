@@ -64,7 +64,7 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
-        // HOME PAGE (QUICK ADD DATA)
+        // QUICK ADD DATA (HOME PAGE)
         // =========================
         [HttpGet]
         public async Task<IActionResult> QuickAddData(int id)
@@ -155,7 +155,7 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
-        // ADD TO CART
+        // ADD TO CART (PRODUCT DETAILS PAGE)
         // =========================
         [HttpPost]
         public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
@@ -205,6 +205,50 @@ namespace EcommerceSystem.Controllers
             TempData["CartSuccess"] = "Product added to cart";
 
             return RedirectToAction("ProductDetails", new { id = productId });
+        }
+
+        // =========================
+        // BUY NOW (PRODUCT DETAILS PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BuyNow(int productId, int quantity, string selectedVariations)
+        {
+            var customer = await GetCurrentCustomerAsync();
+
+            var product = await _context.Products
+                .Include(p => p.Seller)
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+            if (product == null)
+                return RedirectToAction("Home");
+
+            // Create temporary checkout item
+            var buyNowItem = new CartItem
+            {
+                CartItemId = 0,
+                ProductId = product.ProductId,
+                Product = product,
+                Quantity = quantity,
+                Price = product.Price,
+                SelectedVariations = selectedVariations ?? "{}"
+            };
+
+            var addresses = await _context.DeliveryField
+                .Where(a => a.UserId == customer.UserId)
+                .ToListAsync();
+
+            var model = new Checkout
+            {
+                Customer = customer,
+                CartItems = new List<CartItem> { buyNowItem },
+                Addresses = addresses
+            };
+
+            ViewBag.Source = "product";
+            ViewBag.ProductId = productId;
+
+            return View("Checkout", model);
         }
 
         // =========================
@@ -282,9 +326,12 @@ namespace EcommerceSystem.Controllers
         // =========================
         // CHECKOUT (CART PAGE)
         // =========================
-        public async Task<IActionResult> Checkout(string? selectedItems)
+        public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
             var customer = await GetCurrentCustomerAsync();
+
+            ViewBag.Source = source;
+            ViewBag.ProductId = productId;
 
             if (string.IsNullOrWhiteSpace(selectedItems))
                 return RedirectToAction("Cart");
@@ -317,16 +364,30 @@ namespace EcommerceSystem.Controllers
                 Addresses = addresses
             };
 
-            return View(model);
+            ViewBag.Source = "cart";
+            ViewBag.ProductId = null;
+
+            return View("Checkout", model);
         }
 
         // =========================
         // PLACE ORDER (CART PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> PlaceOrder(int selectedAddressId, string paymentMethod, List<int> selectedItemIds)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PlaceOrder(
+            int selectedAddressId, 
+            string paymentMethod, 
+            List<int> selectedItemIds,
+            string source,
+            int? productId,
+            int? buyNowQuantity,
+            string? buyNowSelectedVariations)
         {
             var customer = await GetCurrentCustomerAsync();
+
+            var address = await _context.DeliveryField
+                .FirstOrDefaultAsync(a => a.AddressId == selectedAddressId && a.UserId == customer.UserId);
 
             var cart = await _context.Cart
                 .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
@@ -337,91 +398,126 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Cart");
             }
 
-            var cartItems = await _context.CartItem
-                .Include(c => c.Product)
-                .ThenInclude(p => p.Seller)
-                .Include(c => c.Cart)
-                .Where(c =>
-                    selectedItemIds.Contains(c.CartItemId) &&
-                    c.Cart.UserId == customer.UserId)
-                .ToListAsync();
+            List<CartItem> itemsToPurchase;
 
-            if (!cartItems.Any())
+            if (source == "product")
             {
-                TempData["OrderError"] = "Your cart is empty.";
-                return RedirectToAction("Cart");
-            }
+                var product = await _context.Products
+                    .Include(p => p.Seller)
+                    .FirstOrDefaultAsync(p => p.ProductId == productId.Value);
 
-            decimal totalPayment = cartItems.Sum(c =>
-                c.Quantity * (decimal)c.Price
-            );
+                var qty = buyNowQuantity.Value <= 0 ? 1 : buyNowQuantity.Value;
 
-            var address = await _context.DeliveryField
-                .FirstOrDefaultAsync(a => a.AddressId == selectedAddressId);
-
-            if (address == null)
-            {
-                TempData["OrderError"] = "Address not found.";
-                return RedirectToAction("Cart");
-            }
-
-            var groupedBySeller = cartItems
-                .GroupBy(c => new { c.Product.SellerId, c.Product.Seller.ShopName });
-
-            foreach (var group in groupedBySeller)
-            {
-                var sellerId = group.Key.SellerId;
-                var sellerName = group.Key.ShopName;
-                var messageKey = $"SellerMessage_{sellerName.Replace(" ", "_")}";
-                var customerMessage = Request.Form[messageKey].ToString();
-                var orderTotal = group.Sum(c => c.Quantity * (decimal)c.Price);
-                
-                var order = new Order
+                itemsToPurchase = new List<CartItem>
                 {
-                    CustomerUserId = customer.UserId,
-                    SellerUserId = sellerId,
-                    AddressId = selectedAddressId,
-                    DeliveryRecipientName = address.RecipientName,
-                    DeliveryPhoneNumber = address.PhoneNumber,
-                    DeliveryAddressLine1 = address.AddressLine1,
-                    DeliveryAddressLine2 = address.AddressLine2,
-                    DeliveryCity = address.City,
-                    DeliveryPostcode = address.Postcode,
-                    DeliveryState = address.State,
-                    TotalAmount = orderTotal,
-                    PaymentMethod = paymentMethod,
-                    CurrentStatus = OrderStatus.PENDING,
-                    OrderTime = DateTime.Now,
-                    CustomerMessage = customerMessage
-                };
-
-                _context.Order.Add(order);
-                await _context.SaveChangesAsync();
-
-                foreach (var item in group)
-                {
-                    var orderItem = new OrderItem
+                    new CartItem
                     {
-                        OrderId = order.OrderId,
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity,
-                        Price = (decimal)item.Price,
-                        SelectedVariation = item.SelectedVariations
-                    };
+                        CartItemId = 0,
+                        ProductId = product.ProductId,
+                        Product = product,
+                        Quantity = qty,
+                        Price = product.Price,
+                        SelectedVariations = buyNowSelectedVariations ?? "{}"
+                    }
+                };
+            }
+            else
+            {
+                if (selectedItemIds == null || selectedItemIds.Count == 0)
+                {
+                    TempData["OrderError"] = "No items selected.";
+                    return RedirectToAction("Cart");
+                }
 
-                    _context.OrderItems.Add(orderItem);
+                itemsToPurchase = await _context.CartItem
+                    .Include(ci => ci.Product)
+                        .ThenInclude(p => p.Seller)
+                    .Include(ci => ci.Cart)
+                    .Where(ci =>
+                        selectedItemIds.Contains(ci.CartItemId) &&
+                        ci.Cart.UserId == customer.UserId)
+                    .ToListAsync();
 
-                    item.Product.StockQuantity -= item.Quantity;
+                if (!itemsToPurchase.Any())
+                {
+                    TempData["OrderError"] = "Your cart is empty.";
+                    return RedirectToAction("Cart");
                 }
             }
 
-            _context.CartItem.RemoveRange(cartItems);
+            var groupedBySeller = itemsToPurchase
+                .GroupBy(i => new { i.Product.SellerId, i.Product.Seller.ShopName });
 
-            await _context.SaveChangesAsync();
+            await using var tx = await _context.Database.BeginTransactionAsync();
 
-            TempData["OrderSuccess"] = "Order placed successfully!";
+            try
+            {
+                foreach (var group in groupedBySeller)
+                {
+                    var sellerId = group.Key.SellerId;
+                    var sellerName = group.Key.ShopName;
+                    var messageKey = $"SellerMessage_{sellerName.Replace(" ", "_")}";
+                    var customerMessage = Request.Form[messageKey].ToString();
+                    var orderTotal = group.Sum(i => i.Quantity * (decimal)i.Price);
 
-            return RedirectToAction("PurchaseHistory");
+                    var order = new Order
+                    {
+                        CustomerUserId = customer.UserId,
+                        SellerUserId = sellerId,
+                        AddressId = address.AddressId,
+
+                        DeliveryRecipientName = address.RecipientName,
+                        DeliveryPhoneNumber = address.PhoneNumber,
+                        DeliveryAddressLine1 = address.AddressLine1,
+                        DeliveryAddressLine2 = address.AddressLine2,
+                        DeliveryCity = address.City,
+                        DeliveryPostcode = address.Postcode,
+                        DeliveryState = address.State,
+
+                        TotalAmount = orderTotal,
+                        PaymentMethod = paymentMethod,
+                        CurrentStatus = OrderStatus.PENDING,
+                        OrderTime = DateTime.Now,
+                        CustomerMessage = customerMessage
+                    };
+
+                    _context.Order.Add(order);
+                    await _context.SaveChangesAsync();
+
+                    foreach (var item in group)
+                    {
+                        var orderItem = new OrderItem
+                        {
+                            OrderId = order.OrderId,
+                            ProductId = item.ProductId,
+                            Quantity = item.Quantity,
+                            Price = (decimal)item.Price,
+                            SelectedVariation = item.SelectedVariations
+                        };
+
+                        _context.OrderItems.Add(orderItem);
+
+                        item.Product.StockQuantity -= item.Quantity;
+
+                        if (source != "product" && item.CartItemId != 0)
+                        {
+                            _context.CartItem.Remove(item);
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
+                await tx.CommitAsync();
+
+                return RedirectToAction("PurchaseHistory");
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                TempData["OrderError"] = "Failed to place order. Please try again.";
+                return RedirectToAction(source == "product" ? "ProductDetails" : "Cart", new { id = productId });
+            }
         }
 
         // =========================
@@ -489,7 +585,7 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
-        // UPDATE PROFILE
+        // UPDATE PROFILE (PROFILE PAGE)
         // =========================
         [HttpPost]
         public async Task<IActionResult> UpdateProfile(Customer model, IFormFile profileImage)

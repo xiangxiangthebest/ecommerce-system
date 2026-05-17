@@ -20,14 +20,35 @@
 
     <!-- Page title -->
     <div class="checkout-header">
-        <a asp-action="Cart" class="back-link"><i class="ti ti-arrow-left"></i></a>
+        <a asp-action="Cart" class="back-link" id="backBtn"><i class="ti ti-arrow-left"></i></a>
         <h1 class="checkout-title">Checkout</h1>
         <span class="checkout-step-label">Review &amp; Place Order</span>
     </div>
 
-    <!-- ✅ SINGLE FORM ONLY (removed nested form issue) -->
     <form asp-action="PlaceOrder" method="post" id="checkoutForm">
+        @{
+            var source = (string)ViewBag.Source ?? "cart";
+            var productId = ViewBag.ProductId;
+        }
+
         @Html.AntiForgeryToken()
+
+        <input type="hidden" name="source" value="@source" />
+        <input type="hidden" name="productId" value="@productId" />
+
+        @if (source == "product")
+        {
+            var item = Model.CartItems.First();
+            <input type="hidden" name="buyNowQuantity" value="@item.Quantity" />
+            <input type="hidden" name="buyNowSelectedVariations" value="@item.SelectedVariations" />
+        }
+        else
+        {
+            @foreach (var item in Model.CartItems)
+            {
+                <input type="hidden" name="selectedItemIds" value="@item.CartItemId" />
+            }
+        }
 
         <div class="checkout-layout">
 
@@ -367,6 +388,17 @@
 
 <script>
 (function () {
+
+    const source = "@ViewBag.Source";
+    const productId = "@ViewBag.ProductId";
+
+    const backBtn = document.getElementById("backBtn");
+
+    if (source === "product") {
+        backBtn.href = `/Customer/ProductDetails/${productId}`;
+    } else {
+        backBtn.href = `/Customer/Cart`;
+    }
 
     document.addEventListener("DOMContentLoaded", function () {
 
