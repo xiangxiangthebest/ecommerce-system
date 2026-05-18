@@ -6,25 +6,32 @@
 @using System.Text.Json.Serialization
 
 @{
-    var totalSpent   = Model.Sum(o => o.TotalAmount);
-    var pendingCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
-    var shippedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
-    var deliveredCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
-    var canceledCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
+    var pendingCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
+    var preparingCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
+    var shippedCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
+    var deliveredCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
+    var receivedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
+    var returnCnt     = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+    var canceledCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
 
-    // ── Build serializable order data for the modal ──────
     var jsonOpts = new JsonSerializerOptions { WriteIndented = false };
 
     var orderData = Model.Select(o => new {
-        orderId       = o.OrderId,
-        orderTime     = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
-        status        = o.CurrentStatus.ToString().ToUpper(),
-        statusLabel   = o.CurrentStatus.ToString(),
-        paymentMethod = o.PaymentMethod,
-        totalAmount   = o.TotalAmount.ToString("N2"),
-        shopName      = o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop",
-        shopInitial   = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0,1).ToUpper(),
-        address       = o.Address == null ? null : new {
+        orderId            = o.OrderId,
+        orderTime          = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
+        status             = o.CurrentStatus.ToString().ToUpper(),
+        statusLabel        = StatusLabel(o.CurrentStatus),
+        paymentMethod      = o.PaymentMethod,
+        totalAmount        = o.TotalAmount.ToString("N2"),
+        shopName           = o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop",
+        shopInitial        = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0,1).ToUpper(),
+        customerMessage    = o.CustomerMessage ?? "",
+        cancelReason       = o.CancelReason ?? "",
+        returnReason       = o.ReturnReason ?? "",
+        complaintText      = o.ComplaintText ?? "",
+        complaintSubmitted = o.ComplaintSubmitted,
+        reviewSubmitted    = o.ReviewSubmitted,
+        address = o.Address == null ? null : new {
             recipientName = o.Address.RecipientName,
             phoneNumber   = o.Address.PhoneNumber,
             line1         = o.Address.AddressLine1,
@@ -34,16 +41,18 @@
             state         = o.Address.State
         },
         items = o.OrderItems.Select(item => new {
-            name        = item.Product?.Name ?? "",
-            image       = item.Product?.ImagePath ?? "",
-            images      = ParseImagePaths(item.Product?.ImagePathsJson, item.Product?.ImagePath),
-            price       = item.Price.ToString("0.00"),
-            qty         = item.Quantity,
-            subtotal    = (item.Price * item.Quantity).ToString("0.00"),
-            category    = item.Product?.Category?.Name ?? "",
-            description = item.Product?.Description ?? "",
-            sku         = item.Product?.SKU ?? "",
-            rating      = item.Product?.AverageRating ?? 0,
+            orderItemId   = item.OrderItemId,
+            productId     = item.ProductId,
+            name          = item.Product?.Name ?? "",
+            image         = item.Product?.ImagePath ?? "",
+            images        = ParseImagePaths(item.Product?.ImagePathsJson, item.Product?.ImagePath),
+            price         = item.Price.ToString("0.00"),
+            qty           = item.Quantity,
+            subtotal      = (item.Price * item.Quantity).ToString("0.00"),
+            category      = item.Product?.Category?.Name ?? "",
+            description   = item.Product?.Description ?? "",
+            sku           = item.Product?.SKU ?? "",
+            rating        = item.Product?.AverageRating ?? 0,
             selectedVariation = ParseVariationToString(item.SelectedVariation),
             allVariations     = ParseAllVariations(item.Product?.VariationsJson)
         }).ToList()
@@ -53,525 +62,1033 @@
 }
 
 @functions {
-    // Parse {"Size":"S","Colour":"Black"} → "Size: S · Colour: Black"
+    string StatusLabel(EcommerceSystem.Models.OrderStatus s) => s switch {
+        EcommerceSystem.Models.OrderStatus.PENDING       => "Pending",
+        EcommerceSystem.Models.OrderStatus.PREPARING     => "Preparing",
+        EcommerceSystem.Models.OrderStatus.SHIPPED       => "Shipped",
+        EcommerceSystem.Models.OrderStatus.DELIVERED     => "Delivered",
+        EcommerceSystem.Models.OrderStatus.RECEIVED      => "Received",
+        EcommerceSystem.Models.OrderStatus.RETURN_REFUND => "Return / Refund",
+        EcommerceSystem.Models.OrderStatus.CANCELED      => "Canceled",
+        _ => s.ToString()
+    };
+
     string ParseVariationToString(string? json)
     {
         if (string.IsNullOrWhiteSpace(json) || json == "{}" || json == "[]") return "";
-        try
-        {
+        try {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object)
-            {
+            if (doc.RootElement.ValueKind == JsonValueKind.Object) {
                 var parts = new List<string>();
                 foreach (var prop in doc.RootElement.EnumerateObject())
                     parts.Add($"{prop.Name}: {prop.Value}");
                 return string.Join(" · ", parts);
             }
-        }
-        catch { }
+        } catch { }
         return "";
     }
 
-    // Parse ImagePathsJson → list of image URLs, fallback to mainImage
     List<string> ParseImagePaths(string? json, string? mainImage)
     {
         var list = new List<string>();
-        if (!string.IsNullOrWhiteSpace(json) && json != "[]")
-        {
-            try
-            {
+        if (!string.IsNullOrWhiteSpace(json) && json != "[]") {
+            try {
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.ValueKind == JsonValueKind.Array)
                     foreach (var el in doc.RootElement.EnumerateArray())
                         if (!string.IsNullOrWhiteSpace(el.GetString()))
                             list.Add(el.GetString()!);
-            }
-            catch { }
+            } catch { }
         }
         if (list.Count == 0 && !string.IsNullOrWhiteSpace(mainImage))
             list.Add(mainImage);
         return list;
     }
 
-    // Parse VariationsJson → list of {name, values:[{label,stock}]}
     List<object> ParseAllVariations(string? json)
     {
         var groups = new List<object>();
         if (string.IsNullOrWhiteSpace(json) || json == "[]") return groups;
-        try
-        {
+        try {
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var group in doc.RootElement.EnumerateArray())
-                {
+                foreach (var group in doc.RootElement.EnumerateArray()) {
                     var name   = group.TryGetProperty("name",   out var n) ? n.GetString() ?? "" : "";
                     var values = new List<object>();
                     if (group.TryGetProperty("values", out var vals) && vals.ValueKind == JsonValueKind.Array)
-                        foreach (var v in vals.EnumerateArray())
-                        {
+                        foreach (var v in vals.EnumerateArray()) {
                             var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
                             var stock = v.TryGetProperty("stock", out var s) ? s.GetInt32() : 0;
                             values.Add(new { label, stock });
                         }
                     groups.Add(new { name, values });
                 }
-            }
-        }
-        catch { }
+        } catch { }
         return groups;
     }
 
-    // Same helper for display tags in the card
     List<string> ParseVariationTags(string? json)
     {
         var tags = new List<string>();
         if (string.IsNullOrWhiteSpace(json) || json == "{}" || json == "[]") return tags;
-        try
-        {
+        try {
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind == JsonValueKind.Object)
                 foreach (var prop in doc.RootElement.EnumerateObject())
                     tags.Add($"{prop.Name}: {prop.Value}");
-        }
-        catch { }
+        } catch { }
         return tags;
     }
 }
 
-<div class="purchase-history-page">
+<div class="ph-page">
 
     @if (TempData["OrderSuccess"] != null)
     {
-        <div class="floating-alert" id="successAlert">
+        <div class="ph-toast" id="phToast">
             <i class="ti ti-circle-check"></i>
             @TempData["OrderSuccess"]
         </div>
     }
 
-    <!-- ─── Page Header ─── -->
+    <!-- ── Page Header ── -->
     <div class="ph-header">
-        <h1 class="ph-title">My Orders</h1>
-        <span class="ph-subtitle">@Model.Count order@(Model.Count != 1 ? "s" : "") placed</span>
+        <div>
+            <h1 class="ph-title">My Orders</h1>
+            <p class="ph-subtitle">@Model.Count order@(Model.Count != 1 ? "s" : "") placed across all time</p>
+        </div>
+        <div class="ph-search-wrap">
+            <i class="ti ti-search"></i>
+            <input type="text" id="phSearch" placeholder="Search by order ID or product…" />
+        </div>
     </div>
 
     @if (!Model.Any())
     {
-        <div class="empty-state">
-            <div class="empty-icon"><i class="ti ti-shopping-bag"></i></div>
-            <h2 class="empty-title">No orders yet</h2>
-            <p class="empty-sub">Looks like you haven't placed any orders.<br>Start shopping to see them here.</p>
-            <a href="/Customer/Home" class="btn-shop">
+        <div class="ph-empty">
+            <div class="ph-empty-icon">
+                <i class="ti ti-shopping-bag-x"></i>
+            </div>
+            <h2>No orders yet</h2>
+            <p>You haven't placed any orders. Find something you love and it'll show up here.</p>
+            <a href="/Customer/Home" class="ph-btn ph-btn-primary">
                 <i class="ti ti-arrow-right"></i> Start Shopping
             </a>
         </div>
     }
     else
     {
-        <!-- ─── Summary Banner ─── -->
-        <div class="summary-banner">
-            <div class="summary-cell">
-                <span class="summary-cell-label">Total Spent</span>
-                <span class="summary-cell-value accent">RM @totalSpent.ToString("N2")</span>
-            </div>
-            <div class="summary-cell">
-                <span class="summary-cell-label">Delivered</span>
-                <span class="summary-cell-value green">@deliveredCnt</span>
-            </div>
-            <div class="summary-cell">
-                <span class="summary-cell-label">In Transit</span>
-                <span class="summary-cell-value yellow">@shippedCnt</span>
-            </div>
-            <div class="summary-cell">
-                <span class="summary-cell-label">Pending</span>
-                <span class="summary-cell-value">@pendingCnt</span>
-            </div>
-            <div class="summary-cell">
-                <span class="summary-cell-label">Canceled</span>
-                <span class="summary-cell-value red">@canceledCnt</span>
-            </div>
-        </div>
-
-        <!-- ─── Toolbar ─── -->
+        <!-- ── Toolbar ── -->
         <div class="ph-toolbar">
-            <div class="ph-tabs">
-                <button class="ph-tab active" onclick="filterOrders('ALL', this)">
-                    All <span class="ph-tab-count">@Model.Count</span>
+            <div class="ph-tabs" id="phTabs">
+                <button class="ph-tab active" data-status="ALL">
+                    All <span class="ph-badge">@Model.Count</span>
                 </button>
-                <button class="ph-tab" onclick="filterOrders('PENDING', this)">
-                    Pending <span class="ph-tab-count">@pendingCnt</span>
+                <button class="ph-tab" data-status="PENDING">
+                    Pending <span class="ph-badge">@pendingCnt</span>
                 </button>
-                <button class="ph-tab" onclick="filterOrders('SHIPPED', this)">
-                    Shipped <span class="ph-tab-count">@shippedCnt</span>
+                <button class="ph-tab" data-status="PREPARING">
+                    Preparing <span class="ph-badge">@preparingCnt</span>
                 </button>
-                <button class="ph-tab" onclick="filterOrders('DELIVERED', this)">
-                    Delivered <span class="ph-tab-count">@deliveredCnt</span>
+                <button class="ph-tab" data-status="SHIPPED">
+                    Shipped <span class="ph-badge">@shippedCnt</span>
                 </button>
-                <button class="ph-tab" onclick="filterOrders('CANCELED', this)">
-                    Canceled <span class="ph-tab-count">@canceledCnt</span>
+                <button class="ph-tab" data-status="DELIVERED">
+                    Delivered <span class="ph-badge">@deliveredCnt</span>
                 </button>
-            </div>
-            <div class="ph-search">
-                <i class="ti ti-search"></i>
-                <input type="text" id="searchInput" placeholder="Search orders…" oninput="searchOrders()" />
+                <button class="ph-tab" data-status="RECEIVED">
+                    Received <span class="ph-badge">@receivedCnt</span>
+                </button>
+                <button class="ph-tab" data-status="RETURN_REFUND">
+                    Return/Refund <span class="ph-badge">@returnCnt</span>
+                </button>
+                <button class="ph-tab" data-status="CANCELED">
+                    Canceled <span class="ph-badge">@canceledCnt</span>
+                </button>
             </div>
         </div>
 
-        <!-- ─── Order Cards ─── -->
-        <div id="orderList">
+        <!-- ── Order Cards ── -->
+        <div id="phOrderList">
             @foreach (var order in Model)
             {
                 var statusKey     = order.CurrentStatus.ToString().ToUpper();
-                var itemCount     = order.OrderItems.Count;
                 var sellerName    = order.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop";
                 var sellerInitial = sellerName.Length > 0 ? sellerName[0].ToString().ToUpper() : "S";
+                var itemCount     = order.OrderItems.Count;
                 var searchHint    = order.OrderId + " " + string.Join(" ", order.OrderItems.Select(i => i.Product?.Name ?? ""));
 
-                <div class="order-card"
-                     data-status="@statusKey"
-                     data-search="@searchHint">
+                <div class="ph-card" data-order-id="@order.OrderId" data-status="@statusKey" data-search="@searchHint.ToLower()">
 
-                    <!-- Card Header -->
-                    <div class="order-card-header">
-                        <div class="order-meta">
-                            <span class="order-id">Order #@order.OrderId</span>
-                            <span class="order-date">
-                                <i class="ti ti-calendar"></i>
+                    <!-- Card top bar -->
+                    <div class="ph-card-bar">
+                        <div class="ph-card-bar-left">
+                            <span class="ph-order-id">#@order.OrderId</span>
+                            <span class="ph-order-date">
+                                <i class="ti ti-clock"></i>
                                 @order.OrderTime.ToString("dd MMM yyyy")
                                 &nbsp;·&nbsp;
                                 @order.OrderTime.ToString("hh:mm tt")
                             </span>
                         </div>
-                        <span class="status-badge status-@statusKey">
-                            <span class="status-dot"></span>
-                            @order.CurrentStatus
+                        <span class="ph-status-pill ph-s-@statusKey">
+                            <span class="ph-status-dot"></span>
+                            @StatusLabel(order.CurrentStatus)
                         </span>
                     </div>
 
-                    <!-- Seller Strip -->
-                    <div class="order-seller-strip">
-                        <div class="seller-avatar">@sellerInitial</div>
-                        Sold by <strong>@sellerName</strong>
-                    </div>
-
-                    <!-- Items Toggle -->
-                    <button class="items-toggle" onclick="toggleItems(this)">
-                        <span><i class="ti ti-package"></i> @itemCount item@(itemCount != 1 ? "s" : "")</span>
-                        <i class="ti ti-chevron-down chevron"></i>
-                    </button>
-
-                    <!-- Collapsible Items -->
-                    <div class="items-collapse" style="max-height:0; transition: max-height .3s ease;">
-                        @foreach (var item in order.OrderItems)
-                        {
-                            var variationTags = ParseVariationTags(item.SelectedVariation);
-                            <div class="order-item">
-                                <div class="item-img-wrap">
-                                    <img src="@item.Product?.ImagePath"
-                                         alt="@item.Product?.Name"
-                                         onerror="this.src='/images/placeholder.png'" />
-                                </div>
-                                <div class="item-info">
-                                    <div class="item-name">@item.Product?.Name</div>
-                                    @if (variationTags.Any())
-                                    {
-                                        <div class="item-variations">
-                                            @foreach (var tag in variationTags)
-                                            {
-                                                <span class="item-variation">@tag</span>
-                                            }
-                                        </div>
-                                    }
-                                    <div class="item-qty-text">Qty: @item.Quantity &nbsp;·&nbsp; RM @item.Price.ToString("0.00") each</div>
-                                </div>
-                                <div class="item-price">RM @((item.Price * item.Quantity).ToString("0.00"))</div>
-                            </div>
-                            
-                            @if (!string.IsNullOrWhiteSpace(order.CustomerMessage))
+                    <!-- Order timeline (progress bar) -->
+                    @{
+                        var steps = new[] { "PENDING", "PREPARING", "SHIPPED", "DELIVERED", "RECEIVED" };
+                        int currentStep = Array.IndexOf(steps, statusKey);
+                        bool isCanceled = statusKey == "CANCELED";
+                        bool isReturn   = statusKey == "RETURN_REFUND";
+                    }
+                    @if (!isCanceled && !isReturn)
+                    {
+                        <div class="ph-progress">
+                            @foreach (var (step, idx) in steps.Select((s, i) => (s, i)))
                             {
-                                <div class="order-message">
-                                    <i class="ti ti-message-circle"></i>
-                                    <span>@order.CustomerMessage</span>
+                                var stepClass = idx < currentStep ? "done"
+                                              : idx == currentStep ? "active"
+                                              : "upcoming";
+                                var stepLabel = step switch {
+                                    "PENDING"   => "Pending",
+                                    "PREPARING" => "Preparing",
+                                    "SHIPPED"   => "Shipped",
+                                    "DELIVERED" => "Delivered",
+                                    "RECEIVED"  => "Received",
+                                    _ => step
+                                };
+                                var stepIcon = step switch {
+                                    "PENDING"   => "ti-clock",
+                                    "PREPARING" => "ti-package",
+                                    "SHIPPED"   => "ti-truck",
+                                    "DELIVERED" => "ti-map-pin",
+                                    "RECEIVED"  => "ti-circle-check",
+                                    _ => "ti-circle"
+                                };
+                                <div class="ph-progress-step @stepClass">
+                                    <div class="ph-progress-node">
+                                        <i class="ti @stepIcon"></i>
+                                    </div>
+                                    <div class="ph-progress-label">@stepLabel</div>
+                                    @if (idx < steps.Length - 1)
+                                    {
+                                        <div class="ph-progress-line @(idx < currentStep ? "done" : "")"></div>
+                                    }
                                 </div>
                             }
+                        </div>
+                    }
+
+                    <!-- Canceled notice -->
+                    @if (isCanceled && !string.IsNullOrWhiteSpace(order.CancelReason))
+                    {
+                        <div class="ph-notice ph-notice-canceled">
+                            <i class="ti ti-ban"></i>
+                            <div>
+                                <strong>Order Canceled</strong>
+                                <span>@order.CancelReason</span>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Return/Refund notice -->
+                    @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
+                    {
+                        <div class="ph-notice ph-notice-return">
+                            <i class="ti ti-refresh-alert"></i>
+                            <div>
+                                <strong>Return / Refund Initiated by Seller</strong>
+                                <span>@order.ReturnReason</span>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Seller + items toggle -->
+                    <div class="ph-card-seller">
+                        <div class="ph-seller-avatar">@sellerInitial</div>
+                        <span>Sold by <strong>@sellerName</strong></span>
+                        <button class="ph-toggle-btn" onclick="toggleCollapse(this)">
+                            <span><i class="ti ti-package"></i> @itemCount item@(itemCount != 1 ? "s" : "")</span>
+                            <i class="ti ti-chevron-down ph-chevron"></i>
+                        </button>
+                    </div>
+
+                    <!-- Collapsible items -->
+                    <div class="ph-collapse">
+                        @foreach (var item in order.OrderItems)
+                        {
+                            var vtags = ParseVariationTags(item.SelectedVariation);
+                            <div class="ph-item">
+                                <div class="ph-item-img">
+                                    <img src="@item.Product?.ImagePath" alt="@item.Product?.Name"
+                                         onerror="this.src='/images/placeholder.png'" />
+                                </div>
+                                <div class="ph-item-info">
+                                    <div class="ph-item-name">@item.Product?.Name</div>
+                                    @if (vtags.Any())
+                                    {
+                                        <div class="ph-item-vars">
+                                            @foreach (var tag in vtags)
+                                            { <span class="ph-var-tag">@tag</span> }
+                                        </div>
+                                    }
+                                    <div class="ph-item-qty">Qty: @item.Quantity &nbsp;·&nbsp; RM @item.Price.ToString("0.00") each</div>
+                                </div>
+                                <div class="ph-item-total">RM @((item.Price * item.Quantity).ToString("0.00"))</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(order.CustomerMessage))
+                        {
+                            <div class="ph-customer-msg">
+                                <i class="ti ti-message-circle"></i>
+                                <span>@order.CustomerMessage</span>
+                            </div>
                         }
                     </div>
 
-                    <!-- Delivery Toggle -->
-                    <button class="items-toggle" onclick="toggleItems(this)">
-                        <span><i class="ti ti-map-pin"></i> Delivery Information</span>
-                        <i class="ti ti-chevron-down chevron"></i>
-                    </button>
+                    <!-- Delivery toggle -->
+                    <div class="ph-card-seller ph-card-delivery-toggle">
+                        <i class="ti ti-map-pin" style="font-size:14px;color:#aaa"></i>
+                        <span style="color:#aaa;font-size:12px;font-weight:500">Delivery</span>
+                        <button class="ph-toggle-btn" onclick="toggleCollapse(this)">
+                            <span>View address</span>
+                            <i class="ti ti-chevron-down ph-chevron"></i>
+                        </button>
+                    </div>
 
-                    <!-- Collapsible Delivery Info -->
-                    <div class="items-collapse" style="max-height:0; transition: max-height .3s ease;">
-                        <div class="delivery-panel">
-                            <div class="delivery-panel">
-                                <div class="delivery-row">
-                                    <span class="delivery-label"><i class="ti ti-user"></i> Recipient</span>
-                                    <span class="delivery-value">@order.DeliveryRecipientName</span>
-                                </div>
-                                <div class="delivery-row">
-                                    <span class="delivery-label"><i class="ti ti-phone"></i> Phone</span>
-                                    <span class="delivery-value">@order.DeliveryPhoneNumber</span>
-                                </div>
-                                <div class="delivery-row">
-                                    <span class="delivery-label"><i class="ti ti-map-pin"></i> Address</span>
-                                    <span class="delivery-value">
-                                        @order.DeliveryAddressLine1@(!string.IsNullOrWhiteSpace(order.DeliveryAddressLine2) ? ", " + order.DeliveryAddressLine2 : ""), @order.DeliveryCity, @order.DeliveryPostcode, @order.DeliveryState
-                                    </span>
-                                </div>
+                    <!-- Collapsible delivery -->
+                    <div class="ph-collapse">
+                        <div class="ph-delivery">
+                            <div class="ph-delivery-row">
+                                <span class="ph-delivery-label"><i class="ti ti-user"></i> Recipient</span>
+                                <span>@order.DeliveryRecipientName</span>
+                            </div>
+                            <div class="ph-delivery-row">
+                                <span class="ph-delivery-label"><i class="ti ti-phone"></i> Phone</span>
+                                <span>@order.DeliveryPhoneNumber</span>
+                            </div>
+                            <div class="ph-delivery-row">
+                                <span class="ph-delivery-label"><i class="ti ti-map-pin"></i> Address</span>
+                                <span>
+                                    @order.DeliveryAddressLine1@(!string.IsNullOrWhiteSpace(order.DeliveryAddressLine2) ? ", " + order.DeliveryAddressLine2 : ""),
+                                    @order.DeliveryCity, @order.DeliveryPostcode, @order.DeliveryState
+                                </span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Card Footer -->
-                    <div class="order-card-footer">
-                        <div class="footer-left">
-                            <div class="footer-meta-item">
-                                <i class="ti ti-credit-card"></i>
-                                <span>@order.PaymentMethod</span>
-                            </div>
+                    <!-- Card footer -->
+                    <div class="ph-card-footer">
+                        <div class="ph-footer-payment">
+                            <i class="ti ti-credit-card"></i>
+                            <span>@order.PaymentMethod</span>
                         </div>
-                        <div class="footer-right">
-                            <div>
-                                <div class="order-total-label">Order Total</div>
-                                <div class="order-total-amount">RM @order.TotalAmount.ToString("N2")</div>
+                        <div class="ph-footer-right">
+                            <div class="ph-total-block">
+                                <div class="ph-total-label">Order Total</div>
+                                <div class="ph-total-amt">RM @order.TotalAmount.ToString("N2")</div>
                             </div>
-                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
-                            {
-                                <a href="#" class="btn-action btn-action-primary">
-                                    <i class="ti ti-star"></i> Review
-                                </a>
-                            }
-                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING)
-                            {
-                                <button class="btn-action btn-action-danger">
-                                    <i class="ti ti-x"></i> Cancel
-                                </button>
-                            }
-                            <button class="btn-action btn-action-outline"
-                                    onclick="openOrderDetail(@order.OrderId)">
+
+                            <!-- Details button (always visible) -->
+                            <button class="ph-btn ph-btn-ghost"
+                                    onclick="openDrawer(@order.OrderId)">
                                 <i class="ti ti-file-text"></i> Details
                             </button>
+
+                            <!-- PENDING: Cancel button -->
+                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING)
+                            {
+                                <button class="ph-btn ph-btn-danger"
+                                        onclick="openCancelModal(@order.OrderId)">
+                                    <i class="ti ti-x"></i> Cancel Order
+                                </button>
+                            }
+
+                            <!-- DELIVERED: Confirm Received button -->
+                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
+                            {
+                                <button class="ph-btn ph-btn-primary"
+                                        onclick="confirmReceived(@order.OrderId, this)">
+                                    <i class="ti ti-circle-check"></i> Order Received
+                                </button>
+                            }
+
+                            <!-- RECEIVED: Write Review button -->
+                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)
+                            {
+                                if (!order.ReviewSubmitted)
+                                {
+                                    <button class="ph-btn ph-btn-star js-write-review"
+                                            onclick="openRatingModal(@order.OrderId)">
+                                        <i class="ti ti-star"></i> Write Review
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="ph-btn ph-btn-done">
+                                        <i class="ti ti-check"></i> Review Submitted
+                                    </span>
+                                }
+                            }
+
+                            <!-- RETURN_REFUND or RECEIVED: Complaint button -->
+                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
+                              || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)
+                            {
+                                if (!order.ComplaintSubmitted)
+                                {
+                                    <button class="ph-btn ph-btn-ghost"
+                                            onclick="openComplaintModal(@order.OrderId)">
+                                        <i class="ti ti-alert-triangle"></i> Complaint
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="ph-btn ph-btn-done">
+                                        <i class="ti ti-check"></i> Complaint Sent
+                                    </span>
+                                }
+                            }
                         </div>
                     </div>
 
-                </div>
+                </div><!-- /.ph-card -->
             }
+        </div><!-- /#phOrderList -->
+
+        <div id="phNoResults" class="ph-no-results" style="display:none">
+            <i class="ti ti-search-off"></i>
+            <p>No orders match your search.</p>
         </div>
+
     }
+</div><!-- /.ph-page -->
 
-</div>
+<!-- ═══════════════════════════════════════════════════════════
+     DRAWER  –  Order Detail
+═══════════════════════════════════════════════════════════ -->
+<div class="od-backdrop" id="odBackdrop" onclick="closeDrawer()"></div>
+<aside class="od-drawer" id="odDrawer" role="dialog" aria-modal="true" aria-label="Order details">
 
-<!-- ─── Order Detail Drawer ─── -->
-<div class="od-backdrop" id="odBackdrop" onclick="closeOrderDetail()"></div>
-<div class="od-modal" id="odModal" role="dialog" aria-modal="true">
-
-    <div class="od-modal-header">
+    <div class="od-drawer-header">
         <div>
-            <div class="od-modal-order-id" id="odOrderId"></div>
-            <div class="od-modal-date"     id="odOrderDate"></div>
+            <div class="od-drawer-title" id="odTitle"></div>
+            <div class="od-drawer-date"  id="odDate"></div>
         </div>
-        <div class="od-modal-header-right">
-            <span class="status-badge" id="odStatusBadge">
-                <span class="status-dot"></span>
-                <span id="odStatusLabel"></span>
+        <div class="od-drawer-header-right">
+            <span class="ph-status-pill" id="odBadge">
+                <span class="ph-status-dot"></span>
+                <span id="odBadgeLabel"></span>
             </span>
-            <button class="od-close" onclick="closeOrderDetail()" aria-label="Close">
+            <button class="od-close-btn" onclick="closeDrawer()" aria-label="Close">
                 <i class="ti ti-x"></i>
             </button>
         </div>
     </div>
 
-    <div class="od-modal-body" id="odModalBody"></div>
+    <div class="od-drawer-body" id="odDrawerBody"></div>
 
+</aside>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL  –  Cancel Order
+═══════════════════════════════════════════════════════════ -->
+<div class="ph-modal-backdrop" id="cancelBackdrop" onclick="closeCancelModal()"></div>
+<div class="ph-modal" id="cancelModal">
+    <div class="ph-modal-header">
+        <i class="ti ti-ban" style="color:#ef4444;font-size:22px"></i>
+        <h3>Cancel Order</h3>
+        <button class="ph-modal-close" onclick="closeCancelModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <p class="ph-modal-sub">Please let us know why you'd like to cancel. Your feedback helps us improve.</p>
+
+    <div class="ph-reason-grid" id="cancelReasonGrid">
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Changed my mind</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Found a better price</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Ordered by mistake</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Delivery too slow</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Wrong item ordered</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Other</button>
+    </div>
+
+    <div class="ph-textarea-wrap">
+        <textarea id="cancelCustom" placeholder="Add details (optional)…" rows="3"></textarea>
+    </div>
+
+    <input type="hidden" id="cancelOrderId" />
+
+    <div class="ph-modal-footer">
+        <button class="ph-btn ph-btn-ghost" onclick="closeCancelModal()">Keep Order</button>
+        <button class="ph-btn ph-btn-danger" onclick="submitCancel()">
+            <i class="ti ti-x"></i> Confirm Cancel
+        </button>
+    </div>
 </div>
 
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL  –  Write Review / Rating
+═══════════════════════════════════════════════════════════ -->
+<div class="ph-modal-backdrop" id="ratingBackdrop" onclick="closeRatingModal()"></div>
+<div class="ph-modal" id="ratingModal">
+    <div class="ph-modal-header">
+        <i class="ti ti-star" style="color:#f59e0b;font-size:22px"></i>
+        <h3>Write a Review</h3>
+        <button class="ph-modal-close" onclick="closeRatingModal()"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div id="ratingItemsWrap"></div>
+
+    <input type="hidden" id="ratingOrderId" />
+
+    <div class="ph-modal-footer">
+        <button class="ph-btn ph-btn-ghost" onclick="closeRatingModal()">Cancel</button>
+        <button class="ph-btn ph-btn-star" onclick="submitRating()">
+            <i class="ti ti-send"></i> Submit Review
+        </button>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL  –  Complaint
+═══════════════════════════════════════════════════════════ -->
+<div class="ph-modal-backdrop" id="complaintBackdrop" onclick="closeComplaintModal()"></div>
+<div class="ph-modal" id="complaintModal">
+    <div class="ph-modal-header">
+        <i class="ti ti-alert-triangle" style="color:#f59e0b;font-size:22px"></i>
+        <h3>Submit a Complaint</h3>
+        <button class="ph-modal-close" onclick="closeComplaintModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <p class="ph-modal-sub">Describe your issue and our team will get back to you within 1–2 business days.</p>
+
+    <div class="ph-reason-grid" id="complaintReasonGrid">
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Item not as described</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Damaged on arrival</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Wrong item received</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Refund not processed</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Poor seller communication</button>
+        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Other issue</button>
+    </div>
+
+    <div class="ph-textarea-wrap">
+        <textarea id="complaintCustom" placeholder="Describe your complaint in detail…" rows="4"></textarea>
+    </div>
+
+    <input type="hidden" id="complaintOrderId" />
+
+    <div class="ph-modal-footer">
+        <button class="ph-btn ph-btn-ghost" onclick="closeComplaintModal()">Cancel</button>
+        <button class="ph-btn ph-btn-warning" onclick="submitComplaint()">
+            <i class="ti ti-send"></i> Submit Complaint
+        </button>
+    </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCRIPTS
+═══════════════════════════════════════════════════════════ -->
 <script>
-    // ── Alert auto-hide ───────────────────────────────────
-    const successAlert = document.getElementById('successAlert');
-    if (successAlert) setTimeout(() => successAlert.classList.add('hide'), 3500);
+// ── Toast auto-hide ────────────────────────────────────────
+const _toast = document.getElementById('phToast');
+if (_toast) setTimeout(() => _toast.classList.add('ph-toast-hide'), 3500);
 
-    // ── Tab filter ────────────────────────────────────────
-    function filterOrders(status, btn) {
+// ── Order data ─────────────────────────────────────────────
+const _orders = @Html.Raw(orderDataJson);
+
+// ── Tab filter ─────────────────────────────────────────────
+document.querySelectorAll('.ph-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
         document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.order-card').forEach(card => {
-            card.style.display = (status === 'ALL' || card.dataset.status === status) ? '' : 'none';
-        });
-    }
-
-    // ── Search ────────────────────────────────────────────
-    function searchOrders() {
-        const q = document.getElementById('searchInput').value.toLowerCase();
-        document.querySelectorAll('.order-card').forEach(card => {
-            card.style.display = card.dataset.search.toLowerCase().includes(q) ? '' : 'none';
-        });
-    }
-
-    // ── Collapse toggles ──────────────────────────────────
-    function toggleItems(btn) {
-        btn.classList.toggle('open');
-        const collapse = btn.nextElementSibling;
-        collapse.style.maxHeight = btn.classList.contains('open')
-            ? collapse.scrollHeight + 'px' : '0';
-    }
-
-    // ── Order data (safely serialized by JsonSerializer) ──
-    const _orders = @Html.Raw(orderDataJson);
-
-    // ── Modal open/close ──────────────────────────────────
-    function openOrderDetail(orderId) {
-        const order = _orders.find(o => o.orderId === orderId);
-        if (!order) return;
-
-        // Populate header
-        document.getElementById('odOrderId').textContent   = 'Order #' + order.orderId;
-        document.getElementById('odOrderDate').textContent = order.orderTime;
-        const badge = document.getElementById('odStatusBadge');
-        badge.className = 'status-badge status-' + order.status;
-        document.getElementById('odStatusLabel').textContent = order.statusLabel;
-
-        // Build body HTML — product details only, one card per item
-        let html = '';
-
-        order.items.forEach((item, idx) => {
-            const shopInit   = order.shopInitial || (order.shopName ? order.shopName[0].toUpperCase() : 'S');
-            const fullStars  = Math.floor(item.rating);
-            const emptyStars = 5 - fullStars;
-            const stars = Array(fullStars).fill(`<span class="star">★</span>`).join('')
-                        + Array(emptyStars).fill(`<span class="star empty">★</span>`).join('');
-
-            // ── Gallery ──────────────────────────────────────
-            const imgs = (item.images && item.images.length > 0) ? item.images : [item.image];
-            const mainImg = imgs[0] || item.image;
-
-            const thumbsHtml = imgs.length > 1
-                ? `<div class="od-pd-thumbs">
-                    ${imgs.map((src, i) => `
-                        <div class="od-pd-thumb ${i === 0 ? 'active' : ''}"
-                             onclick="odSwitchImg(this, '${src.replace(/'/g,"\\'")}')">
-                            <img src="${esc(src)}" onerror="this.src='/images/placeholder.png'" />
-                        </div>`).join('')}
-                   </div>`
-                : '';
-
-            // ── All variations (read-only) ────────────────────
-            // Figure out which value was selected per group
-            const selectedMap = {};
-            if (item.selectedVariation) {
-                item.selectedVariation.split(' · ').forEach(pair => {
-                    const colonIdx = pair.indexOf(': ');
-                    if (colonIdx > -1) {
-                        selectedMap[pair.substring(0, colonIdx).trim()] = pair.substring(colonIdx + 2).trim();
-                    }
-                });
-            }
-
-            let variationsHtml = '';
-            if (item.allVariations && item.allVariations.length > 0) {
-                variationsHtml = item.allVariations.map(group => {
-                    const btns = group.values.map(v => {
-                        const isSelected = selectedMap[group.name] === v.label;
-                        const isOos      = v.stock <= 0;
-                        const cls = isSelected ? 'od-var-btn od-var-selected'
-                                  : isOos      ? 'od-var-btn od-var-oos'
-                                  :              'od-var-btn';
-                        return `<button class="${cls}" disabled>${esc(v.label)}</button>`;
-                    }).join('');
-                    return `<div class="od-var-group">
-                        <div class="od-var-label">${esc(group.name)}</div>
-                        <div class="od-var-options">${btns}</div>
-                    </div>`;
-                }).join('');
-            }
-
-            const sep = idx > 0 ? `<div class="od-item-sep"></div>` : '';
-
-            html += `
-            ${sep}
-            <div class="od-pd-wrap">
-
-                <!-- Gallery -->
-                <div class="od-pd-gallery">
-                    <div class="od-pd-img-wrap">
-                        <img id="odMainImg_${idx}" src="${esc(mainImg)}"
-                             alt="${esc(item.name)}"
-                             onerror="this.src='/images/placeholder.png'" />
-                    </div>
-                    ${thumbsHtml}
-                </div>
-
-                <!-- Info -->
-                <div class="od-pd-info">
-
-                    <div class="od-pd-top-row">
-                        ${item.category ? `<span class="od-pd-category">${esc(item.category)}</span>` : ''}
-                    </div>
-
-                    <div class="od-pd-name">${esc(item.name)}</div>
-
-                    <div class="od-pd-rating-row">
-                        <span class="od-stars">${stars}</span>
-                        <span class="od-pd-rating-num">${item.rating}</span>
-                        <span class="od-pd-rating-sep"></span>
-                        <span class="od-pd-rating-num">0 reviews</span>
-                    </div>
-
-                    <div class="od-pd-divider"></div>
-
-                    <div class="od-pd-shop-row">
-                        <div class="od-pd-shop-avatar">${esc(shopInit)}</div>
-                        <span class="od-pd-shop-name">Sold by <strong>${esc(order.shopName)}</strong></span>
-                    </div>
-
-                    <div class="od-pd-price-block">
-                        <div class="od-pd-price">RM ${esc(item.price)}</div>
-                        <div class="od-pd-price-note">Price includes SST where applicable</div>
-                    </div>
-
-                    ${item.sku ? `<div class="od-pd-sku">SKU: ${esc(item.sku)}</div>` : ''}
-
-                    <div class="od-pd-divider"></div>
-
-                    ${item.description ? `<p class="od-pd-desc">${esc(item.description)}</p>` : ''}
-
-                    ${variationsHtml}
-
-                </div>
-            </div>`;
-        });
-
-        document.getElementById('odModalBody').innerHTML = html;
-        document.getElementById('odBackdrop').classList.add('active');
-        document.getElementById('odModal').classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function odSwitchImg(thumbEl, src) {
-        // Find the main image in the same od-pd-gallery
-        const gallery = thumbEl.closest('.od-pd-gallery');
-        const mainImg = gallery.querySelector('.od-pd-img-wrap img');
-        mainImg.src = src;
-        gallery.querySelectorAll('.od-pd-thumb').forEach(t => t.classList.remove('active'));
-        thumbEl.classList.add('active');
-    }
-
-    function closeOrderDetail() {
-        document.getElementById('odBackdrop').classList.remove('active');
-        document.getElementById('odModal').classList.remove('active');
-        document.body.style.overflow = '';
-    }
-
-    // XSS-safe text escaping for innerHTML
-    function esc(str) {
-        const d = document.createElement('div');
-        d.textContent = str ?? '';
-        return d.innerHTML;
-    }
-
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeOrderDetail();
+        tab.classList.add('active');
+        applyFilters();
     });
+});
+
+// ── Search ─────────────────────────────────────────────────
+document.getElementById('phSearch').addEventListener('input', applyFilters);
+
+function applyFilters() {
+    const status = document.querySelector('.ph-tab.active')?.dataset.status ?? 'ALL';
+    const query  = document.getElementById('phSearch').value.toLowerCase().trim();
+    let visible  = 0;
+    document.querySelectorAll('.ph-card').forEach(card => {
+        const matchStatus = status === 'ALL' || card.dataset.status === status;
+        const matchSearch = !query || card.dataset.search.includes(query);
+        const show = matchStatus && matchSearch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('phNoResults').style.display = visible === 0 ? 'flex' : 'none';
+}
+
+// ── Collapsible sections ───────────────────────────────────
+function toggleCollapse(btn) {
+    btn.classList.toggle('open');
+    const collapse = btn.closest('.ph-card-seller, .ph-card-delivery-toggle')
+                        .nextElementSibling;
+    collapse.style.maxHeight = btn.classList.contains('open')
+        ? collapse.scrollHeight + 'px' : '0';
+}
+
+// ═══════════════════════════════════════════════════════════
+// DRAWER  –  Order Detail
+// ═══════════════════════════════════════════════════════════
+function openDrawer(orderId) {
+    const order = _orders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    document.getElementById('odTitle').textContent = 'Order #' + order.orderId;
+    document.getElementById('odDate').textContent  = order.orderTime;
+
+    const badge = document.getElementById('odBadge');
+    badge.className = 'ph-status-pill ph-s-' + order.status;
+    document.getElementById('odBadgeLabel').textContent = order.statusLabel;
+
+    let html = '';
+
+    // Render / Refund notice inside drawer
+    if (order.status === 'RETURN_REFUND' && order.returnReason) {
+        html += `<div class="od-notice od-notice-return">
+            <i class="ti ti-refresh-alert"></i>
+            <div><strong>Return / Refund Reason from Seller</strong><span>${esc(order.returnReason)}</span></div>
+        </div>`;
+    }
+    if (order.status === 'CANCELED' && order.cancelReason) {
+        html += `<div class="od-notice od-notice-canceled">
+            <i class="ti ti-ban"></i>
+            <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
+        </div>`;
+    }
+
+    // Complaint status in drawer
+    if (order.complaintSubmitted && order.complaintText) {
+        html += `<div class="od-complaint-sent">
+            <i class="ti ti-check-circle"></i>
+            <div><strong>Complaint Submitted</strong><span>${esc(order.complaintText)}</span></div>
+        </div>`;
+    }
+
+    // Review status in drawer
+    if (order.reviewSubmitted) {
+        html += `
+        <div class="od-reviewed-sent">
+            <i class="ti ti-star"></i>
+            <div>
+                <strong>Review Submitted</strong><span>You have reviewed this order.</span>
+            </div>
+        </div>`;
+    }
+
+    // Items
+    order.items.forEach((item, idx) => {
+        const imgs    = (item.images && item.images.length > 0) ? item.images : [item.image];
+        const mainImg = imgs[0] || item.image;
+        const thumbsHtml = imgs.length > 1
+            ? `<div class="od-thumbs">${imgs.map((src, i) =>
+                `<div class="od-thumb ${i===0?'active':''}" onclick="odSwitch(this,'${src.replace(/'/g,"\\'")}')">
+                    <img src="${esc(src)}" onerror="this.src='/images/placeholder.png'" /></div>`
+               ).join('')}</div>` : '';
+
+        const fullStars  = Math.floor(item.rating);
+        const stars = Array(fullStars).fill('★').join('') + Array(5-fullStars).fill('☆').join('');
+
+        const selectedMap = {};
+        if (item.selectedVariation) {
+            item.selectedVariation.split(' · ').forEach(pair => {
+                const ci = pair.indexOf(': ');
+                if (ci > -1) selectedMap[pair.substring(0, ci).trim()] = pair.substring(ci+2).trim();
+            });
+        }
+
+        let varHtml = '';
+        if (item.allVariations && item.allVariations.length > 0) {
+            varHtml = item.allVariations.map(g => {
+                const btns = g.values.map(v => {
+                    const sel = selectedMap[g.name] === v.label;
+                    const oos = v.stock <= 0;
+                    const cls = sel ? 'od-var-btn sel' : oos ? 'od-var-btn oos' : 'od-var-btn';
+                    return `<button class="${cls}" disabled>${esc(v.label)}</button>`;
+                }).join('');
+                return `<div class="od-var-group"><div class="od-var-name">${esc(g.name)}</div><div class="od-var-opts">${btns}</div></div>`;
+            }).join('');
+        }
+
+        const sep = idx > 0 ? `<div class="od-sep"></div>` : '';
+        html += `${sep}
+        <div class="od-item-wrap">
+            <div class="od-gallery">
+                <div class="od-main-img-wrap">
+                    <img src="${esc(mainImg)}" alt="${esc(item.name)}" onerror="this.src='/images/placeholder.png'" />
+                </div>
+                ${thumbsHtml}
+            </div>
+            <div class="od-info">
+                ${item.category ? `<div class="od-category">${esc(item.category)}</div>` : ''}
+                <div class="od-name">${esc(item.name)}</div>
+                <div class="od-stars-row">
+                    <span class="od-stars">${stars}</span>
+                    <span class="od-rating-num">${item.rating.toFixed(1)}</span>
+                </div>
+                <div class="od-divider"></div>
+                <div class="od-shop-row">
+                    <div class="od-shop-ava">${esc(order.shopInitial)}</div>
+                    <span>Sold by <strong>${esc(order.shopName)}</strong></span>
+                </div>
+                <div class="od-price">RM ${esc(item.price)}</div>
+                <div class="od-price-note">× ${item.qty} unit${item.qty>1?'s':''} = <strong>RM ${esc(item.subtotal)}</strong></div>
+                ${item.sku ? `<div class="od-sku">SKU: ${esc(item.sku)}</div>` : ''}
+                <div class="od-divider"></div>
+                ${item.description ? `<p class="od-desc">${esc(item.description)}</p>` : ''}
+                ${varHtml}
+            </div>
+        </div>`;
+    });
+
+    // Customer note
+    if (order.customerMessage) {
+        html += `<div class="od-customer-msg">
+            <div class="od-customer-msg-label"><i class="ti ti-message-circle"></i> Note to Seller</div>
+            <div class="od-customer-msg-text">${esc(order.customerMessage)}</div>
+        </div>`;
+    }
+
+    // Address block
+    if (order.address) {
+        const a = order.address;
+        html += `<div class="od-address-block">
+            <div class="od-address-title"><i class="ti ti-map-pin"></i> Delivery Address</div>
+            <div class="od-address-grid">
+                <div class="od-address-row"><span>Recipient</span>${esc(a.recipientName)}</div>
+                <div class="od-address-row"><span>Phone</span>${esc(a.phoneNumber)}</div>
+                <div class="od-address-row"><span>Address</span>${esc(a.line1)}${a.line2?', '+esc(a.line2):''}, ${esc(a.city)}, ${esc(a.postcode)}, ${esc(a.state)}</div>
+                <div class="od-address-row"><span>Payment</span>${esc(order.paymentMethod)}</div>
+            </div>
+        </div>`;
+    }
+
+    // Order total summary
+    html += `<div class="od-total-bar">
+        <span>Order Total</span>
+        <strong>RM ${esc(order.totalAmount)}</strong>
+    </div>`;
+
+    document.getElementById('odDrawerBody').innerHTML = html;
+    document.getElementById('odBackdrop').classList.add('active');
+    document.getElementById('odDrawer').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function odSwitch(thumbEl, src) {
+    const gallery = thumbEl.closest('.od-gallery');
+    gallery.querySelector('.od-main-img-wrap img').src = src;
+    gallery.querySelectorAll('.od-thumb').forEach(t => t.classList.remove('active'));
+    thumbEl.classList.add('active');
+}
+
+function closeDrawer() {
+    document.getElementById('odBackdrop').classList.remove('active');
+    document.getElementById('odDrawer').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANCEL ORDER
+// ═══════════════════════════════════════════════════════════
+let _cancelSelectedReason = '';
+
+function openCancelModal(orderId) {
+    document.getElementById('cancelOrderId').value = orderId;
+    document.getElementById('cancelCustom').value  = '';
+    _cancelSelectedReason = '';
+    document.querySelectorAll('#cancelReasonGrid .ph-reason-chip')
+            .forEach(c => c.classList.remove('selected'));
+    showModal('cancelBackdrop', 'cancelModal');
+}
+
+function closeCancelModal() { hideModal('cancelBackdrop', 'cancelModal'); }
+
+function selectReason(chip, textareaId) {
+    const grid = chip.parentElement;
+    grid.querySelectorAll('.ph-reason-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    _cancelSelectedReason = chip.textContent.trim();
+    // Pre-fill textarea with selected reason if it's still empty
+    const ta = document.getElementById(textareaId);
+    if (!ta.value.trim()) ta.value = _cancelSelectedReason === 'Other' ? '' : _cancelSelectedReason;
+}
+
+async function submitCancel() {
+    const orderId = document.getElementById('cancelOrderId').value;
+    const reason  = document.getElementById('cancelCustom').value.trim()
+                 || _cancelSelectedReason;
+
+    if (!reason) { showInlineError('cancelModal', 'Please select or enter a cancellation reason.'); return; }
+
+    const btn = document.querySelector('#cancelModal .ph-btn-danger');
+    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Canceling…';
+
+    try {
+        const res  = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason });
+        if (res.success) {
+            closeCancelModal();
+            showToast('Order canceled successfully.', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
+            showInlineError('cancelModal', res.message || 'Could not cancel order.');
+        }
+    } catch (err) {
+        btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
+        showInlineError('cancelModal', 'Network error — please try again.');
+        console.error('CancelOrder error:', err);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONFIRM RECEIVED
+// ═══════════════════════════════════════════════════════════
+async function confirmReceived(orderId, btn) {
+    if (!confirm('Confirm that you have received this order?')) return;
+    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Confirming…';
+
+    try {
+        const res = await postJson('/Customer/ConfirmReceived', { orderId });
+        if (res.success) {
+            showToast('Order marked as received!', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
+            showToast(res.message || 'Failed to confirm.', 'error');
+        }
+    } catch (err) {
+        btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
+        console.error('ConfirmReceived error:', err);
+    }
+}
+
+function updateProgressToReceived(card) {
+    const steps = ['PENDING','PREPARING','SHIPPED','DELIVERED','RECEIVED'];
+    const currentStep = 4; // RECEIVED
+
+    const stepEls = card.querySelectorAll('.ph-progress-step');
+    stepEls.forEach((el, idx) => {
+        el.classList.remove('done', 'active', 'upcoming');
+        if (idx < currentStep) el.classList.add('done');
+        else if (idx === currentStep) el.classList.add('active');
+        else el.classList.add('upcoming');
+    });
+
+    const lineEls = card.querySelectorAll('.ph-progress-line');
+    lineEls.forEach((line, idx) => {
+        line.classList.toggle('done', idx < currentStep);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RATING
+// ═══════════════════════════════════════════════════════════
+function openRatingModal(orderId) {
+    const order = _orders.find(o => o.orderId === orderId);
+    if (!order) return;
+    document.getElementById('ratingOrderId').value = orderId;
+
+    let html = '';
+    order.items.forEach((item, idx) => {
+        html += `
+        <div class="ph-rating-item" data-item-idx="${idx}" data-product-id="${item.productId}" data-order-item-id="${item.orderItemId}">
+            <div class="ph-rating-item-top">
+                <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
+                <span>${esc(item.name)}</span>
+            </div>
+            <div class="ph-star-picker" data-selected="0">
+                ${[1,2,3,4,5].map(n =>
+                    `<button class="ph-star-btn" data-val="${n}" onclick="pickStar(this)">★</button>`
+                ).join('')}
+                <span class="ph-star-hint">Tap to rate</span>
+            </div>
+            <div class="ph-textarea-wrap" style="margin-top:10px">
+                <textarea class="ph-review-text" placeholder="Share your experience (optional)…" rows="2"></textarea>
+            </div>
+        </div>
+        ${idx < order.items.length - 1 ? '<div class="od-sep"></div>' : ''}`;
+    });
+
+    document.getElementById('ratingItemsWrap').innerHTML = html;
+    showModal('ratingBackdrop', 'ratingModal');
+}
+
+function closeRatingModal() { hideModal('ratingBackdrop', 'ratingModal'); }
+
+function pickStar(btn) {
+    const picker = btn.closest('.ph-star-picker');
+    const val    = parseInt(btn.dataset.val);
+    picker.dataset.selected = val;
+    picker.querySelectorAll('.ph-star-btn').forEach((b, i) => {
+        b.classList.toggle('filled', i < val);
+    });
+    const labels = ['','Poor','Fair','Good','Very Good','Excellent'];
+    picker.querySelector('.ph-star-hint').textContent = labels[val] || '';
+}
+
+async function submitRating() {
+    const orderId = document.getElementById('ratingOrderId').value;
+    const items   = document.querySelectorAll('.ph-rating-item');
+    let hasError  = false;
+    let allOk     = true;
+
+    for (const item of items) {
+        const rating     = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
+        const reviewText = item.querySelector('.ph-review-text').value.trim();
+        const orderItemId = parseInt(item.dataset.orderItemId);
+        if (!rating) { hasError = true; continue; }
+
+        try {
+            const res = await postJson('/Customer/SubmitRating', { orderItemId, rating, reviewText });
+            if (!res.success) allOk = false;
+        } catch { allOk = false; }
+    }
+
+    if (hasError) { showInlineError('ratingModal', 'Please give at least 1 star for each item.'); return; }
+
+    closeRatingModal();
+    if (allOk) {
+        markReviewWritten(orderId);
+        showToast('Review submitted, thank you!', 'success');
+    } else {
+        showToast('Some reviews could not be saved.', 'error');
+    }
+}
+
+function markReviewWritten(orderId) {
+    const order = _orders.find(o => o.orderId === orderId);
+    if (order) order.reviewSubmitted = true;
+
+    const card = document.querySelector(`.ph-card[data-order-id="${orderId}"]`);
+    if (!card) return;
+
+    const btn = card.querySelector('.js-write-review');
+    if (btn) {
+        btn.outerHTML = `
+          <span class="ph-btn ph-btn-done">
+            <i class="ti ti-check"></i> Review Submitted
+          </span>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPLAINT
+// ═══════════════════════════════════════════════════════════
+let _complaintSelectedReason = '';
+
+function openComplaintModal(orderId) {
+    document.getElementById('complaintOrderId').value = orderId;
+    document.getElementById('complaintCustom').value  = '';
+    _complaintSelectedReason = '';
+    document.querySelectorAll('#complaintReasonGrid .ph-reason-chip')
+            .forEach(c => c.classList.remove('selected'));
+    showModal('complaintBackdrop', 'complaintModal');
+}
+
+function closeComplaintModal() { hideModal('complaintBackdrop', 'complaintModal'); }
+
+async function submitComplaint() {
+    const orderId       = document.getElementById('complaintOrderId').value;
+    const complaintText = document.getElementById('complaintCustom').value.trim()
+                       || _complaintSelectedReason;
+
+    if (!complaintText) { showInlineError('complaintModal', 'Please describe your complaint.'); return; }
+
+    const btn = document.querySelector('#complaintModal .ph-btn-warning');
+    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
+
+    try {
+        const res = await postJson('/Customer/SubmitComplaint', { orderId, complaintText });
+        if (res.success) {
+            closeComplaintModal();
+            showToast('Complaint submitted. We\'ll review it soon.', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
+            showInlineError('complaintModal', res.message || 'Could not submit complaint.');
+        }
+    } catch (err) {
+        btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
+        console.error('SubmitComplaint error:', err);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SHARED HELPERS
+// ═══════════════════════════════════════════════════════════
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str ?? '';
+    return d.innerHTML;
+}
+
+async function postJson(url, data) {
+    // ASP.NET MVC [HttpPost] actions bind from the form body, not JSON.
+    // Send as application/x-www-form-urlencoded with the anti-forgery token as a field.
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    const body  = new URLSearchParams({ ...data, __RequestVerificationToken: token });
+    const res   = await fetch(url, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    body.toString()
+    });
+    return res.json();
+}
+
+function showModal(backdropId, modalId) {
+    document.getElementById(backdropId).classList.add('active');
+    document.getElementById(modalId).classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function hideModal(backdropId, modalId) {
+    document.getElementById(backdropId).classList.remove('active');
+    document.getElementById(modalId).classList.remove('active');
+    document.body.style.overflow = '';
+    // Clear any inline errors
+    document.querySelectorAll(`#${modalId} .ph-inline-err`).forEach(el => el.remove());
+}
+
+function showInlineError(modalId, msg) {
+    const modal = document.getElementById(modalId);
+    let err = modal.querySelector('.ph-inline-err');
+    if (!err) {
+        err = document.createElement('div');
+        err.className = 'ph-inline-err';
+        modal.querySelector('.ph-modal-footer').before(err);
+    }
+    err.innerHTML = `<i class="ti ti-alert-circle"></i> ${msg}`;
+}
+
+function showToast(msg, type='success') {
+    const t = document.createElement('div');
+    t.className = 'ph-toast ' + (type === 'error' ? 'ph-toast-err' : '');
+    t.innerHTML = `<i class="ti ${type==='success'?'ti-circle-check':'ti-alert-circle'}"></i> ${msg}`;
+    document.body.appendChild(t);
+    setTimeout(() => t.classList.add('ph-toast-hide'), 3500);
+    setTimeout(() => t.remove(), 4200);
+}
+
+// Keyboard close
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeDrawer();
+        closeCancelModal();
+        closeRatingModal();
+        closeComplaintModal();
+    }
+});
+
+// CSRF token for form (anti-forgery)
 </script>
+@Html.AntiForgeryToken()

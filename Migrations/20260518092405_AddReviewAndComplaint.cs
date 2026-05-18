@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ecommerce_system.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AddReviewAndComplaint : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -229,7 +229,15 @@ namespace ecommerce_system.Migrations
                     DeliveryAddressLine2 = table.Column<string>(type: "TEXT", nullable: true),
                     DeliveryCity = table.Column<string>(type: "TEXT", nullable: false),
                     DeliveryPostcode = table.Column<string>(type: "TEXT", nullable: false),
-                    DeliveryState = table.Column<string>(type: "TEXT", nullable: false)
+                    DeliveryState = table.Column<string>(type: "TEXT", nullable: false),
+                    CancelReason = table.Column<string>(type: "TEXT", nullable: true),
+                    CanceledAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ReceivedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ReturnReason = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnInitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ComplaintText = table.Column<string>(type: "TEXT", nullable: true),
+                    ComplaintSubmitted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ComplaintAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -312,6 +320,36 @@ namespace ecommerce_system.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "Review",
+                columns: table => new
+                {
+                    ReviewId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    OrderItemId = table.Column<int>(type: "INTEGER", nullable: false),
+                    ProductId = table.Column<int>(type: "INTEGER", nullable: false),
+                    CustomerId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Rating = table.Column<int>(type: "INTEGER", nullable: false),
+                    ReviewText = table.Column<string>(type: "TEXT", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Review", x => x.ReviewId);
+                    table.ForeignKey(
+                        name: "FK_Review_OrderItems_OrderItemId",
+                        column: x => x.OrderItemId,
+                        principalTable: "OrderItems",
+                        principalColumn: "OrderItemId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Review_Product_ProductId",
+                        column: x => x.ProductId,
+                        principalTable: "Product",
+                        principalColumn: "ProductId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_CartItem_CartId",
                 table: "CartItem",
@@ -361,6 +399,16 @@ namespace ecommerce_system.Migrations
                 name: "IX_Product_SellerId",
                 table: "Product",
                 column: "SellerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Review_OrderItemId",
+                table: "Review",
+                column: "OrderItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Review_ProductId",
+                table: "Review",
+                column: "ProductId");
         }
 
         /// <inheritdoc />
@@ -376,10 +424,13 @@ namespace ecommerce_system.Migrations
                 name: "CustomerService");
 
             migrationBuilder.DropTable(
-                name: "OrderItems");
+                name: "Review");
 
             migrationBuilder.DropTable(
                 name: "Cart");
+
+            migrationBuilder.DropTable(
+                name: "OrderItems");
 
             migrationBuilder.DropTable(
                 name: "Order");

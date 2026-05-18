@@ -6,6 +6,8 @@
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
 
 @{
+    var reviews = ViewBag.Reviews as List<EcommerceSystem.Models.Review>
+              ?? new List<EcommerceSystem.Models.Review>();
     var images = ViewBag.Images as List<string> ?? new List<string>();
     var variations = ViewBag.Variations as List<VariationGroupDto> ?? new List<VariationGroupDto>();
     var firstImage = images.Count > 0 ? images[0] : Model.ImagePath;
@@ -87,7 +89,7 @@
                 </div>
                 <span class="pd-rating-text">@Model.AverageRating.ToString("0.0")</span>
                 <div class="pd-rating-sep"></div>
-                <span class="pd-rating-text">0 reviews</span>
+                <span class="pd-rating-text">@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")</span>
             </div>
 
             <div class="pd-divider"></div>
@@ -231,6 +233,50 @@
                     <span>7-day returns</span>
                 </div>
             </div>
+
+            @if (reviews.Any())
+            {
+                <div class="pd-review-section">
+                    <h3 class="pd-review-title">Customer Reviews</h3>
+
+                    @foreach (var r in reviews)
+                    {
+                        var full = r.Rating;
+                        var empty = 5 - full;
+
+                        <div class="pd-review-card">
+                            
+                            <!-- Stars -->
+                            <div class="pd-review-stars">
+                                @for (int i = 0; i < full; i++) { <span>★</span>; }
+                                @for (int i = 0; i < empty; i++) { <span class="empty">★</span>; }
+                            </div>
+
+                            <!-- Text -->
+                            @if (!string.IsNullOrWhiteSpace(r.ReviewText))
+                            {
+                                <div class="pd-review-text">@r.ReviewText</div>
+                            }
+                            else
+                            {
+                                <div class="pd-review-text muted">No comment provided</div>
+                            }
+
+                            <!-- Date -->
+                            <div class="pd-review-date">
+                                @r.CreatedAt.ToString("dd MMM yyyy")
+                            </div>
+
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="pd-review-empty">
+                    No reviews yet.
+                </div>
+            }
 
         </div>
     </div>

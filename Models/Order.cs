@@ -23,6 +23,16 @@ public class Order : OrderStatusSubject
     public string DeliveryCity { get; set; } = string.Empty;
     public string DeliveryPostcode { get; set; } = string.Empty;
     public string DeliveryState { get; set; } = string.Empty;
+    public string? CancelReason { get; set; }
+    public DateTime? CanceledAt{ get; set; }
+    public DateTime? ReceivedAt { get; set; }
+    public string? ReturnReason { get; set; }
+    public DateTime? ReturnInitiatedAt { get; set; }
+    public string? ComplaintText { get; set; }
+    public bool ComplaintSubmitted { get; set; } = false;
+    public DateTime? ComplaintAt { get; set; }
+    [NotMapped]
+    public bool ReviewSubmitted { get; set; }
 
     // Navigation properties
     public Customer? Customer { get; set; }

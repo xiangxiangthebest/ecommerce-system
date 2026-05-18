@@ -566,3 +566,60 @@
   color: #888;
   margin-top: 6px;
 }
+
+/* ─── Reviews Section ───────────────────────── */
+.pd-review-section {
+  margin-top: 30px;
+}
+
+.pd-review-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+/* Review card */
+.pd-review-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f9f8f5;
+  margin-bottom: 10px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Stars */
+.pd-review-stars {
+  font-size: 13px;
+  color: #f5a623;
+  margin-bottom: 6px;
+}
+
+.pd-review-stars .empty {
+  color: #ddd;
+}
+
+/* Text */
+.pd-review-text {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.pd-review-text.muted {
+  color: #999;
+}
+
+/* Date */
+.pd-review-date {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #aaa;
+}
+
+/* Empty */
+.pd-review-empty {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #888;
+}

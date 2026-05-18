@@ -134,6 +134,13 @@ namespace EcommerceSystem.Controllers
             if (product == null)
                 return NotFound();
 
+            var reviews = _context.Reviews
+                .Where(r => r.ProductId == id)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToList();
+
+            ViewBag.Reviews = reviews;
+
             // Deserialize image list
             ViewBag.Images = string.IsNullOrEmpty(product.ImagePathsJson)
                 ? new List<string>()
@@ -536,7 +543,175 @@ namespace EcommerceSystem.Controllers
                 .OrderByDescending(o => o.OrderTime)
                 .ToListAsync();
 
+            var orderItemIds = orders
+                    .SelectMany(o => o.OrderItems)
+                    .Select(oi => oi.OrderItemId)
+                    .ToList();
+
+                if (orderItemIds.Count > 0)
+                {
+                    var reviewedItemIds = await _context.Reviews
+                        .Where(r => r.CustomerId == customer.UserId && orderItemIds.Contains(r.OrderItemId))
+                        .Select(r => r.OrderItemId)
+                        .ToListAsync();
+
+                    var reviewedSet = reviewedItemIds.ToHashSet();
+
+                    foreach (var o in orders)
+                    {
+                        o.ReviewSubmitted = o.OrderItems.Count > 0
+                            && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
+                    }
+                }
+
             return View(orders);
+        }
+
+        // =========================
+        // CANCEL ORDER (POST)
+        // Only allowed from PENDING
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason)
+        {
+            var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
+
+            var order = await _context.Order
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                    && o.CustomerUserId == customer.UserId
+                                    && o.CurrentStatus == OrderStatus.PENDING);
+
+            if (order == null)
+                return Json(new { success = false, message = "Order cannot be canceled." });
+
+            if (string.IsNullOrWhiteSpace(cancelReason))
+                return Json(new { success = false, message = "Please provide a cancellation reason." });
+
+            order.CurrentStatus   = OrderStatus.CANCELED;
+            order.CancelReason    = cancelReason.Trim();
+            order.CanceledAt      = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+
+        // =========================
+        // CONFIRM RECEIVED (POST)
+        // Moves DELIVERED → RECEIVED
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmReceived(int orderId)
+        {
+            var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
+
+            var order = await _context.Order
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                    && o.CustomerUserId == customer.UserId
+                                    && o.CurrentStatus == OrderStatus.DELIVERED);
+
+            if (order == null)
+                return Json(new { success = false, message = "Order not found or already confirmed." });
+
+            order.CurrentStatus = OrderStatus.RECEIVED;
+            order.ReceivedAt    = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+
+        // =========================
+        // SUBMIT RATING (POST)
+        // Only for RECEIVED orders
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText)
+        {
+            var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
+
+            // Verify order belongs to customer and is RECEIVED
+            var orderItem = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId
+                                        && oi.Order.CustomerUserId == customer.UserId
+                                        && oi.Order.CurrentStatus  == OrderStatus.RECEIVED);
+
+            if (orderItem == null)
+                return Json(new { success = false, message = "Cannot review this item." });
+
+            // Check duplicate
+            var existing = await _context.Reviews
+                .FirstOrDefaultAsync(r => r.OrderItemId == orderItem.OrderItemId
+                                    && r.CustomerId  == customer.UserId);
+            if (existing != null)
+                return Json(new { success = false, message = "You have already reviewed this item." });
+
+            if (rating < 1 || rating > 5)
+                return Json(new { success = false, message = "Rating must be 1–5." });
+
+            var review = new Review
+            {
+                OrderItemId  = orderItem.OrderItemId,
+                ProductId    = orderItem.ProductId,
+                CustomerId   = customer.UserId,
+                Rating       = rating,
+                ReviewText   = reviewText?.Trim() ?? "",
+                CreatedAt    = DateTime.UtcNow
+            };
+
+            _context.Reviews.Add(review);
+
+            // Recalculate product average
+            var product = await _context.Products.FindAsync(orderItem.ProductId);
+            if (product != null)
+            {
+                var allRatings = await _context.Reviews
+                    .Where(r => r.ProductId == orderItem.ProductId)
+                    .Select(r => r.Rating)
+                    .ToListAsync();
+                allRatings.Add(rating);
+                product.AverageRating = allRatings.Average();
+                product.ReviewCount   = allRatings.Count;
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+
+        // =========================
+        // SUBMIT COMPLAINT (POST)
+        // For RECEIVED or RETURN_REFUND orders
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SubmitComplaint(int orderId, string complaintText)
+        {
+            var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
+
+            var order = await _context.Order
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                    && o.CustomerUserId == customer.UserId
+                                    && (o.CurrentStatus == OrderStatus.RECEIVED
+                                        || o.CurrentStatus == OrderStatus.RETURN_REFUND));
+
+            if (order == null)
+                return Json(new { success = false, message = "Order not eligible for complaint." });
+
+            if (string.IsNullOrWhiteSpace(complaintText))
+                return Json(new { success = false, message = "Please describe your complaint." });
+
+            order.ComplaintText      = complaintText.Trim();
+            order.ComplaintSubmitted = true;
+            order.ComplaintAt        = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
         }
 
         // =========================

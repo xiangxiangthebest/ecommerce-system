@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260517133212_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260518092405_AddReviewAndComplaint")]
+    partial class AddReviewAndComplaint
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -142,6 +142,21 @@ namespace ecommerce_system.Migrations
                     b.Property<int?>("AddressId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CancelReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CanceledAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ComplaintAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ComplaintSubmitted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ComplaintText")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CurrentStatus")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -184,6 +199,15 @@ namespace ecommerce_system.Migrations
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReturnInitiatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReturnReason")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SellerUserId")
@@ -298,6 +322,40 @@ namespace ecommerce_system.Migrations
                     b.HasIndex("SellerId");
 
                     b.ToTable("Product", (string)null);
+                });
+
+            modelBuilder.Entity("EcommerceSystem.Models.Review", b =>
+                {
+                    b.Property<int>("ReviewId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("OrderItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReviewText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ReviewId");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("Review", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.User", b =>
@@ -509,6 +567,25 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("Seller");
+                });
+
+            modelBuilder.Entity("EcommerceSystem.Models.Review", b =>
+                {
+                    b.HasOne("EcommerceSystem.Models.OrderItem", "OrderItem")
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EcommerceSystem.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>

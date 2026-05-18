@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<DeliveryField> DeliveryField { get; set; }
     public DbSet<Order> Order { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
+    public DbSet<Review> Reviews { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,5 +45,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Order>().HasOne(o => o.Address).WithMany().HasForeignKey(o => o.AddressId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Product>().ToTable("Product");
         modelBuilder.Entity<Category>().ToTable("Category");
+        modelBuilder.Entity<Review>().ToTable("Review");
     }
 }

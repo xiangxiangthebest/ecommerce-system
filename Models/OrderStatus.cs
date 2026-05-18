@@ -1,5 +1,6 @@
 namespace EcommerceSystem.Models;
 
-public enum OrderStatus {
-    PENDING, SHIPPED, DELIVERED, CANCELED
+public enum OrderStatus
+{
+    PENDING, PREPARING, SHIPPED, DELIVERED, RECEIVED, RETURN_REFUND, CANCELED
 }
