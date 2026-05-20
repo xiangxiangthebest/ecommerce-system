@@ -2,6 +2,8 @@ using EcommerceSystem.Data;
 using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
+using EcommerceSystem.Enums;
+using System.Text.Json;
 
 namespace EcommerceSystem.Services
 {
@@ -227,25 +229,33 @@ namespace EcommerceSystem.Services
             return OperationResult.Ok();
         }
 
-        public async Task<OperationResult> SubmitComplaintAsync(int customerId, int orderId, string complaintText)
+        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths, ReturnInitiatedBy initiatedBy)
         {
-            if (string.IsNullOrWhiteSpace(complaintText))
-                return OperationResult.Fail("Please describe your complaint.");
+            if (string.IsNullOrWhiteSpace(reason))
+                return OperationResult.Fail("Please provide a return/refund reason.");
 
             var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                       && o.CustomerUserId == customerId
-                                       && (o.CurrentStatus == OrderStatus.RECEIVED
-                                           || o.CurrentStatus == OrderStatus.RETURN_REFUND));
+                .FirstOrDefaultAsync(o =>
+                    o.OrderId == orderId &&
+                    o.CustomerUserId == userId);
 
             if (order == null)
-                return OperationResult.Fail("Order not eligible for complaint.");
+                return OperationResult.Fail("Order not found.");
 
-            order.ComplaintText = complaintText.Trim();
-            order.ComplaintSubmitted = true;
-            order.ComplaintAt = DateTime.UtcNow;
+            if (order.CurrentStatus != OrderStatus.DELIVERED)
+                return OperationResult.Fail("Only delivered orders can request return/refund.");
+
+            order.ReturnRequested = true;
+            order.ReturnStatus = ReturnStatus.Requested;
+            order.ReturnReason = reason.Trim();
+            order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
+            order.ReturnInitiatedAt = DateTime.UtcNow;
+            order.ReturnInitiatedBy = initiatedBy;
+
+            order.CurrentStatus = OrderStatus.RETURN_REFUND;
 
             await _context.SaveChangesAsync();
+
             return OperationResult.Ok();
         }
 

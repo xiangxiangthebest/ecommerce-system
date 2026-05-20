@@ -182,15 +182,6 @@ namespace ecommerce_system.Migrations
                     b.Property<DateTime?>("CanceledAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("ComplaintAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("ComplaintSubmitted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ComplaintText")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("CurrentStatus")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -238,10 +229,23 @@ namespace ecommerce_system.Migrations
                     b.Property<DateTime?>("ReceivedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReturnImagePathsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ReturnInitiatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReturnInitiatedBy")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ReturnReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ReturnRequested")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReturnStatus")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SellerUserId")
@@ -378,6 +382,9 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("Rating")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReviewImagePathsJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReviewText")
                         .IsRequired()

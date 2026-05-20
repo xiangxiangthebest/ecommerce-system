@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Controllers
 {
@@ -21,6 +22,7 @@ namespace EcommerceSystem.Controllers
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
         private readonly INotificationService _notificationService;
+        private readonly IReturnImageStorage _returnImageStorage;
 
         public CustomerController(
             ICustomerContext customerContext,
@@ -29,7 +31,8 @@ namespace EcommerceSystem.Controllers
             IOrderService orderService,
             IReviewService reviewService,
             IProfileService profileService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IReturnImageStorage returnImageStorage)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -38,6 +41,7 @@ namespace EcommerceSystem.Controllers
             _reviewService = reviewService;
             _profileService = profileService;
             _notificationService = notificationService;
+            _returnImageStorage = returnImageStorage;
         }
 
         // =========================
@@ -312,27 +316,57 @@ namespace EcommerceSystem.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText)
+        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText, List<IFormFile> images)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText);
+            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText, images);
             return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // SUBMIT COMPLAINT (PURCHASE HISTORY PAGE)
+        // RETURN/REFUND (PURCHASE HISTORY PAGE)
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitComplaint(int orderId, string complaintText)
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
 
-            var result = await _orderService.SubmitComplaintAsync(customer.UserId, orderId, complaintText);
-            return Json(new { success = result.Success, message = result.Error });
+            if (customer == null)
+                return Unauthorized();
+
+            List<string> imagePaths = new();
+
+            if (images != null && images.Count > 4)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Maximum 4 images allowed."
+                });
+            }
+
+            if (images != null && images.Any())
+            {
+                imagePaths = await _returnImageStorage
+                    .SaveReturnImagesAsync(images);
+            }
+
+            var result = await _orderService.RequestReturnRefundAsync(
+                customer.UserId,
+                orderId,
+                reason,
+                imagePaths,
+                ReturnInitiatedBy.Customer
+            );
+
+            return Json(new
+            {
+                success = result.Success,
+                message = result.Error
+            });
         }
 
         // =========================

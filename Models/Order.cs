@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Models;
 
@@ -27,10 +28,11 @@ public class Order : OrderStatusSubject
     public DateTime? CanceledAt{ get; set; }
     public DateTime? ReceivedAt { get; set; }
     public string? ReturnReason { get; set; }
+    public string? ReturnImagePathsJson { get; set; }
     public DateTime? ReturnInitiatedAt { get; set; }
-    public string? ComplaintText { get; set; }
-    public bool ComplaintSubmitted { get; set; } = false;
-    public DateTime? ComplaintAt { get; set; }
+    public ReturnInitiatedBy? ReturnInitiatedBy { get; set; }
+    public ReturnStatus ReturnStatus { get; set; } = ReturnStatus.None;
+    public bool ReturnRequested { get; set; } = false;
     [NotMapped]
     public bool ReviewSubmitted { get; set; }
 

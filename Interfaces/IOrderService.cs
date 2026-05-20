@@ -1,4 +1,5 @@
 using EcommerceSystem.Models;
+using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Interfaces
 {
@@ -8,7 +9,7 @@ namespace EcommerceSystem.Interfaces
         Task<List<Order>> GetPurchaseHistoryAsync(int customerId);
         Task<OperationResult> CancelOrderAsync(int customerId, int orderId, string reason);
         Task<OperationResult> ConfirmReceivedAsync(int customerId, int orderId);
-        Task<OperationResult> SubmitComplaintAsync(int customerId, int orderId, string complaintText);
+        Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths,ReturnInitiatedBy initiatedBy);
         Task<OperationResult> UpdateOrderStatusAsync(int orderId, OrderStatus status);
     }
 }

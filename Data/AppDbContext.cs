@@ -35,6 +35,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Cart>().ToTable("Cart");
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
+        modelBuilder.Entity<Order>().Property(o => o.ReturnStatus).HasConversion<string>();
+        modelBuilder.Entity<Order>().Property(o => o.ReturnInitiatedBy).HasConversion<string>();
         modelBuilder.Entity<Order>().Property(o => o.CurrentStatus).HasConversion<string>();
         modelBuilder.Entity<Order>().HasOne(o => o.Address).WithMany().HasForeignKey(o => o.AddressId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Product>().ToTable("Product");

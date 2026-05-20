@@ -43,6 +43,23 @@
     int totalReviews = reviews.Count;
 }
 
+
+@functions {
+    List<string> ParseReviewImages(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "[]") return new List<string>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+}
+
+
 @if (TempData["CartSuccess"] != null)
 {
     <div id="floatingAlert" class="floating-alert">@TempData["CartSuccess"]</div>
@@ -327,6 +344,28 @@
                             <p class="rv-card-text muted">No comment left.</p>
                         }
 
+                        @{
+                            var reviewImgs = ParseReviewImages(r.ReviewImagePathsJson);
+                        }
+
+                        @if (reviewImgs.Any())
+                        {
+                            <div class="rv-photos">
+                                @foreach (var img in reviewImgs.Take(4))
+                                {
+                                    <div class="rv-photo-thumb"
+                                        onclick="rvOpenLightbox('@img')"
+                                        title="View image">
+                                        <img src="@img"
+                                            alt="Review photo"
+                                            onerror="this.style.display='none'" />
+                                        <div class="rv-photo-overlay">
+                                            <i class="ti ti-zoom-in"></i>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 }
                 <div class="rv-empty" id="rvEmpty" style="display:none;">
@@ -335,9 +374,18 @@
                 </div>
             </div>
 
-        </div><!-- /.rv-modal -->
-    </div><!-- /.rv-overlay -->
+        </div>
+    </div>
 }
+
+<!-- Review image lightbox -->
+<div id="rvLightbox" class="rv-lightbox" onclick="rvCloseLightbox()" hidden>
+    <button class="rv-lightbox-close" onclick="rvCloseLightbox(); event.stopPropagation();">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="rvLightboxImg" src="" alt="Review image" onclick="event.stopPropagation()" />
+</div>
+
 
 <script>
 (function () {
@@ -510,6 +558,22 @@
         qs("#buyNowQuantity").value = qty;
         qs("#buyNowSelectedVariations").value = qs("#selectedVariations").value;
         return true;
+    };
+
+    window.rvOpenLightbox = function (src) {
+        const box = document.getElementById('rvLightbox');
+        const img = document.getElementById('rvLightboxImg');
+        img.src = src;
+        box.hidden = false;
+        document.body.style.overflow = "hidden";
+    };
+
+    window.rvCloseLightbox = function () {
+        const box = document.getElementById('rvLightbox');
+        const img = document.getElementById('rvLightboxImg');
+        img.src = "";
+        box.hidden = true;
+        document.body.style.overflow = "";
     };
 
     /* ── Reviews modal ── */

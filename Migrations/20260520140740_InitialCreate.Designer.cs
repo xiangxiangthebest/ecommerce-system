@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260518092405_AddReviewAndComplaint")]
-    partial class AddReviewAndComplaint
+    [Migration("20260520140740_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -133,6 +133,43 @@ namespace ecommerce_system.Migrations
                     b.ToTable("DeliveryField", (string)null);
                 });
 
+            modelBuilder.Entity("EcommerceSystem.Models.Notification", b =>
+                {
+                    b.Property<int>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Notification", (string)null);
+                });
+
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Property<int>("OrderId")
@@ -146,15 +183,6 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CanceledAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ComplaintAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("ComplaintSubmitted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ComplaintText")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CurrentStatus")
@@ -204,10 +232,23 @@ namespace ecommerce_system.Migrations
                     b.Property<DateTime?>("ReceivedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReturnImagePathsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ReturnInitiatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReturnInitiatedBy")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ReturnReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ReturnRequested")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReturnStatus")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SellerUserId")
@@ -344,6 +385,9 @@ namespace ecommerce_system.Migrations
 
                     b.Property<int>("Rating")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReviewImagePathsJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReviewText")
                         .IsRequired()
@@ -503,6 +547,17 @@ namespace ecommerce_system.Migrations
                         .IsRequired();
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("EcommerceSystem.Models.Notification", b =>
+                {
+                    b.HasOne("EcommerceSystem.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>

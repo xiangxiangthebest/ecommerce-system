@@ -28,8 +28,8 @@
         customerMessage    = o.CustomerMessage ?? "",
         cancelReason       = o.CancelReason ?? "",
         returnReason       = o.ReturnReason ?? "",
-        complaintText      = o.ComplaintText ?? "",
-        complaintSubmitted = o.ComplaintSubmitted,
+        returnStatus       = o.ReturnStatus.ToString(),
+        returnImagePath    = ParseReturnImages(o.ReturnImagePathsJson),
         reviewSubmitted    = o.ReviewSubmitted,
         address = o.Address == null ? null : new {
             recipientName = o.Address.RecipientName,
@@ -56,7 +56,8 @@
             selectedVariation = ParseVariationToString(item.SelectedVariation),
             allVariations     = ParseAllVariations(item.Product?.VariationsJson),
             reviewRating = item.Review?.Rating ?? 0,
-            reviewText   = item.Review?.ReviewText ?? ""
+            reviewText   = item.Review?.ReviewText ?? "",
+            reviewImages = ParseReturnImages(item.Review?.ReviewImagePathsJson)
         }).ToList()
     }).ToList();
 
@@ -72,6 +73,15 @@
         EcommerceSystem.Models.OrderStatus.RECEIVED      => "Received",
         EcommerceSystem.Models.OrderStatus.RETURN_REFUND => "Return / Refund",
         EcommerceSystem.Models.OrderStatus.CANCELED      => "Canceled",
+        _ => s.ToString()
+    };
+
+    string ReturnStatusLabel(EcommerceSystem.Enums.ReturnStatus s) => s switch {
+        EcommerceSystem.Enums.ReturnStatus.None      => "None",
+        EcommerceSystem.Enums.ReturnStatus.Requested => "Requested",
+        EcommerceSystem.Enums.ReturnStatus.Approved  => "Approved",
+        EcommerceSystem.Enums.ReturnStatus.Rejected  => "Rejected",
+        EcommerceSystem.Enums.ReturnStatus.Refunded  => "Refunded",
         _ => s.ToString()
     };
 
@@ -105,6 +115,20 @@
         if (list.Count == 0 && !string.IsNullOrWhiteSpace(mainImage))
             list.Add(mainImage);
         return list;
+    }
+
+    List<string> ParseReturnImages(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string>();
+        }
     }
 
     List<object> ParseAllVariations(string? json)
@@ -299,12 +323,55 @@
                     <!-- Return/Refund notice -->
                     @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
                     {
-                        <div class="ph-notice ph-notice-return">
-                            <i class="ti ti-refresh-alert"></i>
-                            <div>
-                                <strong>Return / Refund Initiated by Seller</strong>
-                                <span>@order.ReturnReason</span>
+                        var returnImgs = ParseReturnImages(order.ReturnImagePathsJson);
+
+                        <div class="ph-notice-return-v2">
+
+                            <!-- Header strip -->
+                            <div class="rn-header">
+                                <div class="rn-icon-wrap">
+                                    <i class="ti ti-package-off"></i>
+                                </div>
+                                <div class="rn-header-text">
+                                    <div class="rn-title">Return / Refund Requested</div>
+                                    <div class="rn-status">
+                                        <span class="rn-status-dot"></span>
+                                        @ReturnStatusLabel(order.ReturnStatus)
+                                    </div>
+                                </div>
                             </div>
+
+                            <!-- Reason -->
+                            <div class="rn-body">
+                                <div class="rn-reason">
+                                    <div class="rn-reason-label">Your reason</div>
+                                    <div class="rn-reason-text">@order.ReturnReason</div>
+                                </div>
+                            </div>
+
+                            <!-- Photo strip (only if images exist) -->
+                            @if (returnImgs.Any())
+                            {
+                                <div class="rn-photo-strip">
+                                    <div class="rn-reason-label">Proof photos</div>
+                                    <div class="rn-photo-row">
+                                        @foreach (var img in returnImgs)
+                                        {
+                                            <div class="rn-strip-thumb"
+                                                onclick="rtnOpenLightbox('@img')"
+                                                title="View proof photo">
+                                                <img src="@img"
+                                                    alt="Return proof"
+                                                    onerror="this.closest('.rn-strip-thumb').style.display='none'" />
+                                                <div class="rn-img-badge">
+                                                    <i class="ti ti-zoom-in"></i>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
                         </div>
                     }
 
@@ -409,9 +476,14 @@
                                 </button>
                             }
 
-                            <!-- DELIVERED: Confirm Received button -->
+                            <!-- DELIVERED: Return / Refund + Confirm Received -->
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
                             {
+                                <button class="ph-btn ph-btn-return-trigger"
+                                        onclick="openReturnModal(@order.OrderId)">
+                                    <i class="ti ti-package-off"></i> Return / Refund
+                                </button>
+
                                 <button class="ph-btn ph-btn-primary"
                                         onclick="confirmReceived(@order.OrderId, this)">
                                     <i class="ti ti-circle-check"></i> Order Received
@@ -432,25 +504,6 @@
                                 {
                                     <span class="ph-btn ph-btn-done">
                                         <i class="ti ti-check"></i> Review Submitted
-                                    </span>
-                                }
-                            }
-
-                            <!-- RETURN_REFUND or RECEIVED: Complaint button -->
-                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                              || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)
-                            {
-                                if (!order.ComplaintSubmitted)
-                                {
-                                    <button class="ph-btn ph-btn-ghost"
-                                            onclick="openComplaintModal(@order.OrderId)">
-                                        <i class="ti ti-alert-triangle"></i> Complaint
-                                    </button>
-                                }
-                                else
-                                {
-                                    <span class="ph-btn ph-btn-done">
-                                        <i class="ti ti-check"></i> Complaint Sent
                                     </span>
                                 }
                             }
@@ -531,6 +584,76 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL – Return / Refund
+═══════════════════════════════════════════════════════════ -->
+<div class="ph-modal-backdrop" id="returnBackdrop" onclick="closeReturnModal()"></div>
+
+<div class="ph-modal ph-modal-return" id="returnModal">
+
+    <!-- Hero header -->
+    <div class="rtn-modal-hero">
+        <div class="rtn-modal-hero-icon">
+            <i class="ti ti-package-off"></i>
+        </div>
+        <div class="rtn-modal-hero-text">
+            <div class="rtn-modal-hero-title">Return / Refund</div>
+            <div class="rtn-modal-hero-sub">Tell us what went wrong. Attach photos if you can.</div>
+        </div>
+        <button class="rtn-modal-close" onclick="closeReturnModal()" aria-label="Close">
+            <i class="ti ti-x"></i>
+        </button>
+    </div>
+
+    <!-- Body -->
+    <div class="rtn-modal-body">
+
+        <!-- Reason textarea -->
+        <div class="rtn-field-group">
+            <label class="rtn-field-label" for="returnReason">
+                Reason for return <span class="rtn-required">*</span>
+            </label>
+            <textarea id="returnReason"
+                      class="rtn-textarea"
+                      placeholder="e.g. Item arrived damaged, wrong product sent, missing parts…"
+                      rows="3"></textarea>
+        </div>
+
+        <!-- Upload zone -->
+        <div class="rtn-field-group">
+            <label class="rtn-field-label">Photo proof</label>
+            <div class="rtn-upload-zone" id="rtnUploadZone"
+                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="rtnHandleDrop(event)">
+                <input type="file" id="returnImage" accept="image/*" multiple
+                       onchange="rtnHandleFiles(this.files)" />
+                <div class="rtn-upload-inner">
+                    <div class="rtn-upload-icon"><i class="ti ti-camera"></i></div>
+                    <div class="rtn-upload-text">
+                        <strong>Click to upload</strong> or drag photos here
+                    </div>
+                    <div class="rtn-upload-hint">JPG, PNG, WEBP · Max 5 MB each · Up to 4 photos</div>
+                </div>
+            </div>
+            <!-- Preview chips -->
+            <div class="rtn-preview-row" id="rtnPreviewRow"></div>
+        </div>
+
+    </div>
+
+    <input type="hidden" id="returnOrderId" />
+
+    <!-- Footer -->
+    <div class="ph-modal-footer">
+        <button class="ph-btn ph-btn-ghost" onclick="closeReturnModal()">
+            Cancel
+        </button>
+        <button class="ph-btn ph-btn-return" onclick="submitReturn()">
+            <i class="ti ti-send"></i> Submit Request
+        </button>
+    </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════
      MODAL  –  Write Review / Rating
@@ -555,42 +678,13 @@
     </div>
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════════
-     MODAL  –  Complaint
-═══════════════════════════════════════════════════════════ -->
-<div class="ph-modal-backdrop" id="complaintBackdrop" onclick="closeComplaintModal()"></div>
-<div class="ph-modal" id="complaintModal">
-    <div class="ph-modal-header">
-        <i class="ti ti-alert-triangle" style="color:#f59e0b;font-size:22px"></i>
-        <h3>Submit a Complaint</h3>
-        <button class="ph-modal-close" onclick="closeComplaintModal()"><i class="ti ti-x"></i></button>
-    </div>
-    <p class="ph-modal-sub">Describe your issue and our team will get back to you within 1–2 business days.</p>
-
-    <div class="ph-reason-grid" id="complaintReasonGrid">
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Item not as described</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Damaged on arrival</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Wrong item received</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Refund not processed</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Poor seller communication</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'complaintCustom')">Other issue</button>
-    </div>
-
-    <div class="ph-textarea-wrap">
-        <textarea id="complaintCustom" placeholder="Describe your complaint in detail…" rows="4"></textarea>
-    </div>
-
-    <input type="hidden" id="complaintOrderId" />
-
-    <div class="ph-modal-footer">
-        <button class="ph-btn ph-btn-ghost" onclick="closeComplaintModal()">Cancel</button>
-        <button class="ph-btn ph-btn-warning" onclick="submitComplaint()">
-            <i class="ti ti-send"></i> Submit Complaint
-        </button>
-    </div>
+<!-- ── Return proof lightbox ── -->
+<div class="rtn-lightbox" id="rtnLightbox" onclick="rtnCloseLightbox()">
+    <button class="rtn-lightbox-close" onclick="rtnCloseLightbox()" aria-label="Close">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="rtnLightboxImg" src="" alt="Return proof" onclick="event.stopPropagation()" />
 </div>
-
 
 <!-- ═══════════════════════════════════════════════════════════
      SCRIPTS
@@ -654,25 +748,54 @@ function openDrawer(orderId) {
 
     let html = '';
 
-    // Render / Refund notice inside drawer
+    // Return / Refund notice inside drawer
     if (order.status === 'RETURN_REFUND' && order.returnReason) {
-        html += `<div class="od-notice od-notice-return">
-            <i class="ti ti-refresh-alert"></i>
-            <div><strong>Return / Refund Reason from Seller</strong><span>${esc(order.returnReason)}</span></div>
-        </div>`;
-    }
-    if (order.status === 'CANCELED' && order.cancelReason) {
-        html += `<div class="od-notice od-notice-canceled">
-            <i class="ti ti-ban"></i>
-            <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
+        let photoStripHtml = '';
+        const imgs = Array.isArray(order.returnImagePath) ? order.returnImagePath.filter(Boolean) : [];
+
+        if (imgs.length > 0) {
+            const thumbs = imgs.map(src =>
+                `<div class="rn-strip-thumb" onclick="rtnOpenLightbox('${src.replace(/'/g,"\\'")}')">
+                    <img src="${esc(src)}" alt="Return proof"
+                        onerror="this.closest('.rn-strip-thumb').style.display='none'" />
+                    <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
+                </div>`
+            ).join('');
+
+            photoStripHtml = `
+            <div class="rn-photo-strip">
+                <div class="rn-reason-label">Proof photos</div>
+                <div class="rn-photo-row">${thumbs}</div>
+            </div>`;
+        }
+
+        html += `
+        <div class="ph-notice-return-v2">
+            <div class="rn-header">
+                <div class="rn-icon-wrap"><i class="ti ti-package-off"></i></div>
+                <div class="rn-header-text">
+                    <div class="rn-title">Return / Refund in Progress</div>
+                    <div class="rn-status">
+                        <span class="rn-status-dot"></span>
+                        ${esc(order.returnStatus || 'Pending Review')}
+                    </div>
+                </div>
+            </div>
+            <div class="rn-body">
+                <div class="rn-reason">
+                    <div class="rn-reason-label">Customer's reason</div>
+                    <div class="rn-reason-text">${esc(order.returnReason)}</div>
+                </div>
+            </div>
+            ${photoStripHtml}
         </div>`;
     }
 
-    // Complaint status in drawer
-    if (order.complaintSubmitted && order.complaintText) {
-        html += `<div class="od-complaint-sent">
-            <i class="ti ti-check-circle"></i>
-            <div><strong>Complaint Submitted</strong><span>${esc(order.complaintText)}</span></div>
+    if (order.status === 'CANCELED' && order.cancelReason) {
+        html += `
+        <div class="od-notice od-notice-canceled">
+            <i class="ti ti-ban"></i>
+            <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
         </div>`;
     }
 
@@ -689,6 +812,28 @@ function openDrawer(orderId) {
                 const textLine = item.reviewText
                     ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>`
                     : '';
+                const imgs = Array.isArray(item.reviewImages) ? item.reviewImages.filter(Boolean) : [];
+                    let photoStripHtml = '';
+
+                    if (imgs.length > 0) {
+                        const thumbs = imgs.map(src => `
+                            <div class="rw-strip-thumb"
+                                onclick="rtnOpenLightbox('${String(src).replace(/'/g,"\\'")}')"
+                                title="View review photo">
+                                <img src="${esc(src)}"
+                                    alt="Review photo"
+                                    onerror="this.closest('.rw-strip-thumb').style.display='none'" />
+                                <div class="rw-img-badge"><i class="ti ti-zoom-in"></i></div>
+                            </div>
+                        `).join('');
+
+                        photoStripHtml = `
+                            <div class="rn-photo-strip" style="margin-top:10px">
+                                <div class="rn-reason-label">Review photos</div>
+                                <div class="rn-photo-row">${thumbs}</div>
+                            </div>
+                        `;
+                    }
                 return `
                 <div class="od-reviewed-item">
                     <span class="od-reviewed-item-name">${esc(item.name)}</span>
@@ -697,6 +842,7 @@ function openDrawer(orderId) {
                         <span class="od-reviewed-label">${label}</span>
                     </span>
                     ${textLine}
+                    ${photoStripHtml}
                 </div>`;
             }).join('');
 
@@ -876,6 +1022,130 @@ async function submitCancel() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// RETURN / REFUND
+// ═══════════════════════════════════════════════════════════
+let _rtnFiles = [];
+
+function openReturnModal(orderId) {
+    document.getElementById('returnOrderId').value = orderId;
+    document.getElementById('returnReason').value  = '';
+    _rtnFiles = [];
+    rtnRenderPreviews();
+    showModal('returnBackdrop', 'returnModal');
+}
+
+function closeReturnModal() {
+    hideModal('returnBackdrop', 'returnModal');
+    _rtnFiles = [];
+    rtnRenderPreviews();
+}
+
+function rtnHandleFiles(fileList) {
+    const incoming = Array.from(fileList);
+    incoming.forEach(f => {
+        if (_rtnFiles.length >= 4) return;
+        if (!f.type.startsWith('image/')) return;
+        if (f.size > 5 * 1024 * 1024) {
+            showInlineError('returnModal', `"${f.name}" exceeds 5 MB.`);
+            return;
+        }
+        _rtnFiles.push(f);
+    });
+    // Reset the file input so the same file can be re-added after removal
+    document.getElementById('returnImage').value = '';
+    rtnRenderPreviews();
+}
+
+function rtnHandleDrop(e) {
+    e.preventDefault();
+    document.getElementById('rtnUploadZone').classList.remove('drag-over');
+    rtnHandleFiles(e.dataTransfer.files);
+}
+
+function rtnRemoveFile(idx) {
+    _rtnFiles.splice(idx, 1);
+    rtnRenderPreviews();
+}
+
+function rtnRenderPreviews() {
+    const row = document.getElementById('rtnPreviewRow');
+    if (!_rtnFiles.length) { row.innerHTML = ''; return; }
+
+    row.innerHTML = _rtnFiles.map((f, i) => {
+        const url  = URL.createObjectURL(f);
+        const name = f.name.length > 18 ? f.name.slice(0, 15) + '…' : f.name;
+        return `
+        <div class="rtn-preview-chip">
+            <img src="${url}" alt="${esc(name)}" />
+            <span>${esc(name)}</span>
+            <button class="rtn-chip-remove" onclick="rtnRemoveFile(${i})" aria-label="Remove photo">
+                <i class="ti ti-x"></i>
+            </button>
+        </div>`;
+    }).join('');
+}
+
+async function submitReturn() {
+    const orderId = document.getElementById('returnOrderId').value;
+    const reason  = document.getElementById('returnReason').value.trim();
+
+    if (!reason) {
+        showInlineError('returnModal', 'Please describe your reason for returning.');
+        return;
+    }
+
+    const btn = document.querySelector('#returnModal .ph-btn-return');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
+
+    try {
+        const formData = new FormData();
+        formData.append('orderId', orderId);
+        formData.append('reason',  reason);
+
+        // Append all selected images
+        _rtnFiles.forEach((f, i) => formData.append('images', f));
+
+        // Keep backward-compat: also append first file as "image" if your controller expects it
+        if (_rtnFiles.length > 0) formData.append('image', _rtnFiles[0]);
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        formData.append('__RequestVerificationToken', token);
+
+        const res  = await fetch('/Customer/RequestReturnRefund', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            closeReturnModal();
+            showToast('Return request submitted!', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showInlineError('returnModal', data.message || 'Could not submit request.');
+        }
+    } catch (err) {
+        console.error('ReturnRefund error:', err);
+        showInlineError('returnModal', 'Network error — please try again.');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
+}
+
+// ── Return proof lightbox ──────────────────────────────────
+function rtnOpenLightbox(src) {
+    document.getElementById('rtnLightboxImg').src = src;
+    document.getElementById('rtnLightbox').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function rtnCloseLightbox() {
+    document.getElementById('rtnLightbox').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') rtnCloseLightbox();
+});
+
+// ═══════════════════════════════════════════════════════════
 // CONFIRM RECEIVED
 // ═══════════════════════════════════════════════════════════
 async function confirmReceived(orderId, btn) {
@@ -918,27 +1188,70 @@ function updateProgressToReceived(card) {
 // ═══════════════════════════════════════════════════════════
 // RATING
 // ═══════════════════════════════════════════════════════════
+let _ratingFilesByOrderItem = {}; // { [orderItemId]: File[] }
+
 function openRatingModal(orderId) {
     const order = _orders.find(o => o.orderId === orderId);
     if (!order) return;
+
     document.getElementById('ratingOrderId').value = orderId;
+
+    // reset file store each time modal opens
+    _ratingFilesByOrderItem = {};
 
     let html = '';
     order.items.forEach((item, idx) => {
+        // initialise array
+        _ratingFilesByOrderItem[item.orderItemId] = [];
+
         html += `
-        <div class="ph-rating-item" data-item-idx="${idx}" data-product-id="${item.productId}" data-order-item-id="${item.orderItemId}">
+        <div class="ph-rating-item"
+             data-item-idx="${idx}"
+             data-product-id="${item.productId}"
+             data-order-item-id="${item.orderItemId}">
+             
             <div class="ph-rating-item-top">
                 <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
                 <span>${esc(item.name)}</span>
             </div>
+
             <div class="ph-star-picker" data-selected="0">
                 ${[1,2,3,4,5].map(n =>
                     `<button class="ph-star-btn" data-val="${n}" onclick="pickStar(this)">★</button>`
                 ).join('')}
                 <span class="ph-star-hint">Tap to rate</span>
             </div>
+
             <div class="ph-textarea-wrap" style="margin-top:10px">
                 <textarea class="ph-review-text" placeholder="Share your experience (optional)…" rows="2"></textarea>
+            </div>
+
+            <!-- Upload zone (max 4) -->
+            <div class="ph-review-upload" style="margin-top:12px">
+                <label class="rtn-field-label" style="display:block;margin-bottom:6px">Review photos (optional)</label>
+
+                <div class="rw-upload-zone"
+                     ondragover="event.preventDefault();this.classList.add('drag-over')"
+                     ondragleave="this.classList.remove('drag-over')"
+                     ondrop="ratingHandleDrop(event, ${item.orderItemId})">
+
+                    <input type="file"
+                           class="ph-review-images"
+                           accept="image/*"
+                           multiple
+                           onchange="ratingHandleFiles(this.files, ${item.orderItemId}); this.value='';" />
+
+                    <div class="rw-upload-inner">
+                        <div class="rw-upload-icon"><i class="ti ti-camera"></i></div>
+                        <div class="rw-upload-text">
+                            <strong>Click to upload</strong> or drag photos here
+                        </div>
+                        <div class="rw-upload-hint">JPG, PNG, WEBP · Max 5 MB each · Up to 4 photos</div>
+                    </div>
+                </div>
+
+                <!-- Preview chips -->
+                <div class="rw-preview-row" id="ratingPreviewRow_${item.orderItemId}"></div>
             </div>
         </div>
         ${idx < order.items.length - 1 ? '<div class="od-sep"></div>' : ''}`;
@@ -946,6 +1259,60 @@ function openRatingModal(orderId) {
 
     document.getElementById('ratingItemsWrap').innerHTML = html;
     showModal('ratingBackdrop', 'ratingModal');
+}
+
+function ratingHandleFiles(fileList, orderItemId) {
+    const incoming = Array.from(fileList || []);
+    const arr = _ratingFilesByOrderItem[orderItemId] ?? (_ratingFilesByOrderItem[orderItemId] = []);
+
+    incoming.forEach(f => {
+        if (arr.length >= 4) return;
+        if (!f.type.startsWith('image/')) return;
+
+        if (f.size > 5 * 1024 * 1024) {
+            showInlineError('ratingModal', `"${f.name}" exceeds 5 MB.`);
+            return;
+        }
+        arr.push(f);
+    });
+
+    ratingRenderPreviews(orderItemId);
+}
+
+function ratingHandleDrop(e, orderItemId) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    ratingHandleFiles(e.dataTransfer.files, orderItemId);
+}
+
+function ratingRemoveFile(orderItemId, idx) {
+    const arr = _ratingFilesByOrderItem[orderItemId] ?? [];
+    arr.splice(idx, 1);
+    ratingRenderPreviews(orderItemId);
+}
+
+function ratingRenderPreviews(orderItemId) {
+    const row = document.getElementById(`ratingPreviewRow_${orderItemId}`);
+    if (!row) return;
+
+    const arr = _ratingFilesByOrderItem[orderItemId] ?? [];
+    if (!arr.length) { row.innerHTML = ''; return; }
+
+    row.innerHTML = arr.map((f, i) => {
+        const url  = URL.createObjectURL(f);
+        const name = f.name.length > 18 ? f.name.slice(0, 15) + '…' : f.name;
+
+        return `
+        <div class="rw-preview-chip">
+            <img src="${url}" alt="${esc(name)}" />
+            <span>${esc(name)}</span>
+            <button class="rw-chip-remove"
+                    onclick="ratingRemoveFile(${orderItemId}, ${i})"
+                    aria-label="Remove photo">
+                <i class="ti ti-x"></i>
+            </button>
+        </div>`;
+    }).join('');
 }
 
 function closeRatingModal() { hideModal('ratingBackdrop', 'ratingModal'); }
@@ -964,43 +1331,63 @@ function pickStar(btn) {
 async function submitRating() {
     const orderId = document.getElementById('ratingOrderId').value;
     const items   = document.querySelectorAll('.ph-rating-item');
-    let hasError  = false;
-    let allOk     = true;
 
+    let hasError = false;
+    let allOk    = true;
     const submitted = [];
 
     for (const item of items) {
         const rating      = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
         const reviewText  = item.querySelector('.ph-review-text').value.trim();
         const orderItemId = parseInt(item.dataset.orderItemId);
-        const productId   = parseInt(item.dataset.productId);
+
         if (!rating) { hasError = true; continue; }
 
         try {
-            const res = await postJson('/Customer/SubmitRating', { orderItemId, rating, reviewText });
-            if (res.success) submitted.push({ orderItemId, rating, reviewText });
-            else allOk = false;
-        } catch { allOk = false; }
+            const formData = new FormData();
+            formData.append('orderItemId', orderItemId);
+            formData.append('rating', rating);
+            formData.append('reviewText', reviewText);
+
+            const files = _ratingFilesByOrderItem[orderItemId] ?? [];
+            files.slice(0, 4).forEach(f => formData.append('images', f));
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            formData.append('__RequestVerificationToken', token);
+
+            const res  = await fetch('/Customer/SubmitRating', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.success) {
+                submitted.push({ orderItemId, rating, reviewText });
+            } else {
+                allOk = false;
+                showInlineError('ratingModal', data.message || 'Could not save review.');
+            }
+        } catch (e) {
+            allOk = false;
+            showInlineError('ratingModal', 'Network error — please try again.');
+        }
     }
 
-    if (hasError) { showInlineError('ratingModal', 'Please give at least 1 star for each item.'); return; }
+    if (hasError) {
+        showInlineError('ratingModal', 'Please give at least 1 star for each item.');
+        return;
+    }
 
-    // ── update _orders in memory so the drawer shows correct data immediately ──
+    // update in-memory order data (so drawer updates immediately)
     const order = _orders.find(o => o.orderId === parseInt(orderId));
     if (order) {
         submitted.forEach(({ orderItemId, rating, reviewText }) => {
-            const item = order.items.find(i => i.orderItemId === orderItemId);
-            if (item) {
-                item.reviewRating = rating;
-                item.reviewText   = reviewText;
-            }
+            const it = order.items.find(i => i.orderItemId === orderItemId);
+            if (it) { it.reviewRating = rating; it.reviewText = reviewText; }
         });
         order.reviewSubmitted = true;
     }
 
     closeRatingModal();
     if (allOk) {
-        markReviewWritten(orderId);
+        markReviewWritten(parseInt(orderId));
         showToast('Review submitted, thank you!', 'success');
     } else {
         showToast('Some reviews could not be saved.', 'error');
@@ -1020,48 +1407,6 @@ function markReviewWritten(orderId) {
           <span class="ph-btn ph-btn-done">
             <i class="ti ti-check"></i> Review Submitted
           </span>`;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// COMPLAINT
-// ═══════════════════════════════════════════════════════════
-let _complaintSelectedReason = '';
-
-function openComplaintModal(orderId) {
-    document.getElementById('complaintOrderId').value = orderId;
-    document.getElementById('complaintCustom').value  = '';
-    _complaintSelectedReason = '';
-    document.querySelectorAll('#complaintReasonGrid .ph-reason-chip')
-            .forEach(c => c.classList.remove('selected'));
-    showModal('complaintBackdrop', 'complaintModal');
-}
-
-function closeComplaintModal() { hideModal('complaintBackdrop', 'complaintModal'); }
-
-async function submitComplaint() {
-    const orderId       = document.getElementById('complaintOrderId').value;
-    const complaintText = document.getElementById('complaintCustom').value.trim()
-                       || _complaintSelectedReason;
-
-    if (!complaintText) { showInlineError('complaintModal', 'Please describe your complaint.'); return; }
-
-    const btn = document.querySelector('#complaintModal .ph-btn-warning');
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
-
-    try {
-        const res = await postJson('/Customer/SubmitComplaint', { orderId, complaintText });
-        if (res.success) {
-            closeComplaintModal();
-            showToast('Complaint submitted. We\'ll review it soon.', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
-            showInlineError('complaintModal', res.message || 'Could not submit complaint.');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
-        console.error('SubmitComplaint error:', err);
     }
 }
 
@@ -1127,7 +1472,6 @@ document.addEventListener('keydown', e => {
         closeDrawer();
         closeCancelModal();
         closeRatingModal();
-        closeComplaintModal();
     }
 });
 
