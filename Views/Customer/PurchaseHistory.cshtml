@@ -54,7 +54,9 @@
             sku           = item.Product?.SKU ?? "",
             rating        = item.Product?.AverageRating ?? 0,
             selectedVariation = ParseVariationToString(item.SelectedVariation),
-            allVariations     = ParseAllVariations(item.Product?.VariationsJson)
+            allVariations     = ParseAllVariations(item.Product?.VariationsJson),
+            reviewRating = item.Review?.Rating ?? 0,
+            reviewText   = item.Review?.ReviewText ?? ""
         }).ToList()
     }).ToList();
 
@@ -675,12 +677,35 @@ function openDrawer(orderId) {
     }
 
     // Review status in drawer
+    // AFTER
     if (order.reviewSubmitted) {
+        const reviewLines = order.items
+            .filter(item => item.reviewRating > 0)
+            .map(item => {
+                const filled   = '★'.repeat(item.reviewRating);
+                const unfilled = '☆'.repeat(5 - item.reviewRating);
+                const labels   = ['','Poor','Fair','Good','Very Good','Excellent'];
+                const label    = labels[item.reviewRating] ?? '';
+                const textLine = item.reviewText
+                    ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>`
+                    : '';
+                return `
+                <div class="od-reviewed-item">
+                    <span class="od-reviewed-item-name">${esc(item.name)}</span>
+                    <span class="od-reviewed-stars">
+                        <span class="od-reviewed-filled">${filled}</span><span class="od-reviewed-unfilled">${unfilled}</span>
+                        <span class="od-reviewed-label">${label}</span>
+                    </span>
+                    ${textLine}
+                </div>`;
+            }).join('');
+
         html += `
         <div class="od-reviewed-sent">
             <i class="ti ti-star"></i>
             <div>
-                <strong>Review Submitted</strong><span>You have reviewed this order.</span>
+                <strong>Review Submitted</strong>
+                ${reviewLines}
             </div>
         </div>`;
     }
@@ -942,19 +967,36 @@ async function submitRating() {
     let hasError  = false;
     let allOk     = true;
 
+    const submitted = [];
+
     for (const item of items) {
-        const rating     = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
-        const reviewText = item.querySelector('.ph-review-text').value.trim();
+        const rating      = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
+        const reviewText  = item.querySelector('.ph-review-text').value.trim();
         const orderItemId = parseInt(item.dataset.orderItemId);
+        const productId   = parseInt(item.dataset.productId);
         if (!rating) { hasError = true; continue; }
 
         try {
             const res = await postJson('/Customer/SubmitRating', { orderItemId, rating, reviewText });
-            if (!res.success) allOk = false;
+            if (res.success) submitted.push({ orderItemId, rating, reviewText });
+            else allOk = false;
         } catch { allOk = false; }
     }
 
     if (hasError) { showInlineError('ratingModal', 'Please give at least 1 star for each item.'); return; }
+
+    // ── update _orders in memory so the drawer shows correct data immediately ──
+    const order = _orders.find(o => o.orderId === parseInt(orderId));
+    if (order) {
+        submitted.forEach(({ orderItemId, rating, reviewText }) => {
+            const item = order.items.find(i => i.orderItemId === orderItemId);
+            if (item) {
+                item.reviewRating = rating;
+                item.reviewText   = reviewText;
+            }
+        });
+        order.reviewSubmitted = true;
+    }
 
     closeRatingModal();
     if (allOk) {

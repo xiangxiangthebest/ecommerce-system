@@ -680,10 +680,36 @@
     border: 1px solid rgba(245,158,11,0.3);
     font-size: 13px; color: #92400e;
 }
-.od-reviewed-sent i { font-size: 18px; flex-shrink: 0; }
-.od-reviewed-sent div { display: flex; flex-direction: column; gap: 3px; }
+.od-reviewed-sent > i { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.od-reviewed-sent > div { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .od-reviewed-sent strong { font-weight: 600; }
-.od-reviewed-sent span { color: #c16024; line-height: 1.5; }
+
+.od-reviewed-item {
+    display: flex; flex-direction: column; gap: 3px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(245,158,11,0.2);
+}
+.od-reviewed-item:first-of-type { border-top: none; padding-top: 0; }
+
+.od-reviewed-item-name {
+    font-weight: 500; color: #78350f; font-size: 12px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.od-reviewed-stars {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 15px; line-height: 1;
+}
+.od-reviewed-filled  { color: #f59e0b; letter-spacing: 1px; }
+.od-reviewed-unfilled { color: #d6b87a; letter-spacing: 1px; }
+.od-reviewed-label {
+    font-size: 11px; font-weight: 600; color: #92400e;
+    background: rgba(245,158,11,0.15);
+    padding: 1px 6px; border-radius: 20px;
+}
+.od-reviewed-text {
+    color: #b45309; line-height: 1.5; font-size: 12px;
+    font-style: italic;
+}
 
 /* Item wrap inside drawer */
 .od-item-wrap { display: flex; flex-direction: column; padding-bottom: 6px; }

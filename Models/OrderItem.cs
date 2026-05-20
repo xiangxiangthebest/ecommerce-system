@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace EcommerceSystem.Models;
 
 public class OrderItem
@@ -10,4 +12,6 @@ public class OrderItem
     public int Quantity { get; set; }
     public decimal Price { get; set; }
     public string? SelectedVariation { get; set; }
+    [NotMapped]
+    public Review? Review { get; set; }
 }
