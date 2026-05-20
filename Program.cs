@@ -6,12 +6,16 @@ using EcommerceSystem.Interfaces;
 using EcommerceSystem.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllersWithViews();
 
-builder.Services.AddControllersWithViews().AddRazorRuntimeCompilation();;
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseSqlite(
+//         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=database.db"));
 
+builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerContext, CustomerContext>();

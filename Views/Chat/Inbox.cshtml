@@ -1,0 +1,11 @@
+@model List<EcommerceSystem.ViewModels.ChatInboxViewModel>
+
+<h2>Inbox</h2>
+
+@foreach (var c in Model)
+{
+    <div>
+        <b>@c.ProductName</b>
+        <p>@c.LastMessage</p>
+    </div>
+}

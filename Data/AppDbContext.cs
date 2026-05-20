@@ -9,7 +9,9 @@ public class AppDbContext : DbContext
         : base(options)
     {
     }
-
+    
+    public DbSet<ChatConversation> ChatConversations { get; set; }
+    public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Customer> Customers { get; set; }
     public DbSet<CustomerService> CustomerServices { get; set; }
@@ -41,5 +43,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Category>().ToTable("Category");
         modelBuilder.Entity<Review>().ToTable("Review");
         modelBuilder.Entity<Notification>().ToTable("Notification");
+        modelBuilder.Entity<ChatConversation>().ToTable("ChatConversations");
+        modelBuilder.Entity<ChatMessage>().ToTable("ChatMessages");
     }
 }

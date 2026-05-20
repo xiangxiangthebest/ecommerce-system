@@ -3,6 +3,7 @@ using System;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260520185715_AddChatModule")]
+    partial class AddChatModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -110,7 +113,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasIndex("SellerId");
 
-                    b.ToTable("ChatConversations", (string)null);
+                    b.ToTable("ChatConversations");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.ChatMessage", b =>
@@ -139,7 +142,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasIndex("ChatConversationId");
 
-                    b.ToTable("ChatMessages", (string)null);
+                    b.ToTable("ChatMessages");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>

@@ -226,6 +226,28 @@
                 </form>
             </div>
 
+            @* <button class="pd-chat-seller-btn secondary">
+    Chat with seller
+</button> *@
+       <form asp-controller="Chat"
+      asp-action="StartConversation"
+      method="post">
+
+    <input type="hidden"
+           name="productId"
+           value="@Model.ProductId" />
+
+    <input type="hidden"
+           id="chatVariationJson"
+           name="variationJson" />
+
+    <button class="pd-chat-seller-btn"
+            type="submit">
+        <i class="ti ti-message"></i>
+        Chat with Seller
+    </button>
+</form>
+
             <div class="pd-trust">
                 <div class="pd-trust-item">
                     <i class="ti ti-truck-delivery"></i>
@@ -449,7 +471,28 @@
             });
         }
     }
+function updateChatVariationJson() {
+
+    const obj = {};
+
+    for (let i = 0; i < totalGroups; i++) {
+
+        if (selectedKeys[i] !== null) {
+            obj[groupNames[i]] = selectedKeys[i];
+        }
+    }
+
+    document.getElementById(
+        "chatVariationJson"
+    ).value = JSON.stringify(obj);
+}
+
+    document.getElementById("chatSelectedVariations").value
+        = JSON.stringify(obj);
+}
+
     function updateVariationUI() {
+        updateChatVariationJson();
         var allSelected = selectedKeys.every(function (v) { return v !== null; });
         updateHiddenSelected();
         updateOptionAvailability();
