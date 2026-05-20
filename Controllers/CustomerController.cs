@@ -5,8 +5,6 @@ using EcommerceSystem.Data;
 using EcommerceSystem.Models;
 using System.Security.Claims;
 using EcommerceSystem.Models.ViewModels;
-using Microsoft.AspNetCore.Identity;
-using BCrypt.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -49,7 +47,7 @@ namespace EcommerceSystem.Controllers
 
                 query = query.Where(p =>
                     EF.Functions.Like(p.Name, $"%{keyword}%") ||
-                    EF.Functions.Like(p.Seller.ShopName, $"%{keyword}%"));
+                    (p.Seller != null && EF.Functions.Like(p.Seller.ShopName, $"%{keyword}%")));
             }
 
             // Category filter
@@ -168,6 +166,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var cart = await _context.Cart
                 .Include(c => c.CartItems)
@@ -222,6 +221,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> BuyNow(int productId, int quantity, string selectedVariations)
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var product = await _context.Products
                 .Include(p => p.Seller)
@@ -264,6 +264,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Cart()
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var cart = await _context.Cart
                 .Include(c => c.CartItems)
@@ -289,6 +290,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> UpdateQuantity(int cartItemId, int quantity)
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var item = await _context.CartItem
                 .Include(ci => ci.Cart)
@@ -313,6 +315,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> RemoveItem(int cartItemId)
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var item = await _context.CartItem
                 .Include(ci => ci.Cart)
@@ -336,6 +339,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             ViewBag.Source = source;
             ViewBag.ProductId = productId;
@@ -392,9 +396,16 @@ namespace EcommerceSystem.Controllers
             string? buyNowSelectedVariations)
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var address = await _context.DeliveryField
                 .FirstOrDefaultAsync(a => a.AddressId == selectedAddressId && a.UserId == customer.UserId);
+
+            if (address == null)
+            {
+                TempData["OrderError"] = "Delivery address not found.";
+                return RedirectToAction("Cart");
+            }
 
             var cart = await _context.Cart
                 .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
@@ -409,11 +420,23 @@ namespace EcommerceSystem.Controllers
 
             if (source == "product")
             {
+                if (!productId.HasValue)
+                {
+                    TempData["OrderError"] = "Product not specified.";
+                    return RedirectToAction("Cart");
+                }
+
                 var product = await _context.Products
                     .Include(p => p.Seller)
                     .FirstOrDefaultAsync(p => p.ProductId == productId.Value);
 
-                var qty = buyNowQuantity.Value <= 0 ? 1 : buyNowQuantity.Value;
+                if (product == null)
+                {
+                    TempData["OrderError"] = "Product not found.";
+                    return RedirectToAction("Cart");
+                }
+
+                var qty = (buyNowQuantity.HasValue && buyNowQuantity.Value > 0) ? buyNowQuantity.Value : 1;
 
                 itemsToPurchase = new List<CartItem>
                 {
@@ -442,7 +465,7 @@ namespace EcommerceSystem.Controllers
                     .Include(ci => ci.Cart)
                     .Where(ci =>
                         selectedItemIds.Contains(ci.CartItemId) &&
-                        ci.Cart.UserId == customer.UserId)
+                        ci.Cart != null && ci.Cart.UserId == customer.UserId)
                     .ToListAsync();
 
                 if (!itemsToPurchase.Any())
@@ -453,7 +476,10 @@ namespace EcommerceSystem.Controllers
             }
 
             var groupedBySeller = itemsToPurchase
-                .GroupBy(i => new { i.Product.SellerId, i.Product.Seller.ShopName });
+                .GroupBy(i => new {
+                    SellerId  = i.Product != null ? i.Product.SellerId : 0,
+                    ShopName  = i.Product?.Seller?.ShopName ?? "Unknown"
+                });
 
             await using var tx = await _context.Database.BeginTransactionAsync();
 
@@ -504,7 +530,8 @@ namespace EcommerceSystem.Controllers
 
                         _context.OrderItems.Add(orderItem);
 
-                        item.Product.StockQuantity -= item.Quantity;
+                        if (item.Product != null)
+                            item.Product.StockQuantity -= item.Quantity;
 
                         if (source != "product" && item.CartItemId != 0)
                         {
@@ -533,6 +560,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> PurchaseHistory()
         {
             var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
 
             var orders = await _context.Order
                 .Where(o => o.CustomerUserId == customer.UserId)
@@ -569,7 +597,7 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // CANCEL ORDER (POST)
-        // Only allowed from PENDING
+        // Only allowed from PENDING — restores stock for each item
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -579,6 +607,7 @@ namespace EcommerceSystem.Controllers
             if (customer == null) return Unauthorized();
 
             var order = await _context.Order
+                .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                     && o.CustomerUserId == customer.UserId
                                     && o.CurrentStatus == OrderStatus.PENDING);
@@ -589,9 +618,72 @@ namespace EcommerceSystem.Controllers
             if (string.IsNullOrWhiteSpace(cancelReason))
                 return Json(new { success = false, message = "Please provide a cancellation reason." });
 
-            order.CurrentStatus   = OrderStatus.CANCELED;
-            order.CancelReason    = cancelReason.Trim();
-            order.CanceledAt      = DateTime.UtcNow;
+            // Restore stock for every item in the canceled order
+            foreach (var item in order.OrderItems)
+            {
+                var product = await _context.Products.FindAsync(item.ProductId);
+                if (product != null)
+                    product.StockQuantity += item.Quantity;
+            }
+
+            order.CurrentStatus = OrderStatus.CANCELED;
+            order.CancelReason  = cancelReason.Trim();
+            order.CanceledAt    = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true });
+        }
+
+        // =========================
+        // REQUEST RETURN / REFUND (POST)
+        // Allowed from DELIVERED (before customer clicks Received)
+        // Customer specifies which items need returning and quantities
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string returnReason,
+            List<int> returnItemIds, List<int> returnQtys)
+        {
+            var customer = await GetCurrentCustomerAsync();
+            if (customer == null) return Unauthorized();
+
+            var order = await _context.Order
+                .Include(o => o.OrderItems)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                    && o.CustomerUserId == customer.UserId
+                                    && o.CurrentStatus == OrderStatus.DELIVERED);
+
+            if (order == null)
+                return Json(new { success = false, message = "Order is not eligible for a return/refund request." });
+
+            if (string.IsNullOrWhiteSpace(returnReason))
+                return Json(new { success = false, message = "Please describe the reason for your return/refund." });
+
+            if (returnItemIds == null || returnItemIds.Count == 0)
+                return Json(new { success = false, message = "Please select at least one item to return." });
+
+            // Validate that all supplied item IDs actually belong to this order
+            var orderItemIds = order.OrderItems.Select(oi => oi.OrderItemId).ToHashSet();
+            foreach (var id in returnItemIds)
+            {
+                if (!orderItemIds.Contains(id))
+                    return Json(new { success = false, message = "Invalid item selection." });
+            }
+
+            // Build a structured payload so the seller modal can read the exact
+            // items and quantities the customer requested, rather than just a plain string.
+            // Format stored in ReturnReason:
+            //   [<reason text>]||<json-array>
+            // where the JSON array is: [{"orderItemId":5,"qty":1}, ...]
+            var returnItems = returnItemIds
+                .Zip(returnQtys, (id, qty) => new { orderItemId = id, qty })
+                .ToList();
+
+            var returnItemsJson = System.Text.Json.JsonSerializer.Serialize(returnItems);
+
+            order.CurrentStatus     = OrderStatus.RETURN_REFUND;
+            order.ReturnReason      = $"[{returnReason.Trim()}]||{returnItemsJson}";
+            order.ReturnInitiatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return Json(new { success = true });
@@ -889,7 +981,7 @@ namespace EcommerceSystem.Controllers
             address.State = model.State;
 
             // Set default
-            if (model.IsDefault)
+            if (model.IsDefault && address.Customer != null)
             {
                 foreach (var addr in address.Customer.Addresses)
                 {

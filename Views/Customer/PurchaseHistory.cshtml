@@ -27,7 +27,9 @@
         shopInitial        = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0,1).ToUpper(),
         customerMessage    = o.CustomerMessage ?? "",
         cancelReason       = o.CancelReason ?? "",
-        returnReason       = o.ReturnReason ?? "",
+        returnReason       = (o.ReturnReason != null && o.ReturnReason.Contains("||"))
+                             ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
+                             : (o.ReturnReason ?? ""),
         complaintText      = o.ComplaintText ?? "",
         complaintSubmitted = o.ComplaintSubmitted,
         reviewSubmitted    = o.ReviewSubmitted,
@@ -54,7 +56,9 @@
             sku           = item.Product?.SKU ?? "",
             rating        = item.Product?.AverageRating ?? 0,
             selectedVariation = ParseVariationToString(item.SelectedVariation),
-            allVariations     = ParseAllVariations(item.Product?.VariationsJson)
+            allVariations     = ParseAllVariations(item.Product?.VariationsJson),
+            // for return modal: max returnable qty
+            maxReturnQty  = item.Quantity
         }).ToList()
     }).ToList();
 
@@ -297,11 +301,16 @@
                     <!-- Return/Refund notice -->
                     @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
                     {
+                        // Strip the "||<json>" suffix — only show the human-readable reason
+                        var returnDisplay = order.ReturnReason;
+                        var rrSep = returnDisplay.IndexOf("||");
+                        if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
+
                         <div class="ph-notice ph-notice-return">
                             <i class="ti ti-refresh-alert"></i>
                             <div>
                                 <strong>Return / Refund Initiated by Seller</strong>
-                                <span>@order.ReturnReason</span>
+                                <span>@returnDisplay</span>
                             </div>
                         </div>
                     }
@@ -407,12 +416,16 @@
                                 </button>
                             }
 
-                            <!-- DELIVERED: Confirm Received button -->
+                            <!-- DELIVERED: Confirm Received button + Request Return/Refund button -->
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
                             {
                                 <button class="ph-btn ph-btn-primary"
                                         onclick="confirmReceived(@order.OrderId, this)">
                                     <i class="ti ti-circle-check"></i> Order Received
+                                </button>
+                                <button class="ph-btn ph-btn-warning"
+                                        onclick="openReturnModal(@order.OrderId)">
+                                    <i class="ti ti-refresh-alert"></i> Request Return/Refund
                                 </button>
                             }
 
@@ -552,6 +565,104 @@
         </button>
     </div>
 </div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL  –  Request Return / Refund  
+═══════════════════════════════════════════════════════════ -->
+<div class="ph-modal-backdrop" id="returnBackdrop" onclick="closeReturnModal()"></div>
+<div class="ph-modal" id="returnModal" style="max-width:540px">
+    <div class="ph-modal-header">
+        <i class="ti ti-refresh-alert" style="color:#f97316;font-size:22px"></i>
+        <h3>Request Return / Refund &nbsp;<span style="font-size:13px;font-weight:400;color:#9a98b6">(Request Return/Refund)</span></h3>
+        <button class="ph-modal-close" onclick="closeReturnModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <p class="ph-modal-sub">Select the item(s) affected and describe the issue. The seller will review your request.</p>
+
+    <div id="returnItemsWrap"></div>
+
+    <!-- ── Return Type ── -->
+    <div style="margin-top:16px">
+        <div style="font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#1e1b4b;margin-bottom:8px">
+            Return Type <span style="color:#ef4444">*</span>
+        </div>
+        <div class="ph-return-type-grid" id="returnTypeGrid">
+            <button class="ph-return-type-chip" onclick="selectReturnType(this,'ReturnRefund')">
+                <i class="ti ti-package-import" style="font-size:18px;color:#4f46e5;margin-bottom:4px"></i>
+                <span style="font-weight:700;font-size:13px">Return &amp; Refund</span>
+                <span style="font-size:11px;color:#9a98b6;line-height:1.3">Send item back, receive money refund</span>
+            </button>
+            <button class="ph-return-type-chip" onclick="selectReturnType(this,'ReturnReplace')">
+                <i class="ti ti-replace" style="font-size:18px;color:#f97316;margin-bottom:4px"></i>
+                <span style="font-weight:700;font-size:13px">Return &amp; Replace</span>
+                <span style="font-size:11px;color:#9a98b6;line-height:1.3">Send item back, get correct one</span>
+            </button>
+            <button class="ph-return-type-chip" onclick="selectReturnType(this,'RefundOnly')">
+                <i class="ti ti-coin" style="font-size:18px;color:#10b981;margin-bottom:4px"></i>
+                <span style="font-weight:700;font-size:13px">Refund Only</span>
+                <span style="font-size:11px;color:#9a98b6;line-height:1.3">Item missing / not received — no return needed</span>
+            </button>
+        </div>
+    </div>
+    <input type="hidden" id="returnTypeValue" />
+
+    <!-- ── Return Reason ── -->
+    <div style="margin-top:14px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;color:#1e1b4b;margin-bottom:8px">
+        Reason <span style="color:#ef4444">*</span>
+    </div>
+    <div class="ph-reason-grid" id="returnReasonGrid">
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Wrong item received</button>
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Item not delivered</button>
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Damaged / defective</button>
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Item not as described</button>
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Missing parts / accessories</button>
+        <button class="ph-reason-chip" onclick="selectReturnReason(this)">Other</button>
+    </div>
+
+    <div class="ph-textarea-wrap" style="margin-top:10px">
+        <textarea id="returnCustom" placeholder="Describe the issue in detail…" rows="3"></textarea>
+    </div>
+
+    <input type="hidden" id="returnOrderId" />
+
+    <div class="ph-modal-footer">
+        <button class="ph-btn ph-btn-ghost" onclick="closeReturnModal()">Cancel</button>
+        <button class="ph-btn ph-btn-warning" onclick="submitReturn()" id="returnSubmitBtn">
+            <i class="ti ti-send"></i> Submit Request
+        </button>
+    </div>
+</div>
+
+<style>
+.ph-return-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.ph-return-type-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 12px 8px;
+    border: 1.5px solid #e8eaf6;
+    border-radius: 12px;
+    background: #fafafa;
+    cursor: pointer;
+    transition: all 0.18s;
+    gap: 2px;
+    font-family: 'DM Sans', sans-serif;
+}
+.ph-return-type-chip:hover {
+    border-color: #4f46e5;
+    background: #f0f0ff;
+}
+.ph-return-type-chip.selected {
+    border-color: #4f46e5;
+    background: #ede9fe;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+}
+</style>
 
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -982,6 +1093,130 @@ function markReviewWritten(orderId) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// REQUEST RETURN / REFUND
+// ═══════════════════════════════════════════════════════════
+let _returnSelectedReason = '';
+let _returnSelectedType   = '';
+
+function selectReturnType(chip, type) {
+    document.querySelectorAll('#returnTypeGrid .ph-return-type-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    _returnSelectedType = type;
+    document.getElementById('returnTypeValue').value = type;
+}
+
+function openReturnModal(orderId) {
+    const order = _orders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    document.getElementById('returnOrderId').value = orderId;
+    document.getElementById('returnCustom').value = '';
+    _returnSelectedReason = '';
+    _returnSelectedType   = '';
+    document.getElementById('returnTypeValue').value = '';
+    document.querySelectorAll('#returnTypeGrid .ph-return-type-chip').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('#returnReasonGrid .ph-reason-chip').forEach(c => c.classList.remove('selected'));
+
+    // Build item checkboxes with qty selectors
+    let html = '';
+    order.items.forEach(item => {
+        html += `
+        <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
+            <input type="checkbox" class="return-item-chk" id="retChk_${item.orderItemId}"
+                   data-order-item-id="${item.orderItemId}" data-max="${item.maxReturnQty}"
+                   onchange="syncReturnQty(this)" style="width:16px;height:16px;cursor:pointer" />
+            <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'"
+                 style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0" />
+            <label for="retChk_${item.orderItemId}" style="flex:1;cursor:pointer">
+                <div style="font-weight:600;font-size:13px">${esc(item.name)}</div>
+                <div style="font-size:12px;color:#9a98b6">Qty ordered: ${item.maxReturnQty}</div>
+            </label>
+            <div style="display:flex;align-items:center;gap:6px">
+                <label style="font-size:12px;color:#9a98b6">Return qty:</label>
+                <input type="number" class="return-item-qty" id="retQty_${item.orderItemId}"
+                       min="1" max="${item.maxReturnQty}" value="${item.maxReturnQty}"
+                       disabled
+                       style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+            </div>
+        </div>`;
+    });
+    document.getElementById('returnItemsWrap').innerHTML = html || '<p style="color:#aaa;font-size:13px">No items found.</p>';
+
+    showModal('returnBackdrop', 'returnModal');
+}
+
+function syncReturnQty(chk) {
+    const qtyInput = document.getElementById('retQty_' + chk.dataset.orderItemId.replace ? chk.dataset.orderItemId : chk.dataset.orderItemId);
+    // find the corresponding qty input in the same row
+    const row = chk.closest('.ph-return-item');
+    const qty = row.querySelector('.return-item-qty');
+    if (qty) qty.disabled = !chk.checked;
+}
+
+function selectReturnReason(chip) {
+    document.querySelectorAll('#returnReasonGrid .ph-reason-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    _returnSelectedReason = chip.textContent.trim();
+    const ta = document.getElementById('returnCustom');
+    if (!ta.value.trim() && _returnSelectedReason !== 'Other') ta.value = _returnSelectedReason;
+}
+
+function closeReturnModal() { hideModal('returnBackdrop', 'returnModal'); }
+
+async function submitReturn() {
+    const orderId      = document.getElementById('returnOrderId').value;
+    const returnReason = document.getElementById('returnCustom').value.trim() || _returnSelectedReason;
+    const returnType   = document.getElementById('returnTypeValue').value;
+
+    if (!returnType)   { showInlineError('returnModal', 'Please select a return type (Return & Refund, Return & Replace, or Refund Only).'); return; }
+    if (!returnReason) { showInlineError('returnModal', 'Please describe the reason for your return.'); return; }
+
+    const checked = document.querySelectorAll('.return-item-chk:checked');
+    if (checked.length === 0) { showInlineError('returnModal', 'Please select at least one item to return.'); return; }
+
+    const returnItemIds = [];
+    const returnQtys    = [];
+    let valid = true;
+
+    checked.forEach(chk => {
+        const row = chk.closest('.ph-return-item');
+        const qtyInput = row.querySelector('.return-item-qty');
+        const max = parseInt(chk.dataset.max);
+        const qty = parseInt(qtyInput.value);
+        if (!qty || qty < 1 || qty > max) { valid = false; return; }
+        returnItemIds.push(parseInt(chk.dataset.orderItemId));
+        returnQtys.push(qty);
+    });
+
+    if (!valid) { showInlineError('returnModal', 'Invalid quantity for one or more items.'); return; }
+
+    const btn = document.getElementById('returnSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
+
+    try {
+        const res = await postJson('/Customer/RequestReturnRefund', {
+            orderId,
+            returnReason,
+            returnType,
+            ...Object.fromEntries(returnItemIds.map((id, i) => [`returnItemIds[${i}]`, id])),
+            ...Object.fromEntries(returnQtys.map((q, i)    => [`returnQtys[${i}]`, q]))
+        });
+        if (res.success) {
+            closeReturnModal();
+            showToast('Return / Refund request submitted. The seller will review it shortly.', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
+            showInlineError('returnModal', res.message || 'Could not submit request.');
+        }
+    } catch (err) {
+        btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
+        showInlineError('returnModal', 'Network error — please try again.');
+        console.error('RequestReturnRefund error:', err);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
 // COMPLAINT
 // ═══════════════════════════════════════════════════════════
 let _complaintSelectedReason = '';
@@ -1084,6 +1319,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         closeDrawer();
         closeCancelModal();
+        closeReturnModal();
         closeRatingModal();
         closeComplaintModal();
     }

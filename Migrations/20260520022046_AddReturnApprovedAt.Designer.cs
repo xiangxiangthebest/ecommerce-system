@@ -3,6 +3,7 @@ using System;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260520022046_AddReturnApprovedAt")]
+    partial class AddReturnApprovedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -213,9 +216,6 @@ namespace ecommerce_system.Migrations
                     b.Property<string>("ReturnReason")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ReturnType")
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("SellerUserId")
                         .HasColumnType("INTEGER");
 
@@ -403,66 +403,6 @@ namespace ecommerce_system.Migrations
                     b.ToTable("Users", (string)null);
 
                     b.UseTptMappingStrategy();
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Wallet", b =>
-                {
-                    b.Property<int>("WalletId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("Balance")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("WalletId");
-
-                    b.ToTable("Wallet", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.WalletTransaction", b =>
-                {
-                    b.Property<int>("WalletTransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("BalanceAfter")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("RelatedOrderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("WalletId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("WalletTransactionId");
-
-                    b.HasIndex("WalletId");
-
-                    b.ToTable("WalletTransaction", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
@@ -654,17 +594,6 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.WalletTransaction", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Wallet", "Wallet")
-                        .WithMany("Transactions")
-                        .HasForeignKey("WalletId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Wallet");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.User", null)
@@ -714,11 +643,6 @@ namespace ecommerce_system.Migrations
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Navigation("OrderItems");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Wallet", b =>
-                {
-                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>
