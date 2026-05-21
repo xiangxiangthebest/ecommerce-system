@@ -12,13 +12,6 @@ public enum ReturnType
     ReturnRefund,
 
     /// <summary>
-    /// Customer sends item back and seller sends the correct/replacement item.
-    /// Seller pays: two delivery fees (customer → seller, seller → customer).
-    /// No product refund; replacement is sent instead.
-    /// </summary>
-    ReturnReplace,
-
-    /// <summary>
     /// Customer did not receive the item or items are missing — no physical return needed.
     /// Seller pays: refund for the affected product(s) only.
     /// </summary>

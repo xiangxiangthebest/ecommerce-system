@@ -10,5 +10,9 @@ public class Review
     public int CustomerId { get; set; }
     public int Rating { get; set; }   // 1–5
     public string ReviewText { get; set; } = "";
+
+    /// <summary>JSON-serialised list of image paths uploaded with the review (max 4).</summary>
+    public string? ReviewImagePathsJson { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

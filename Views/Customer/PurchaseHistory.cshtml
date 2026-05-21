@@ -27,9 +27,10 @@
         shopInitial        = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0,1).ToUpper(),
         customerMessage    = o.CustomerMessage ?? "",
         cancelReason       = o.CancelReason ?? "",
-        returnReason       = (o.ReturnReason != null && o.ReturnReason.Contains("||"))
-                             ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
-                             : (o.ReturnReason ?? ""),
+        returnReason       = StripReturnReasonBrackets(
+                                 (o.ReturnReason != null && o.ReturnReason.Contains("||"))
+                                 ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
+                                 : (o.ReturnReason ?? "")),
         complaintText      = o.ComplaintText ?? "",
         complaintSubmitted = o.ComplaintSubmitted,
         reviewSubmitted    = o.ReviewSubmitted,
@@ -129,6 +130,18 @@
                 }
         } catch { }
         return groups;
+    }
+
+    // Strips legacy square-bracket wrapping from old ReturnReason entries.
+    // Old format stored "[reason text]||..." so the extracted part was "[reason text]".
+    // New format stores "reason text||..." — no brackets. This handles both.
+    string StripReturnReasonBrackets(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason)) return reason;
+        var r = reason.Trim();
+        if (r.StartsWith("[") && r.EndsWith("]"))
+            r = r[1..^1].Trim();
+        return r;
     }
 
     List<string> ParseVariationTags(string? json)
@@ -302,9 +315,11 @@
                     @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
                     {
                         // Strip the "||<json>" suffix — only show the human-readable reason
+                        // Also strip legacy "[" "]" brackets from old stored entries
                         var returnDisplay = order.ReturnReason;
                         var rrSep = returnDisplay.IndexOf("||");
                         if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
+                        returnDisplay = StripReturnReasonBrackets(returnDisplay);
 
                         <div class="ph-notice ph-notice-return">
                             <i class="ti ti-refresh-alert"></i>
@@ -592,11 +607,7 @@
                 <span style="font-weight:700;font-size:13px">Return &amp; Refund</span>
                 <span style="font-size:11px;color:#9a98b6;line-height:1.3">Send item back, receive money refund</span>
             </button>
-            <button class="ph-return-type-chip" onclick="selectReturnType(this,'ReturnReplace')">
-                <i class="ti ti-replace" style="font-size:18px;color:#f97316;margin-bottom:4px"></i>
-                <span style="font-weight:700;font-size:13px">Return &amp; Replace</span>
-                <span style="font-size:11px;color:#9a98b6;line-height:1.3">Send item back, get correct one</span>
-            </button>
+
             <button class="ph-return-type-chip" onclick="selectReturnType(this,'RefundOnly')">
                 <i class="ti ti-coin" style="font-size:18px;color:#10b981;margin-bottom:4px"></i>
                 <span style="font-weight:700;font-size:13px">Refund Only</span>
@@ -1168,7 +1179,7 @@ async function submitReturn() {
     const returnReason = document.getElementById('returnCustom').value.trim() || _returnSelectedReason;
     const returnType   = document.getElementById('returnTypeValue').value;
 
-    if (!returnType)   { showInlineError('returnModal', 'Please select a return type (Return & Refund, Return & Replace, or Refund Only).'); return; }
+    if (!returnType)   { showInlineError('returnModal', 'Please select a return type (Return & Refund, or Refund Only).'); return; }
     if (!returnReason) { showInlineError('returnModal', 'Please describe the reason for your return.'); return; }
 
     const checked = document.querySelectorAll('.return-item-chk:checked');

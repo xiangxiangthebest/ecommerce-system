@@ -1,62 +1,70 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using EcommerceSystem.Data;
-using EcommerceSystem.Models;
 using System.Security.Claims;
+using EcommerceSystem.Enums;
+using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using EcommerceSystem.DTOs;
-using EcommerceSystem.ViewModels;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
     [Authorize(Roles = "Customer")]
     public class CustomerController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly ICustomerContext _customerContext;
+        private readonly IProductService _productService;
+        private readonly ICartService _cartService;
+        private readonly IOrderService _orderService;
+        private readonly IReviewService _reviewService;
+        private readonly IProfileService _profileService;
+        private readonly INotificationService _notificationService;
+        private readonly IReturnImageStorage _returnImageStorage;
 
-        public CustomerController(AppDbContext context)
+        public CustomerController(
+            ICustomerContext customerContext,
+            IProductService productService,
+            ICartService cartService,
+            IOrderService orderService,
+            IReviewService reviewService,
+            IProfileService profileService,
+            INotificationService notificationService,
+            IReturnImageStorage returnImageStorage)
         {
-            _context = context;
+            _customerContext = customerContext;
+            _productService = productService;
+            _cartService = cartService;
+            _orderService = orderService;
+            _reviewService = reviewService;
+            _profileService = profileService;
+            _notificationService = notificationService;
+            _returnImageStorage = returnImageStorage;
+        }
+
+        // =========================
+        // NAVBAR CART COUNT
+        // =========================
+        private async Task LoadCartCountAsync()
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
+            ViewBag.NotificationCount = await _notificationService.GetUnreadCountAsync(customer.UserId);
         }
 
         // =========================
         // HOME PAGE (BROWSING PRODUCTS)
         // =========================
-        public IActionResult Home(string? search, int? categoryId)
+        public async Task<IActionResult> Home(string? search, int? categoryId)
         {
-            ViewBag.Category = _context.Category.ToList();
+            await LoadCartCountAsync();
+
+            var categories = await _productService.GetCategoriesAsync();
+            var products = await _productService.GetBrowseProductsAsync(search, categoryId);
+
+            ViewBag.Category = categories;
             ViewBag.Search = search;
             ViewBag.CategoryId = categoryId;
-
-            var query = _context.Products
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .Where(p =>
-                    !p.IsDraft &&
-                    p.Seller != null &&
-                    p.Seller.IsApproved);
-
-            // Search
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                var keyword = search.Trim();
-
-                query = query.Where(p =>
-                    EF.Functions.Like(p.Name, $"%{keyword}%") ||
-                    (p.Seller != null && EF.Functions.Like(p.Seller.ShopName, $"%{keyword}%")));
-            }
-
-            // Category filter
-            if (categoryId.HasValue)
-            {
-                query = query.Where(p => p.CategoryId == categoryId.Value);
-            }
-
-            var products = query.ToList();
 
             return View(products);
         }
@@ -67,96 +75,25 @@ namespace EcommerceSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> QuickAddData(int id)
         {
-            var product = await _context.Products
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .FirstOrDefaultAsync(p => p.ProductId == id && !p.IsDraft);
-
-            if (product == null)
-                return NotFound();
-
-            var images = string.IsNullOrEmpty(product.ImagePathsJson)
-                ? new List<string>()
-                : JsonSerializer.Deserialize<List<string>>(product.ImagePathsJson) ?? new List<string>();
-
-            // Fall back to single ImagePath if no list
-            if (images.Count == 0 && !string.IsNullOrEmpty(product.ImagePath))
-                images.Add(product.ImagePath);
-
-            var variations = string.IsNullOrEmpty(product.VariationsJson)
-                ? new List<VariationGroupDto>()
-                : JsonSerializer.Deserialize<List<VariationGroupDto>>(
-                    product.VariationsJson,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                ?? new List<VariationGroupDto>();
-
-            List<Product.VariationCombo> combos;
-            try
-            {
-                combos = JsonSerializer.Deserialize<List<Product.VariationCombo>>(
-                            product.VariationCombosJson ?? "[]")
-                        ?? new List<Product.VariationCombo>();
-            }
-            catch
-            {
-                combos = new List<Product.VariationCombo>();
-            }
-
-            return Json(new
-            {
-                productId    = product.ProductId,
-                name         = product.Name,
-                price        = product.Price,
-                sku          = product.SKU,
-                description  = product.Description,
-                stockQuantity = product.StockQuantity,
-                images,
-                variations,
-                variationCombosJson = product.VariationCombosJson ?? "[]",
-                shopName     = product.Seller?.ShopName ?? "Unknown Shop"
-            });
+            var dto = await _productService.GetQuickAddProductAsync(id);
+            return dto == null ? NotFound() : Json(dto);
         }
 
         // =========================
         // PRODUCT DETAILS
         // =========================
-        public IActionResult ProductDetails(int id)
+        public async Task<IActionResult> ProductDetails(int id)
         {
-            var product = _context.Products
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .FirstOrDefault(p =>
-                    p.ProductId == id &&
-                    !p.IsDraft);
+            await LoadCartCountAsync();
 
-            if (product == null)
-                return NotFound();
+            var vm = await _productService.GetProductDetailsAsync(id);
+            if (vm == null) return NotFound();
 
-            var reviews = _context.Reviews
-                .Where(r => r.ProductId == id)
-                .OrderByDescending(r => r.CreatedAt)
-                .ToList();
+            ViewBag.Reviews = vm.Reviews;
+            ViewBag.Images = vm.Images;
+            ViewBag.Variations = vm.Variations;
 
-            ViewBag.Reviews = reviews;
-
-            // Deserialize image list
-            ViewBag.Images = string.IsNullOrEmpty(product.ImagePathsJson)
-                ? new List<string>()
-                : JsonSerializer.Deserialize<List<string>>(product.ImagePathsJson);
-
-            // Deserialize variations
-            var variations = string.IsNullOrEmpty(product.VariationsJson)
-                ? new List<VariationGroupDto>()
-                : JsonSerializer.Deserialize<List<VariationGroupDto>>(
-                    product.VariationsJson,
-                    new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-            ViewBag.Variations = variations;
-
-            return View(product);
+            return View(vm.Product);
         }
 
         // =========================
@@ -165,51 +102,18 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var cart = await _context.Cart
-                .Include(c => c.CartItems)
-                .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
+            var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
-            if (cart == null)
+            if (!result.Success)
             {
-                cart = new Cart { UserId = customer.UserId };
-                _context.Cart.Add(cart);
-                await _context.SaveChangesAsync();
+                TempData["CartError"] = result.Error;
+                return RedirectToAction("ProductDetails", new { id = productId });
             }
-
-            var product = await _context.Products.FindAsync(productId);
-
-            if (product == null)
-            {
-                return NotFound();
-            }
-
-            // Match existing item by product AND same variation combo
-            var existingItem = cart.CartItems
-                .FirstOrDefault(x => x.ProductId == productId
-                                && x.SelectedVariations == selectedVariations);
-
-            if (existingItem != null)
-            {
-                existingItem.Quantity += quantity;
-            }
-            else
-            {
-                cart.CartItems.Add(new CartItem
-                {
-                    ProductId          = productId,
-                    Quantity           = quantity,
-                    Price              = product.Price,
-                    SelectedVariations = selectedVariations
-                });
-            }
-
-            await _context.SaveChangesAsync();
 
             TempData["CartSuccess"] = "Product added to cart";
-
             return RedirectToAction("ProductDetails", new { id = productId });
         }
 
@@ -220,42 +124,20 @@ namespace EcommerceSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> BuyNow(int productId, int quantity, string selectedVariations)
         {
-            var customer = await GetCurrentCustomerAsync();
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var product = await _context.Products
-                .Include(p => p.Seller)
-                .FirstOrDefaultAsync(p => p.ProductId == productId);
+            var checkout = await _cartService.BuildBuyNowCheckoutAsync(customer.UserId, productId, quantity, selectedVariations);
 
-            if (product == null)
+            if (!checkout.Success)
                 return RedirectToAction("Home");
-
-            // Create temporary checkout item
-            var buyNowItem = new CartItem
-            {
-                CartItemId = 0,
-                ProductId = product.ProductId,
-                Product = product,
-                Quantity = quantity,
-                Price = product.Price,
-                SelectedVariations = selectedVariations ?? "{}"
-            };
-
-            var addresses = await _context.DeliveryField
-                .Where(a => a.UserId == customer.UserId)
-                .ToListAsync();
-
-            var model = new Checkout
-            {
-                Customer = customer,
-                CartItems = new List<CartItem> { buyNowItem },
-                Addresses = addresses
-            };
 
             ViewBag.Source = "product";
             ViewBag.ProductId = productId;
 
-            return View("Checkout", model);
+            return View("Checkout", checkout.Value);
         }
 
         // =========================
@@ -263,23 +145,12 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Cart()
         {
-            var customer = await GetCurrentCustomerAsync();
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var cart = await _context.Cart
-                .Include(c => c.CartItems)
-                .ThenInclude(ci => ci.Product)
-                .ThenInclude(p => p.Seller)
-                .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
-
-            if (cart == null)
-            {
-                cart = new Cart
-                {
-                    CartItems = new List<CartItem>()
-                };
-            }
-
+            var cart = await _cartService.GetCartAsync(customer.UserId);
             return View(cart);
         }
 
@@ -289,23 +160,11 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdateQuantity(int cartItemId, int quantity)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var item = await _context.CartItem
-                .Include(ci => ci.Cart)
-                .FirstOrDefaultAsync(ci =>
-                    ci.CartItemId == cartItemId &&
-                    ci.Cart.UserId == customer.UserId);
-
-            if (item == null)
-                return NotFound();
-
-            item.Quantity = quantity;
-
-            await _context.SaveChangesAsync();
-
-            return Ok();
+            var result = await _cartService.UpdateQuantityAsync(customer.UserId, cartItemId, quantity);
+            return result.Success ? Ok() : BadRequest(result.Error);
         }
 
         // =========================
@@ -314,23 +173,11 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> RemoveItem(int cartItemId)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var item = await _context.CartItem
-                .Include(ci => ci.Cart)
-                .FirstOrDefaultAsync(ci =>
-                    ci.CartItemId == cartItemId &&
-                    ci.Cart.UserId == customer.UserId);
-
-            if (item == null)
-                return NotFound();
-
-            _context.CartItem.Remove(item);
-
-            await _context.SaveChangesAsync();
-
-            return Ok();
+            var result = await _cartService.RemoveItemAsync(customer.UserId, cartItemId);
+            return result.Success ? Ok() : BadRequest(result.Error);
         }
 
         // =========================
@@ -338,7 +185,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
             ViewBag.Source = source;
@@ -347,211 +194,76 @@ namespace EcommerceSystem.Controllers
             if (string.IsNullOrWhiteSpace(selectedItems))
                 return RedirectToAction("Cart");
 
-            var addresses = await _context.DeliveryField
-                .Where(a => a.UserId == customer.UserId)
-                .ToListAsync();
-
             var ids = selectedItems
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(int.Parse)
                 .ToList();
 
-            var cartItems = await _context.CartItem
-                .Include(ci => ci.Product)
-                .ThenInclude(p => p.Seller)
-                .Include(ci => ci.Cart)
-                .Where(ci =>
-                    ids.Contains(ci.CartItemId) &&
-                    ci.Cart.UserId == customer.UserId)
-                .ToListAsync();
+            var result = await _cartService.BuildCartCheckoutAsync(customer.UserId, ids);
 
-            if (!cartItems.Any())
+            if (!result.Success)
                 return RedirectToAction("Cart");
-
-            var model = new Checkout
-            {
-                Customer = customer,
-                CartItems = cartItems,
-                Addresses = addresses
-            };
 
             ViewBag.Source = "cart";
             ViewBag.ProductId = null;
 
-            return View("Checkout", model);
+            return View("Checkout", result.Value);
         }
 
         // =========================
-        // PLACE ORDER (CART PAGE)
+        // PLACE ORDER
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> PlaceOrder(
-            int selectedAddressId, 
-            string paymentMethod, 
+            int selectedAddressId,
+            string paymentMethod,
             List<int> selectedItemIds,
             string source,
             int? productId,
             int? buyNowQuantity,
             string? buyNowSelectedVariations)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var address = await _context.DeliveryField
-                .FirstOrDefaultAsync(a => a.AddressId == selectedAddressId && a.UserId == customer.UserId);
-
-            if (address == null)
+            var req = new PlaceOrderRequest
             {
-                TempData["OrderError"] = "Delivery address not found.";
-                return RedirectToAction("Cart");
-            }
+                CustomerId = customer.UserId,
+                SelectedAddressId = selectedAddressId,
+                PaymentMethod = paymentMethod,
+                SelectedItemIds = selectedItemIds ?? new List<int>(),
+                Source = source ?? "cart",
+                ProductId = productId,
+                BuyNowQuantity = buyNowQuantity,
+                BuyNowSelectedVariations = buyNowSelectedVariations ?? "{}",
+                SellerMessages = ExtractSellerMessagesFromForm(Request.Form)
+            };
 
-            var cart = await _context.Cart
-                .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
+            var result = await _orderService.PlaceOrderAsync(req);
 
-            if (cart == null)
+            if (!result.Success)
             {
-                TempData["OrderError"] = "Cart not found.";
-                return RedirectToAction("Cart");
-            }
-
-            List<CartItem> itemsToPurchase;
-
-            if (source == "product")
-            {
-                if (!productId.HasValue)
-                {
-                    TempData["OrderError"] = "Product not specified.";
-                    return RedirectToAction("Cart");
-                }
-
-                var product = await _context.Products
-                    .Include(p => p.Seller)
-                    .FirstOrDefaultAsync(p => p.ProductId == productId.Value);
-
-                if (product == null)
-                {
-                    TempData["OrderError"] = "Product not found.";
-                    return RedirectToAction("Cart");
-                }
-
-                var qty = (buyNowQuantity.HasValue && buyNowQuantity.Value > 0) ? buyNowQuantity.Value : 1;
-
-                itemsToPurchase = new List<CartItem>
-                {
-                    new CartItem
-                    {
-                        CartItemId = 0,
-                        ProductId = product.ProductId,
-                        Product = product,
-                        Quantity = qty,
-                        Price = product.Price,
-                        SelectedVariations = buyNowSelectedVariations ?? "{}"
-                    }
-                };
-            }
-            else
-            {
-                if (selectedItemIds == null || selectedItemIds.Count == 0)
-                {
-                    TempData["OrderError"] = "No items selected.";
-                    return RedirectToAction("Cart");
-                }
-
-                itemsToPurchase = await _context.CartItem
-                    .Include(ci => ci.Product)
-                        .ThenInclude(p => p.Seller)
-                    .Include(ci => ci.Cart)
-                    .Where(ci =>
-                        selectedItemIds.Contains(ci.CartItemId) &&
-                        ci.Cart != null && ci.Cart.UserId == customer.UserId)
-                    .ToListAsync();
-
-                if (!itemsToPurchase.Any())
-                {
-                    TempData["OrderError"] = "Your cart is empty.";
-                    return RedirectToAction("Cart");
-                }
-            }
-
-            var groupedBySeller = itemsToPurchase
-                .GroupBy(i => new {
-                    SellerId  = i.Product != null ? i.Product.SellerId : 0,
-                    ShopName  = i.Product?.Seller?.ShopName ?? "Unknown"
-                });
-
-            await using var tx = await _context.Database.BeginTransactionAsync();
-
-            try
-            {
-                foreach (var group in groupedBySeller)
-                {
-                    var sellerId = group.Key.SellerId;
-                    var sellerName = group.Key.ShopName;
-                    var messageKey = $"SellerMessage_{sellerName.Replace(" ", "_")}";
-                    var customerMessage = Request.Form[messageKey].ToString();
-                    var orderTotal = group.Sum(i => i.Quantity * (decimal)i.Price);
-
-                    var order = new Order
-                    {
-                        CustomerUserId = customer.UserId,
-                        SellerUserId = sellerId,
-                        AddressId = address.AddressId,
-
-                        DeliveryRecipientName = address.RecipientName,
-                        DeliveryPhoneNumber = address.PhoneNumber,
-                        DeliveryAddressLine1 = address.AddressLine1,
-                        DeliveryAddressLine2 = address.AddressLine2,
-                        DeliveryCity = address.City,
-                        DeliveryPostcode = address.Postcode,
-                        DeliveryState = address.State,
-
-                        TotalAmount = orderTotal,
-                        PaymentMethod = paymentMethod,
-                        CurrentStatus = OrderStatus.PENDING,
-                        OrderTime = DateTime.Now,
-                        CustomerMessage = customerMessage
-                    };
-
-                    _context.Order.Add(order);
-                    await _context.SaveChangesAsync();
-
-                    foreach (var item in group)
-                    {
-                        var orderItem = new OrderItem
-                        {
-                            OrderId = order.OrderId,
-                            ProductId = item.ProductId,
-                            Quantity = item.Quantity,
-                            Price = (decimal)item.Price,
-                            SelectedVariation = item.SelectedVariations
-                        };
-
-                        _context.OrderItems.Add(orderItem);
-
-                        if (item.Product != null)
-                            item.Product.StockQuantity -= item.Quantity;
-
-                        if (source != "product" && item.CartItemId != 0)
-                        {
-                            _context.CartItem.Remove(item);
-                        }
-                    }
-
-                    await _context.SaveChangesAsync();
-                }
-
-                await tx.CommitAsync();
-
-                return RedirectToAction("PurchaseHistory");
-            }
-            catch
-            {
-                await tx.RollbackAsync();
-                TempData["OrderError"] = "Failed to place order. Please try again.";
+                TempData["OrderError"] = result.Error;
                 return RedirectToAction(source == "product" ? "ProductDetails" : "Cart", new { id = productId });
             }
+
+            return RedirectToAction("PurchaseHistory");
+        }
+
+        private Dictionary<string, string> ExtractSellerMessagesFromForm(IFormCollection form)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var key in form.Keys)
+            {
+                if (key.StartsWith("SellerMessage_", StringComparison.OrdinalIgnoreCase))
+                {
+                    dict[key] = form[key].ToString();
+                }
+            }
+
+            return dict;
         }
 
         // =========================
@@ -559,278 +271,103 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> PurchaseHistory()
         {
-            var customer = await GetCurrentCustomerAsync();
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var orders = await _context.Order
-                .Where(o => o.CustomerUserId == customer.UserId)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
-                        .ThenInclude(p => p.Seller)
-                .Include(o => o.Address)
-                .OrderByDescending(o => o.OrderTime)
-                .ToListAsync();
-
-            var orderItemIds = orders
-                    .SelectMany(o => o.OrderItems)
-                    .Select(oi => oi.OrderItemId)
-                    .ToList();
-
-                if (orderItemIds.Count > 0)
-                {
-                    var reviewedItemIds = await _context.Reviews
-                        .Where(r => r.CustomerId == customer.UserId && orderItemIds.Contains(r.OrderItemId))
-                        .Select(r => r.OrderItemId)
-                        .ToListAsync();
-
-                    var reviewedSet = reviewedItemIds.ToHashSet();
-
-                    foreach (var o in orders)
-                    {
-                        o.ReviewSubmitted = o.OrderItems.Count > 0
-                            && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
-                    }
-                }
-
+            var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
             return View(orders);
         }
 
         // =========================
-        // CANCEL ORDER (POST)
+        // CANCEL ORDER (PURCHASE HISTORY PAGE)
         // Only allowed from PENDING — restores stock for each item
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelOrder(int orderId, string cancelReason)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var order = await _context.Order
-                .Include(o => o.OrderItems)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customer.UserId
-                                    && o.CurrentStatus == OrderStatus.PENDING);
-
-            if (order == null)
-                return Json(new { success = false, message = "Order cannot be canceled." });
-
-            if (string.IsNullOrWhiteSpace(cancelReason))
-                return Json(new { success = false, message = "Please provide a cancellation reason." });
-
-            // Restore stock for every item in the canceled order
-            foreach (var item in order.OrderItems)
-            {
-                var product = await _context.Products.FindAsync(item.ProductId);
-                if (product != null)
-                    product.StockQuantity += item.Quantity;
-            }
-
-            order.CurrentStatus = OrderStatus.CANCELED;
-            order.CancelReason  = cancelReason.Trim();
-            order.CanceledAt    = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
+            var result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // REQUEST RETURN / REFUND (POST)
-        // Allowed from DELIVERED (before customer clicks Received)
-        // Customer specifies which items need returning and quantities
+        // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
+        // Allowed from DELIVERED — supports item selection, quantities, and images
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RequestReturnRefund(int orderId, string returnReason,
-            List<int> returnItemIds, List<int> returnQtys)
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var order = await _context.Order
-                .Include(o => o.OrderItems)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customer.UserId
-                                    && o.CurrentStatus == OrderStatus.DELIVERED);
+            List<string> imagePaths = new();
 
-            if (order == null)
-                return Json(new { success = false, message = "Order is not eligible for a return/refund request." });
+            if (images != null && images.Count > 4)
+                return Json(new { success = false, message = "Maximum 4 images allowed." });
 
-            if (string.IsNullOrWhiteSpace(returnReason))
-                return Json(new { success = false, message = "Please describe the reason for your return/refund." });
+            if (images != null && images.Any())
+                imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
 
-            if (returnItemIds == null || returnItemIds.Count == 0)
-                return Json(new { success = false, message = "Please select at least one item to return." });
+            var result = await _orderService.RequestReturnRefundAsync(
+                customer.UserId,
+                orderId,
+                reason,
+                imagePaths,
+                ReturnInitiatedBy.Customer
+            );
 
-            // Validate that all supplied item IDs actually belong to this order
-            var orderItemIds = order.OrderItems.Select(oi => oi.OrderItemId).ToHashSet();
-            foreach (var id in returnItemIds)
-            {
-                if (!orderItemIds.Contains(id))
-                    return Json(new { success = false, message = "Invalid item selection." });
-            }
-
-            // Build a structured payload so the seller modal can read the exact
-            // items and quantities the customer requested, rather than just a plain string.
-            // Format stored in ReturnReason:
-            //   [<reason text>]||<json-array>
-            // where the JSON array is: [{"orderItemId":5,"qty":1}, ...]
-            var returnItems = returnItemIds
-                .Zip(returnQtys, (id, qty) => new { orderItemId = id, qty })
-                .ToList();
-
-            var returnItemsJson = System.Text.Json.JsonSerializer.Serialize(returnItems);
-
-            order.CurrentStatus     = OrderStatus.RETURN_REFUND;
-            order.ReturnReason      = $"[{returnReason.Trim()}]||{returnItemsJson}";
-            order.ReturnInitiatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // CONFIRM RECEIVED (POST)
+        // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
         // Moves DELIVERED → RECEIVED
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ConfirmReceived(int orderId)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customer.UserId
-                                    && o.CurrentStatus == OrderStatus.DELIVERED);
-
-            if (order == null)
-                return Json(new { success = false, message = "Order not found or already confirmed." });
-
-            order.CurrentStatus = OrderStatus.RECEIVED;
-            order.ReceivedAt    = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
+            var result = await _orderService.ConfirmReceivedAsync(customer.UserId, orderId);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // SUBMIT RATING (POST)
-        // Only for RECEIVED orders
+        // SUBMIT RATING (PURCHASE HISTORY PAGE)
+        // Only for RECEIVED orders — supports review images
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText)
+        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText, List<IFormFile> images)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            // Verify order belongs to customer and is RECEIVED
-            var orderItem = await _context.OrderItems
-                .Include(oi => oi.Order)
-                .FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId
-                                        && oi.Order.CustomerUserId == customer.UserId
-                                        && oi.Order.CurrentStatus  == OrderStatus.RECEIVED);
-
-            if (orderItem == null)
-                return Json(new { success = false, message = "Cannot review this item." });
-
-            // Check duplicate
-            var existing = await _context.Reviews
-                .FirstOrDefaultAsync(r => r.OrderItemId == orderItem.OrderItemId
-                                    && r.CustomerId  == customer.UserId);
-            if (existing != null)
-                return Json(new { success = false, message = "You have already reviewed this item." });
-
-            if (rating < 1 || rating > 5)
-                return Json(new { success = false, message = "Rating must be 1–5." });
-
-            var review = new Review
-            {
-                OrderItemId  = orderItem.OrderItemId,
-                ProductId    = orderItem.ProductId,
-                CustomerId   = customer.UserId,
-                Rating       = rating,
-                ReviewText   = reviewText?.Trim() ?? "",
-                CreatedAt    = DateTime.UtcNow
-            };
-
-            _context.Reviews.Add(review);
-
-            // Recalculate product average
-            var product = await _context.Products.FindAsync(orderItem.ProductId);
-            if (product != null)
-            {
-                var allRatings = await _context.Reviews
-                    .Where(r => r.ProductId == orderItem.ProductId)
-                    .Select(r => r.Rating)
-                    .ToListAsync();
-                allRatings.Add(rating);
-                product.AverageRating = allRatings.Average();
-                product.ReviewCount   = allRatings.Count;
-            }
-
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
+            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText, images);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // SUBMIT COMPLAINT (POST)
+        // SUBMIT COMPLAINT (PURCHASE HISTORY PAGE)
         // For RECEIVED or RETURN_REFUND orders
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitComplaint(int orderId, string complaintText)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customer.UserId
-                                    && (o.CurrentStatus == OrderStatus.RECEIVED
-                                        || o.CurrentStatus == OrderStatus.RETURN_REFUND));
-
-            if (order == null)
-                return Json(new { success = false, message = "Order not eligible for complaint." });
-
-            if (string.IsNullOrWhiteSpace(complaintText))
-                return Json(new { success = false, message = "Please describe your complaint." });
-
-            order.ComplaintText      = complaintText.Trim();
-            order.ComplaintSubmitted = true;
-            order.ComplaintAt        = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return Json(new { success = true });
-        }
-
-        // =========================
-        // GET CURRENT CUSTOMER
-        // =========================
-        private async Task<Customer?> GetCurrentCustomerAsync()
-        {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
-
-            return await _context.Customers
-                .FirstOrDefaultAsync(x => x.Email == email);
-        }
-        
-        // =========================
-        // CHAT
-        // =========================
-        public IActionResult Chat()
-        {
-            return View();
-        }
-
-        // =========================
-        // NOTIFICATIONS
-        // =========================
-        public IActionResult Notifications()
-        {
-            return View();
+            var result = await _orderService.SubmitComplaintAsync(customer.UserId, orderId, complaintText);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
@@ -838,123 +375,63 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Profile()
         {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            await LoadCartCountAsync();
 
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .Include(x => x.Addresses)
-                .FirstOrDefaultAsync(x => x.Email == email);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return NotFound();
-
-            return View(customer);
+            var profile = await _profileService.GetProfileAsync(customer.UserId);
+            return profile == null ? NotFound() : View(profile);
         }
 
         // =========================
         // UPDATE PROFILE (PROFILE PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> UpdateProfile(Customer model, IFormFile profileImage)
+        public async Task<IActionResult> UpdateProfile(Customer model, IFormFile? profileImage)
         {
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.UserId == model.UserId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return NotFound();
+            var result = await _profileService.UpdateProfileAsync(customer.UserId, model, profileImage);
 
-            customer.FullName = model.FullName;
-            customer.Email = model.Email;
-            customer.Phone = model.Phone;
-            customer.Gender = model.Gender;
-            customer.Birthday = model.Birthday;
-
-            if (profileImage != null && profileImage.Length > 0)
+            if (!result.Success)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images/profile");
-
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
-
-                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await profileImage.CopyToAsync(stream);
-                }
-
-                customer.ProfilePicture = "/images/profile/" + fileName;
+                TempData["ProfileError"] = result.Error;
+                return RedirectToAction("Profile");
             }
 
-            await _context.SaveChangesAsync();
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, customer.FullName),
-                new Claim(ClaimTypes.Email, customer.Email),
-                new Claim(ClaimTypes.Role, customer.Role)
-            };
-
-            var identity = new ClaimsIdentity(
-                claims,
-                CookieAuthenticationDefaults.AuthenticationScheme);
-
-            var principal = new ClaimsPrincipal(identity);
-
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal);
+            var updated = result.Value!;
+            await RefreshSignInAsync(updated);
 
             TempData["ProfileSuccess"] = "Profile updated successfully.";
-
             return RedirectToAction("Profile");
         }
 
+        private async Task RefreshSignInAsync(User user)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+        }
+
         // =========================
-        // DELIVERY FIELDS (PROFILE PAGE)
+        // ADD ADDRESS (PROFILE PAGE)
         // =========================
         [HttpPost]
         public async Task<IActionResult> AddAddress(DeliveryField model)
         {
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .Include(x => x.Addresses)
-                .FirstOrDefaultAsync(x => x.UserId == model.UserId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return NotFound();
-
-            // Maximum 3 addresses
-            if (customer.Addresses.Count >= 3)
-            {
-                TempData["AddressError"] = "Maximum 3 addresses allowed.";
-                return RedirectToAction("Profile");
-            }
-
-            // First address automatically default
-            if (!customer.Addresses.Any())
-            {
-                model.IsDefault = true;
-            }
-            else if (model.IsDefault)
-            {
-                foreach (var addr in customer.Addresses)
-                {
-                    addr.IsDefault = false;
-                }
-            }
-
-            model.UserId = customer.UserId;
-            model.Customer = null; // avoid EF confusion
-
-            _context.DeliveryField.Add(model);
-
-            await _context.SaveChangesAsync();
-
-            TempData["AddressSuccess"] = "Address added successfully.";
-
+            var result = await _profileService.AddAddressAsync(customer.UserId, model);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address added successfully." : result.Error;
             return RedirectToAction("Profile");
         }
 
@@ -964,37 +441,11 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> EditAddress(DeliveryField model)
         {
-            var address = await _context.DeliveryField
-                .Include(x => x.Customer)
-                .ThenInclude(x => x.Addresses)
-                .FirstOrDefaultAsync(x => x.AddressId == model.AddressId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (address == null)
-                return NotFound();
-
-            address.RecipientName = model.RecipientName;
-            address.PhoneNumber = model.PhoneNumber;
-            address.AddressLine1 = model.AddressLine1;
-            address.AddressLine2 = model.AddressLine2;
-            address.City = model.City;
-            address.Postcode = model.Postcode;
-            address.State = model.State;
-
-            // Set default
-            if (model.IsDefault && address.Customer != null)
-            {
-                foreach (var addr in address.Customer.Addresses)
-                {
-                    addr.IsDefault = false;
-                }
-
-                address.IsDefault = true;
-            }
-
-            await _context.SaveChangesAsync();
-
-            TempData["AddressSuccess"] = "Address updated successfully.";
-
+            var result = await _profileService.EditAddressAsync(customer.UserId, model);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address updated successfully." : result.Error;
             return RedirectToAction("Profile");
         }
 
@@ -1004,101 +455,65 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public async Task<IActionResult> RemoveAddress(int addressId)
         {
-            var address = await _context.DeliveryField
-                .FirstOrDefaultAsync(x => x.AddressId == addressId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (address == null)
-                return NotFound();
-
-            int userId = address.UserId;
-            bool wasDefault = address.IsDefault;
-
-            _context.DeliveryField.Remove(address);
-            await _context.SaveChangesAsync();
-
-            if (wasDefault)
-            {
-                var next = await _context.DeliveryField
-                    .Where(x => x.UserId == userId)
-                    .OrderBy(x => x.CreatedAt)
-                    .FirstOrDefaultAsync();
-
-                if (next != null)
-                {
-                    next.IsDefault = true;
-                    await _context.SaveChangesAsync();
-                }
-            }
-
+            var result = await _profileService.RemoveAddressAsync(customer.UserId, addressId);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address removed successfully." : result.Error;
             return RedirectToAction("Profile");
         }
 
         // =========================
-        // CHANGE PASSWORD PAGE
+        // CHANGE PASSWORD (PROFILE PAGE)
         // =========================
         [HttpGet]
-        public IActionResult ChangePassword()
+        public async Task<IActionResult> ChangePassword()
         {
+            await LoadCartCountAsync();
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _profileService.ChangePasswordAsync(customer.UserId, model.OldPassword, model.NewPassword);
+
+            if (!result.Success)
+            {
+                ModelState.AddModelError("OldPassword", result.Error ?? "Failed to change password.");
+                return View(model);
+            }
+
+            TempData["PasswordSuccess"] = "Password changed successfully.";
+            return RedirectToAction("Profile");
+        }
+
+        // =========================
+        // CHAT
+        // =========================
+        public async Task<IActionResult> Chat()
+        {
+            await LoadCartCountAsync();
             return View();
         }
 
         // =========================
-        // CHANGE PASSWORD
+        // NOTIFICATIONS
         // =========================
-        [HttpPost]
-        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        public async Task<IActionResult> Notifications()
         {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
+            await LoadCartCountAsync();
 
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.Email == email);
-
-            if (customer == null)
-                return NotFound();
-
-            // Verify current password
-            bool passwordCorrect = BCrypt.Net.BCrypt.Verify(
-                model.OldPassword,
-                customer.PasswordHash
-            );
-
-            if (!passwordCorrect)
-            {
-                ModelState.AddModelError(
-                    "OldPassword",
-                    "Current password is incorrect."
-                );
-
-                return View(model);
-            }
-
-            // Prevent same password
-            if (model.OldPassword == model.NewPassword)
-            {
-                ModelState.AddModelError(
-                    "NewPassword",
-                    "New password cannot be same as current password."
-                );
-
-                return View(model);
-            }
-
-            // Hash new password
-            customer.PasswordHash = BCrypt.Net.BCrypt.HashPassword(
-                model.NewPassword
-            );
-
-            await _context.SaveChangesAsync();
-
-            TempData["PasswordSuccess"] = "Password changed successfully.";
-
-            return RedirectToAction("Profile");
+            var notifications = await _notificationService.GetUserNotificationsAsync(customer.UserId);
+            return View(notifications);
         }
     }
 }

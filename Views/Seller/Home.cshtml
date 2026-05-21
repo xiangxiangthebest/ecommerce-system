@@ -224,12 +224,67 @@
         }
         else if (ViewBag.ActiveTab == "Order")
         {
-            <div class="product-header">
+            var allOrders = ViewBag.Orders as List<EcommerceSystem.Models.Order> ?? new List<EcommerceSystem.Models.Order>();
+
+            int cntAll          = allOrders.Count;
+            int cntPending      = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
+            int cntPreparing    = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
+            int cntShipped      = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
+            int cntDelivered    = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
+            int cntReceived     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
+            int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
+            int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+
+            <!-- ── Page header ── -->
+            <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
             </div>
-            @if (ViewBag.Orders != null && ((List<EcommerceSystem.Models.Order>)ViewBag.Orders).Any())
+
+            <!-- ── Status tabs ── -->
+            <div class="order-tabs" id="orderTabs">
+                <button class="order-tab active" data-status="ALL">
+                    All <span class="order-tab-badge">@cntAll</span>
+                </button>
+                <button class="order-tab" data-status="PENDING">
+                    Pending <span class="order-tab-badge">@cntPending</span>
+                </button>
+                <button class="order-tab" data-status="PREPARING">
+                    Processing <span class="order-tab-badge">@cntPreparing</span>
+                </button>
+                <button class="order-tab" data-status="SHIPPED">
+                    Shipped <span class="order-tab-badge">@cntShipped</span>
+                </button>
+                <button class="order-tab" data-status="DELIVERED">
+                    Delivered <span class="order-tab-badge">@cntDelivered</span>
+                </button>
+                <button class="order-tab" data-status="RECEIVED">
+                    Completed <span class="order-tab-badge">@cntReceived</span>
+                </button>
+                <button class="order-tab" data-status="CANCELED">
+                    Cancelled <span class="order-tab-badge">@cntCanceled</span>
+                </button>
+                <button class="order-tab" data-status="RETURN_REFUND">
+                    Return/Refund <span class="order-tab-badge">@cntReturnRefund</span>
+                </button>
+            </div>
+
+            <!-- ── Search + SKU filter bar ── -->
+            <div class="order-filter-bar">
+                <div class="order-search-wrap">
+                    <i class="fas fa-search" style="color:#9a98b6;font-size:13px"></i>
+                    <input type="text" id="orderSearch" placeholder="Search by Order ID or customer email…"
+                           oninput="applyOrderFilters()" />
+                </div>
+                <div class="order-search-wrap">
+                    <i class="fas fa-barcode" style="color:#9a98b6;font-size:13px"></i>
+                    <input type="text" id="orderSkuFilter" placeholder="Filter by product SKU…"
+                           oninput="applyOrderFilters()" />
+                </div>
+            </div>
+
+            @if (allOrders.Any())
             {
-                <table class="orders-table">
+                <table class="orders-table" id="ordersTable">
                     <thead>
                         <tr>
                             <th>Order ID</th>
@@ -243,10 +298,15 @@
                             <th>Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach (var order in (List<EcommerceSystem.Models.Order>)ViewBag.Orders)
+                    <tbody id="ordersTableBody">
+                        @foreach (var order in allOrders)
                         {
-                            <tr>
+                            var statusKey  = order.CurrentStatus.ToString().ToUpper();
+                            var skuList    = string.Join(" ", order.OrderItems.Select(oi => oi.Product?.SKU ?? "")).ToLower();
+                            var searchHint = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
+                            <tr data-status="@statusKey"
+                                data-search="@searchHint"
+                                data-sku="@skuList">
                                 <td>#@order.OrderId</td>
                                 <td>@(order.Customer?.Email ?? "—")</td>
                                 <td>@order.OrderTime.ToString("dd MMM yyyy")</td>
@@ -260,10 +320,12 @@
                                 <td style="max-width:180px;font-size:12px;color:#6b6b8a;word-break:break-word">
                                     @if (!string.IsNullOrWhiteSpace(order.ReturnReason))
                                     {
-                                        @* Strip the "||<json>" suffix so only the human-readable reason is shown *@
                                         var displayReason = order.ReturnReason;
                                         var sepIdx = displayReason.IndexOf("||");
                                         if (sepIdx >= 0) displayReason = displayReason[..sepIdx];
+                                        displayReason = displayReason.Trim();
+                                        if (displayReason.StartsWith("[") && displayReason.EndsWith("]"))
+                                            displayReason = displayReason[1..^1].Trim();
                                         @displayReason
                                     }
                                     else { <span style="color:#ccc">—</span> }
@@ -297,7 +359,6 @@
                                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                                              && !order.ReturnApprovedAt.HasValue)
                                     {
-                                        <!-- Approve Return button — opens a per-order modal to select items/qtys -->
                                         <button class="btn-update-status"
                                                 style="background:#f97316"
                                                 onclick="openApproveReturnModal(@order.OrderId)">
@@ -320,14 +381,54 @@
                         }
                     </tbody>
                 </table>
+
+                <!-- Empty state shown when filters produce no results -->
+                <div id="orderNoResults" class="empty-state-panel" style="display:none;">
+                    <i class="fas fa-search empty-icon"></i>
+                    <p>No orders match your filter.</p>
+                </div>
             }
             else
             {
-                <div class="empty-state-panel" style="text-align:center;padding:60px 20px;color:#9a98b6;">
-                    <i class="fas fa-shopping-bag" style="font-size:48px;opacity:0.4;display:block;margin-bottom:16px;"></i>
-                    <p style="font-size:15px;font-weight:500;">No orders yet.</p>
+                <div class="empty-state-panel">
+                    <i class="fas fa-shopping-bag empty-icon"></i>
+                    <p>No orders yet.</p>
                 </div>
             }
+
+            <script>
+            // ── Order tab + filter logic ──────────────────────────────────────
+            document.querySelectorAll('.order-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    applyOrderFilters();
+                });
+            });
+
+            function applyOrderFilters() {
+                const status = document.querySelector('.order-tab.active')?.dataset.status ?? 'ALL';
+                const search = (document.getElementById('orderSearch')?.value ?? '').toLowerCase().trim();
+                const sku    = (document.getElementById('orderSkuFilter')?.value ?? '').toLowerCase().trim();
+
+                let visible = 0;
+                document.querySelectorAll('#ordersTableBody tr').forEach(row => {
+                    const matchStatus = status === 'ALL' || row.dataset.status === status;
+                    const matchSearch = !search || row.dataset.search.includes(search);
+                    const matchSku    = !sku    || row.dataset.sku.includes(sku);
+                    const show = matchStatus && matchSearch && matchSku;
+                    row.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+
+                const noRes = document.getElementById('orderNoResults');
+                const table = document.getElementById('ordersTable');
+                if (noRes && table) {
+                    noRes.style.display = visible === 0 ? 'flex' : 'none';
+                    table.style.display = visible === 0 ? 'none' : '';
+                }
+            }
+            </script>
         }
         else
         {
@@ -355,6 +456,10 @@
             return (raw, new Dictionary<int, int>(), "");
 
         var reasonPart = raw[..sep];
+        // Strip legacy "[]" brackets written by the old controller format
+        reasonPart = reasonPart.Trim();
+        if (reasonPart.StartsWith("[") && reasonPart.EndsWith("]"))
+            reasonPart = reasonPart[1..^1].Trim();
         var rest       = raw[(sep + 2)..];
 
         // Extract optional return type appended as "||ReturnRefund" etc.
@@ -411,6 +516,10 @@
             var displayReturnReason = o.ReturnReason ?? "";
             var rSep = displayReturnReason.IndexOf("||");
             if (rSep >= 0) displayReturnReason = displayReturnReason[..rSep];
+            // Strip legacy "[]" brackets from old stored entries
+            displayReturnReason = displayReturnReason.Trim();
+            if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]"))
+                displayReturnReason = displayReturnReason[1..^1].Trim();
             return new {
                 orderId         = o.OrderId,
                 orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
@@ -458,7 +567,6 @@
         // Show the return type the customer chose
         const returnTypeLabel = {
             'ReturnRefund':  '📦 Return &amp; Refund — customer sends item back, receives money refund',
-            'ReturnReplace': '🔄 Return &amp; Replace — customer sends item back, gets correct one',
             'RefundOnly':    '💰 Refund Only — item not received / missing, no physical return needed'
         };
         const rtEl = document.getElementById('approveReturnTypeInfo');
