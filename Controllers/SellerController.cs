@@ -438,6 +438,39 @@ namespace EcommerceSystem.Controllers
             return result;
         }
 
+        private static string RestoreComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]") return combosJson;
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                            ?? new Dictionary<string, string>();
+                if (selected.Count == 0) return combosJson;
+
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+                    int stock = combo.TryGetProperty("stock", out var s)
+                        ? (s.ValueKind == JsonValueKind.Number ? s.GetInt32() : int.Parse(s.GetString() ?? "0"))
+                        : 0;
+
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+                    if (isMatch) stock += quantity;
+
+                    updated.Add(new { keys, stock });
+                }
+                return JsonSerializer.Serialize(updated);
+            }
+            catch { return combosJson; }
+        }
+
         [HttpPost]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -565,7 +598,7 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveReturn(int orderId,
-            List<int> approveItemIds, List<int> approveQtys)
+            List<int> approveItemIds, List<int> approveQtys, string? returnType)
         {
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
@@ -600,7 +633,13 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 
-            // Restore stock only for the approved items and quantities
+            // ── Stock restoration logic ──────────────────────────────────────
+            // ReturnRefund : customer physically sends item back → add stock back.
+            // RefundOnly   : item was never received / partially missing → stock
+            //                stays as-is (items were never returned to warehouse).
+            bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
+                                      StringComparison.OrdinalIgnoreCase);
+
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
             var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
 
@@ -609,16 +648,25 @@ namespace EcommerceSystem.Controllers
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
 
-                var product = await _context.Products.FindAsync(orderItem.ProductId);
-                if (product != null)
-                    product.StockQuantity += qty;
+                if (isReturnRefund)
+                {
+                    // Physical return: restore the approved quantity to stock
+                    var product = await _context.Products.FindAsync(orderItem.ProductId);
+                    if (product != null)
+                        product.StockQuantity += qty;
+                }
+                // RefundOnly: no stock change — items were not physically returned
             }
 
             order.ReturnApprovedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. Stock has been restored.";
+            var stockMsg = isReturnRefund
+                ? "Stock has been restored."
+                : "Stock unchanged (Refund Only — items not physically returned).";
+
+            TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
             return RedirectToAction("Home", new { tab = "Order" });
         }
     }

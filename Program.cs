@@ -1,6 +1,7 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.Models;
 using EcommerceSystem.Services;
+using EcommerceSystem.Interfaces;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,9 +20,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
-// ── Background job: auto-confirms DELIVERED orders as RECEIVED after 3 days ──
-builder.Services.AddHostedService<AutoReceiveOrdersJob>();
-
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICustomerContext, CustomerContext>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IProfileService, ProfileService>();
+builder.Services.AddScoped<IProfileImageStorage, LocalProfileImageStorage>();
+builder.Services.AddScoped<IReturnImageStorage, LocalReturnImageStorage>();
+builder.Services.AddScoped<IReviewImageStorage, LocalReviewImageStorage>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

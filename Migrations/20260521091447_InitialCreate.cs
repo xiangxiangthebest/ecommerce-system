@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ecommerce_system.Migrations
 {
     /// <inheritdoc />
-    public partial class AddReviewAndComplaint : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -109,6 +109,31 @@ namespace ecommerce_system.Migrations
                     table.PrimaryKey("PK_CustomerService", x => x.UserId);
                     table.ForeignKey(
                         name: "FK_CustomerService_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Notifications",
+                columns: table => new
+                {
+                    NotificationId = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Title = table.Column<string>(type: "TEXT", nullable: false),
+                    Message = table.Column<string>(type: "TEXT", nullable: false),
+                    IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    OrderId = table.Column<int>(type: "INTEGER", nullable: true),
+                    Type = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Notifications", x => x.NotificationId);
+                    table.ForeignKey(
+                        name: "FK_Notifications_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
@@ -232,9 +257,16 @@ namespace ecommerce_system.Migrations
                     DeliveryState = table.Column<string>(type: "TEXT", nullable: false),
                     CancelReason = table.Column<string>(type: "TEXT", nullable: true),
                     CanceledAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DeliveredAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReceivedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReturnReason = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnType = table.Column<int>(type: "INTEGER", nullable: true),
+                    ReturnImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     ReturnInitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    ReturnInitiatedBy = table.Column<int>(type: "INTEGER", nullable: true),
+                    ReturnStatus = table.Column<int>(type: "INTEGER", nullable: false),
+                    ReturnRequested = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ReturnApprovedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ComplaintText = table.Column<string>(type: "TEXT", nullable: true),
                     ComplaintSubmitted = table.Column<bool>(type: "INTEGER", nullable: false),
                     ComplaintAt = table.Column<DateTime>(type: "TEXT", nullable: true)
@@ -331,6 +363,7 @@ namespace ecommerce_system.Migrations
                     CustomerId = table.Column<int>(type: "INTEGER", nullable: false),
                     Rating = table.Column<int>(type: "INTEGER", nullable: false),
                     ReviewText = table.Column<string>(type: "TEXT", nullable: false),
+                    ReviewImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -363,6 +396,11 @@ namespace ecommerce_system.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_DeliveryField_UserId",
                 table: "DeliveryField",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Notifications_UserId",
+                table: "Notifications",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
@@ -422,6 +460,9 @@ namespace ecommerce_system.Migrations
 
             migrationBuilder.DropTable(
                 name: "CustomerService");
+
+            migrationBuilder.DropTable(
+                name: "Notifications");
 
             migrationBuilder.DropTable(
                 name: "Review");

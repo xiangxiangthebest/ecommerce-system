@@ -130,6 +130,43 @@ namespace ecommerce_system.Migrations
                     b.ToTable("DeliveryField", (string)null);
                 });
 
+            modelBuilder.Entity("EcommerceSystem.Models.Notification", b =>
+                {
+                    b.Property<int>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Property<int>("OrderId")
@@ -207,14 +244,26 @@ namespace ecommerce_system.Migrations
                     b.Property<DateTime?>("ReturnApprovedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ReturnImagePathsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ReturnInitiatedAt")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("ReturnInitiatedBy")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReturnReason")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ReturnType")
-                        .HasColumnType("TEXT");
+                    b.Property<bool>("ReturnRequested")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ReturnStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ReturnType")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SellerUserId")
                         .HasColumnType("INTEGER");
@@ -351,6 +400,9 @@ namespace ecommerce_system.Migrations
                     b.Property<int>("Rating")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ReviewImagePathsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ReviewText")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -403,66 +455,6 @@ namespace ecommerce_system.Migrations
                     b.ToTable("Users", (string)null);
 
                     b.UseTptMappingStrategy();
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Wallet", b =>
-                {
-                    b.Property<int>("WalletId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("Balance")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("WalletId");
-
-                    b.ToTable("Wallet", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.WalletTransaction", b =>
-                {
-                    b.Property<int>("WalletTransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("BalanceAfter")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("RelatedOrderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("WalletId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("WalletTransactionId");
-
-                    b.HasIndex("WalletId");
-
-                    b.ToTable("WalletTransaction", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
@@ -571,6 +563,17 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("EcommerceSystem.Models.Notification", b =>
+                {
+                    b.HasOne("EcommerceSystem.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.DeliveryField", "Address")
@@ -654,17 +657,6 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.WalletTransaction", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Wallet", "Wallet")
-                        .WithMany("Transactions")
-                        .HasForeignKey("WalletId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Wallet");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.Admin", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.User", null)
@@ -714,11 +706,6 @@ namespace ecommerce_system.Migrations
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
                 {
                     b.Navigation("OrderItems");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.Wallet", b =>
-                {
-                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Customer", b =>

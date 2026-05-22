@@ -356,21 +356,6 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
-        // SUBMIT COMPLAINT (PURCHASE HISTORY PAGE)
-        // For RECEIVED or RETURN_REFUND orders
-        // =========================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitComplaint(int orderId, string complaintText)
-        {
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
-
-            var result = await _orderService.SubmitComplaintAsync(customer.UserId, orderId, complaintText);
-            return Json(new { success = result.Success, message = result.Error });
-        }
-
-        // =========================
         // PROFILE PAGE
         // =========================
         public async Task<IActionResult> Profile()
