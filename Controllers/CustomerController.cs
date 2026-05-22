@@ -1,14 +1,12 @@
 using System.Security.Claims;
-using EcommerceSystem.DTOs;
-using EcommerceSystem.Interfaces;
+using EcommerceSystem.Enums;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
-using EcommerceSystem.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using EcommerceSystem.Enums;
+using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
@@ -255,7 +253,6 @@ namespace EcommerceSystem.Controllers
 
         private Dictionary<string, string> ExtractSellerMessagesFromForm(IFormCollection form)
         {
-            // Keeps controller responsibility: HTTP form parsing
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var key in form.Keys)
@@ -285,6 +282,7 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // CANCEL ORDER (PURCHASE HISTORY PAGE)
+        // Only allowed from PENDING — restores stock for each item
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -298,7 +296,38 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
+        // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
+        // Allowed from DELIVERED — supports item selection, quantities, and images
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            List<string> imagePaths = new();
+
+            if (images != null && images.Count > 4)
+                return Json(new { success = false, message = "Maximum 4 images allowed." });
+
+            if (images != null && images.Any())
+                imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
+
+            var result = await _orderService.RequestReturnRefundAsync(
+                customer.UserId,
+                orderId,
+                reason,
+                imagePaths,
+                ReturnInitiatedBy.Customer
+            );
+
+            return Json(new { success = result.Success, message = result.Error });
+        }
+
+        // =========================
         // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
+        // Moves DELIVERED → RECEIVED
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -313,6 +342,7 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // SUBMIT RATING (PURCHASE HISTORY PAGE)
+        // Only for RECEIVED orders — supports review images
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -326,56 +356,12 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
-        // RETURN/REFUND (PURCHASE HISTORY PAGE)
-        // =========================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
-        {
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-
-            if (customer == null)
-                return Unauthorized();
-
-            List<string> imagePaths = new();
-
-            if (images != null && images.Count > 4)
-            {
-                return Json(new
-                {
-                    success = false,
-                    message = "Maximum 4 images allowed."
-                });
-            }
-
-            if (images != null && images.Any())
-            {
-                imagePaths = await _returnImageStorage
-                    .SaveReturnImagesAsync(images);
-            }
-
-            var result = await _orderService.RequestReturnRefundAsync(
-                customer.UserId,
-                orderId,
-                reason,
-                imagePaths,
-                ReturnInitiatedBy.Customer
-            );
-
-            return Json(new
-            {
-                success = result.Success,
-                message = result.Error
-            });
-        }
-
-        // =========================
-        // PROFILE
+        // PROFILE PAGE
         // =========================
         public async Task<IActionResult> Profile()
         {
             await LoadCartCountAsync();
-            
+
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
@@ -495,7 +481,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         // CHAT
         // =========================
-        public async Task<IActionResult> Chat() 
+        public async Task<IActionResult> Chat()
         {
             await LoadCartCountAsync();
             return View();
@@ -509,13 +495,9 @@ namespace EcommerceSystem.Controllers
             await LoadCartCountAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return Unauthorized();
-
-            var notifications =
-                await _notificationService.GetUserNotificationsAsync(customer.UserId);
-
+            var notifications = await _notificationService.GetUserNotificationsAsync(customer.UserId);
             return View(notifications);
         }
     }

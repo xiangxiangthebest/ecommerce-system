@@ -18,6 +18,59 @@ namespace EcommerceSystem.Services
             _notificationService = notificationService;
         }
 
+        // ── Deducts stock from the matching combo inside VariationCombosJson ──
+        // selectedVariationsJson example: {"Flavour":"Honey(60g)"}
+        // combosJson example: [{"keys":["Honey(60g)"],"stock":250}]
+        private static string DeductComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
+                return combosJson;
+
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                               ?? new Dictionary<string, string>();
+
+                if (selected.Count == 0) return combosJson;
+
+                // Collect all selected variation values, e.g. ["Honey(60g)"]
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+
+                    int stock = 0;
+                    if (combo.TryGetProperty("stock", out var s))
+                    {
+                        stock = s.ValueKind == JsonValueKind.Number
+                            ? (s.TryGetInt32(out var si) ? si : (int)s.GetDouble())
+                            : int.TryParse(s.GetString(), out var sp) ? sp : 0;
+                    }
+
+                    // Match: every key in this combo must appear in the selected values
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+
+                    if (isMatch)
+                        stock = Math.Max(0, stock - quantity);
+
+                    updated.Add(new { keys, stock });
+                }
+
+                return JsonSerializer.Serialize(updated);
+            }
+            catch
+            {
+                return combosJson;
+            }
+        }
+
         public async Task<OperationResult> PlaceOrderAsync(PlaceOrderRequest request)
         {
             var address = await _context.DeliveryField
@@ -118,10 +171,23 @@ namespace EcommerceSystem.Services
 
                         _context.OrderItems.Add(orderItem);
 
-                        // stock decrement
+                        // Deduct from total stock quantity
                         item.Product!.StockQuantity -= item.Quantity;
 
-                        // remove from cart if from cart
+                        // ── Also deduct from the matching combo's stock in VariationCombosJson ──
+                        var selectedVars = item.SelectedVariations ?? "{}";
+                        if (!string.IsNullOrWhiteSpace(item.Product.VariationCombosJson)
+                            && item.Product.VariationCombosJson != "[]"
+                            && selectedVars != "{}")
+                        {
+                            item.Product.VariationCombosJson = DeductComboStock(
+                                item.Product.VariationCombosJson,
+                                selectedVars,
+                                item.Quantity
+                            );
+                        }
+
+                        // Remove from cart if purchased from cart
                         if (request.Source != "product" && item.CartItemId != 0)
                             _context.CartItem.Remove(item);
                     }

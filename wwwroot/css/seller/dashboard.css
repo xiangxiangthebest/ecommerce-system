@@ -630,3 +630,103 @@
     transition: background 0.2s;
 }
 .btn-update-status:hover { background: #283593; }
+/* ═══════════════════════════════════════════════════════
+   ORDER STATUS TABS
+═══════════════════════════════════════════════════════ */
+.order-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-bottom: 2px solid #e8eaf6;
+    margin-bottom: 0;
+}
+
+.order-tab {
+    background: none;
+    border: none;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #9a98b6;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Syne', sans-serif;
+    white-space: nowrap;
+}
+
+.order-tab:hover { color: #1e1b4b; }
+
+.order-tab.active { color: #1e1b4b; }
+
+.order-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0; right: 0;
+    height: 2px;
+    background: #1e1b4b;
+    border-radius: 2px 2px 0 0;
+}
+
+.order-tab-badge {
+    background: #e8eaf6;
+    color: #5b587d;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.order-tab.active .order-tab-badge {
+    background: #1e1b4b;
+    color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════
+   ORDER FILTER / SEARCH BAR
+═══════════════════════════════════════════════════════ */
+.order-filter-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 0 16px;
+    flex-wrap: wrap;
+}
+
+.order-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1.5px solid #e8eaf6;
+    border-radius: 10px;
+    padding: 8px 14px;
+    min-width: 260px;
+    flex: 1;
+    transition: border-color 0.18s;
+}
+
+.order-search-wrap:focus-within {
+    border-color: #1e1b4b;
+}
+
+.order-search-wrap input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+    color: #1e1b4b;
+    width: 100%;
+    font-family: 'Syne', sans-serif;
+}
+
+.order-search-wrap input::placeholder { color: #b0aec8; }
+
+/* status badges for new statuses */
+.status-preparing    { background: #e3f2fd; color: #1565c0; }
+.status-received     { background: #e8f5e9; color: #2e7d32; }
+.status-return_refund{ background: #ffebee; color: #c62828; }

@@ -1478,6 +1478,173 @@
 .spin { display: inline-block; animation: spin 0.8s linear infinite; }
 
 /* ═══════════════════════════════════════════════════════════
+   RETURN MODAL – COMBINED (item select, type btns, reason chips)
+═══════════════════════════════════════════════════════════ */
+
+/* Item list */
+.rtn-item-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rtn-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1.5px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    background: #fafaf8;
+    transition: border-color var(--transition), background var(--transition);
+}
+.rtn-item-row:hover { border-color: rgba(200,75,47,0.25); background: #fff; }
+
+.rtn-item-row-disabled {
+    opacity: 0.45;
+}
+
+.rtn-item-check-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+}
+
+.rtn-item-checkbox {
+    width: 16px; height: 16px;
+    cursor: pointer;
+    accent-color: #c84b2f;
+    flex-shrink: 0;
+}
+
+.rtn-item-img {
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid rgba(0,0,0,0.07);
+    flex-shrink: 0;
+}
+
+.rtn-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.rtn-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ph-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rtn-item-ordered {
+    font-size: 11.5px;
+    color: var(--ph-muted);
+}
+
+.rtn-item-qty-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+}
+
+.rtn-item-qty-label {
+    font-size: 11.5px;
+    color: var(--ph-muted);
+    white-space: nowrap;
+}
+
+.rtn-qty-input {
+    width: 52px;
+    padding: 5px 8px;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--ph-text);
+    background: #fff;
+    outline: none;
+    text-align: center;
+    transition: border-color var(--transition);
+}
+.rtn-qty-input:focus { border-color: #c84b2f; }
+.rtn-qty-input:disabled { background: #f0f0f0; color: #bbb; }
+
+/* Return type buttons */
+.rtn-type-row {
+    display: flex;
+    gap: 10px;
+}
+
+.rtn-type-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 11px 14px;
+    border: 1.5px solid rgba(0,0,0,0.1);
+    border-radius: 11px;
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ph-muted);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+.rtn-type-btn i { font-size: 15px; }
+.rtn-type-btn:hover {
+    border-color: rgba(200,75,47,0.35);
+    color: #c84b2f;
+    background: rgba(200,75,47,0.04);
+}
+.rtn-type-btn.active {
+    border-color: #c84b2f;
+    background: #c84b2f;
+    color: #fff;
+}
+
+/* Reason chips (orange theme) */
+.rtn-reason-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 8px;
+}
+
+.rtn-reason-chip {
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1.5px solid rgba(0,0,0,0.09);
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12.5px;
+    color: var(--ph-muted);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+.rtn-reason-chip:hover {
+    border-color: rgba(200,75,47,0.3);
+    color: #c84b2f;
+    background: rgba(200,75,47,0.04);
+}
+.rtn-reason-chip.selected {
+    border-color: #c84b2f;
+    background: #c84b2f;
+    color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════════════════ */
 @media (max-width: 860px) {
