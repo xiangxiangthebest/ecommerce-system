@@ -10,6 +10,8 @@ public class Review
     public int CustomerId { get; set; }
     public int Rating { get; set; }   // 1–5
     public string ReviewText { get; set; } = "";
+
     public string? ReviewImagePathsJson { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

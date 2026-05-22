@@ -257,13 +257,16 @@ namespace ecommerce_system.Migrations
                     DeliveryState = table.Column<string>(type: "TEXT", nullable: false),
                     CancelReason = table.Column<string>(type: "TEXT", nullable: true),
                     CanceledAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DeliveredAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReceivedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReturnReason = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnType = table.Column<int>(type: "INTEGER", nullable: true),
                     ReturnImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     ReturnInitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReturnInitiatedBy = table.Column<string>(type: "TEXT", nullable: true),
                     ReturnStatus = table.Column<string>(type: "TEXT", nullable: false),
-                    ReturnRequested = table.Column<bool>(type: "INTEGER", nullable: false)
+                    ReturnRequested = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ReturnApprovedAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
