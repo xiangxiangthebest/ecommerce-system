@@ -51,11 +51,6 @@ public class Order : OrderStatusSubject
     /// <summary>Set when seller approves the return/refund request — triggers stock restoration.</summary>
     public DateTime? ReturnApprovedAt { get; set; }
 
-    // ── Complaint ────────────────────────────────────────────────────────────
-    public string? ComplaintText { get; set; }
-    public bool ComplaintSubmitted { get; set; } = false;
-    public DateTime? ComplaintAt { get; set; }
-
     // ── Review flag (not persisted) ─────────────────────────────────────────
     [NotMapped]
     public bool ReviewSubmitted { get; set; }

@@ -26,7 +26,8 @@
             </div>
         }
 
-        <form method="post" class="auth-form">
+        <form asp-controller="Auth" asp-action="Login" method="post" class="auth-form">
+            @Html.AntiForgeryToken()
 
             <input type="hidden" name="role" value="@role" />
 

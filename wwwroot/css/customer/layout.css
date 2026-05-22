@@ -2,6 +2,10 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap');
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
 
+html {
+    overflow-y: scroll;
+}
+
 /* ─── Reset & Base ───────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -9,8 +13,6 @@
 
 body {
   font-family: 'DM Sans', sans-serif;
-  margin-bottom: 60px;
-  padding-bottom: 60px;
 }
 
 /* ─── Navbar Shell ───────────────────────────────────── */

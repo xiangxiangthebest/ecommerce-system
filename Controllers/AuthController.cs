@@ -13,183 +13,113 @@ namespace EcommerceSystem.Controllers
 {
     public class AuthController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IUserService _userService;
 
-        public AuthController(AppDbContext context)
+        public AuthController(IUserService userService)
         {
-            _context = context;
+            _userService = userService;
         }
 
         [HttpGet]
         public IActionResult Login(string role)
         {
             ViewBag.Role = role;
-
             return View();
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDto dto, string role)
         {
-            ViewBag.Role = role;
-
-            // check user
-            var user = await _context.Users
-                .FirstOrDefaultAsync(x => x.Email == dto.Email);
-
+            var user = await _userService.LoginAsync(dto, role);
+            
             if (user == null)
             {
-                ViewBag.Error = "Account does not exist";
-                return View();
-            }
-
-            if (!user.IsActive)
-            {
-                ViewBag.Error = "This account has been deactivated. Please contact the administrator.";
-                return View();
-            }
-
-            if (user.Role != role)
-            {
-                ViewBag.Error = $"This account is not a {role}";
-                return View();
-            }
-
-            bool valid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-
-            if (!valid)
-            {
-                ViewBag.Error = "Invalid password";
-                return View();
+                ViewBag.Role = role;
+                ViewBag.Error = "Invalid credentials";
+                return View(dto);
             }
 
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, user.FullName ?? user.Email),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
             };
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-
             var principal = new ClaimsPrincipal(identity);
 
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                principal);
 
-            return user.Role switch
-            {
-                "Admin" => RedirectToAction("Home", "Admin"),
-                "Customer" => RedirectToAction("Home", "Customer"),
-                "Seller" => RedirectToAction("Home", "Seller"),
-                "CustomerService" => RedirectToAction("Home", "CustomerService"),
-                _ => RedirectToAction("Index", "Home")
-            };
+            if (user.Role == "Customer")
+                return RedirectToAction("Home", "Customer");
+
+            if (user.Role == "Seller")
+                return RedirectToAction("Home", "Seller");
+
+            if (user.Role == "CustomerService")
+                return RedirectToAction("Home", "CustomerService");
+
+            if (user.Role == "Admin")
+                return RedirectToAction("Home", "Admin");
+
+            return RedirectToAction("Index", "Home");
         }
 
         [HttpGet]
         public IActionResult RegisterCustomer()
         {
+            ViewBag.Role = "Customer";
             return View();
         }
 
         [HttpPost]
-        public async Task<IActionResult> RegisterCustomer(RegisterCustomerDto dto)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterCustomer(RegisterCustomerDto model)
         {
             if (!ModelState.IsValid)
             {
-                return View(dto);
+                ViewBag.Role = "Customer";
+                return View(model);
             }
 
-            bool emailExists = await _context.Users
-                .AnyAsync(x => x.Email == dto.Email);
+            await _userService.RegisterCustomerAsync(model);
 
-            if (emailExists)
-            {
-                ModelState.AddModelError("Email", "Email already exists");
-                return View(dto);
-            }
-
-            UserCreator creator = new CustomerCreator(dto);
-
-            var user = creator.CreateUser();
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-                
             return RedirectToAction("Login", new { role = "Customer" });
         }
 
         [HttpGet]
         public IActionResult RegisterSeller()
         {
+            ViewBag.Role = "Seller";
             return View();
         }
 
         [HttpPost]
-        public async Task<IActionResult> RegisterSeller(RegisterSellerDto dto)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterSeller(RegisterSellerDto model)
         {
             if (!ModelState.IsValid)
             {
-                ViewBag.Error = ModelState.Values
-                    .SelectMany(v => v.Errors)
-                    .FirstOrDefault()?.ErrorMessage;
-                return View(dto);
+                ViewBag.Role = "Seller";
+                return View(model);
             }
 
-            if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
-            {
-                ViewBag.Error = "Email already linked to an account. <br />Please try another email.";
-                return View(dto);
-            }
-
-            if (await _context.Seller.AnyAsync(x => x.ShopName == dto.ShopName))
-
-            {
-                ViewBag.Error = "This Shop Name is already taken. <br />Please try another name.";
-                return View(dto);
-            }
-
-            if (await _context.Seller.AnyAsync(x => x.PhoneNumber == dto.PhoneNumber))
-
-            {
-                ViewBag.Error = "This Phone Number is already linked to an account. <br />Please try another phone number.";
-                return View(dto);
-            }
-
-            if (dto.Password != dto.ConfirmPassword)
-            {
-                ViewBag.Error = "Passwords do not match";
-                return View(dto);
-            }
-
-            UserCreator creator = new SellerCreator(dto);
-            var user = creator.CreateUser();
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userService.RegisterSellerAsync(model);
 
             return RedirectToAction("Login", new { role = "Seller" });
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateCustomerService(RegisterCustomerServiceDto dto)
-        {
-            UserCreator creator = new CustomerServiceCreator(dto);
-
-            var user = creator.CreateUser();
-
-            _context.Users.Add(user);
-
-            await _context.SaveChangesAsync();
-
-            return RedirectToAction("Index");
-        }
-
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
             return RedirectToAction("Index", "Home");
-            
         }
     }
 }

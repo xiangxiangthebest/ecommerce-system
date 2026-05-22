@@ -6,9 +6,8 @@
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
 
 @{
-    var reviews = ViewBag.Reviews as List<EcommerceSystem.Models.Review>
-              ?? new List<EcommerceSystem.Models.Review>();
-    var images = ViewBag.Images as List<string> ?? new List<string>();
+    var reviews    = ViewBag.Reviews as List<EcommerceSystem.Models.Review> ?? new List<EcommerceSystem.Models.Review>();
+    var images     = ViewBag.Images as List<string> ?? new List<string>();
     var variations = ViewBag.Variations as List<VariationGroupDto> ?? new List<VariationGroupDto>();
     var firstImage = images.Count > 0 ? images[0] : Model.ImagePath;
     var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
@@ -23,9 +22,9 @@
 
     string stockClass, stockLabel;
     if (!hasVariations) {
-        if (Model.StockQuantity <= 0) { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
-        else if (Model.StockQuantity <= 5) { stockClass = "low-stock"; stockLabel = "Low Stock"; }
-        else { stockClass = "in-stock"; stockLabel = "In Stock"; }
+        if (Model.StockQuantity <= 0)      { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
+        else if (Model.StockQuantity <= 5) { stockClass = "low-stock";    stockLabel = "Low Stock"; }
+        else                               { stockClass = "in-stock";      stockLabel = "In Stock"; }
     } else {
         stockClass = "select-options"; stockLabel = "Select Options";
     }
@@ -33,12 +32,33 @@
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
 
-    // Used as initial max before an option is fully selected
     int totalVariationStock = hasVariations ? combos.Sum(c => c.Stock) : Model.StockQuantity;
 
-    // Used by JS to build { GroupName: SelectedLabel }
     var variationGroupNamesJson = JsonSerializer.Serialize(variations.Select(v => v.Name).ToList());
+
+    var breakdown = Enumerable.Range(1, 5).OrderByDescending(s => s).ToDictionary(
+        s => s,
+        s => reviews.Count(r => r.Rating == s)
+    );
+    int totalReviews = reviews.Count;
 }
+
+
+@functions {
+    List<string> ParseReviewImages(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "[]") return new List<string>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+}
+
 
 @if (TempData["CartSuccess"] != null)
 {
@@ -82,6 +102,7 @@
 
             <h1 class="pd-name">@Model.Name</h1>
 
+            <!-- Rating row — stars + score + review trigger inline -->
             <div class="pd-rating-row">
                 <div class="pd-stars">
                     @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
@@ -89,7 +110,18 @@
                 </div>
                 <span class="pd-rating-text">@Model.AverageRating.ToString("0.0")</span>
                 <div class="pd-rating-sep"></div>
-                <span class="pd-rating-text">@Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")</span>
+                <button class="pd-review-trigger"
+                        id="reviewTriggerBtn"
+                        type="button"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        @(totalReviews == 0 ? "disabled" : "")>
+                    @Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")
+                    @if (totalReviews > 0)
+                    {
+                        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+                    }
+                </button>
             </div>
 
             <div class="pd-divider"></div>
@@ -124,9 +156,7 @@
                     {
                         var group = variations[gi];
                         <div class="pd-variation-group" data-group-index="@gi">
-                            <!-- IMPORTANT: No “selected label” appended here -->
                             <div class="pd-variation-label">@group.Name</div>
-
                             <div class="pd-variation-options">
                                 @foreach (var val in group.Values)
                                 {
@@ -155,7 +185,6 @@
                         </div>
                     }
                 </div>
-
                 <div id="pdVariationStockNote" class="pd-stock-variation-note" style="display:none;"></div>
             }
 
@@ -167,7 +196,6 @@
                            min="1" max="@totalVariationStock" value="1" readonly />
                     <button id="pdQtyPlus" class="pd-qty-btn" type="button">+</button>
                 </div>
-
                 @if (!hasVariations && Model.StockQuantity > 0)
                 {
                     <span class="pd-stock-note">@Model.StockQuantity left</span>
@@ -179,16 +207,14 @@
                       asp-action="AddToCart"
                       method="post"
                       onsubmit="return validateVariationsBeforeSubmit();">
-                      @Html.AntiForgeryToken()
-
-                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId"        value="@Model.ProductId" />
                     <input type="hidden" id="selectedVariations" name="selectedVariations" value="{}" />
-                    <input type="hidden" id="cartQuantity" name="quantity" value="1" />
-
+                    <input type="hidden" id="cartQuantity"       name="quantity" value="1" />
                     <button id="pdBtnCart"
                             type="submit"
                             class="pd-btn-cart"
-                            @( (!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : "") )>
+                            @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
                         @if (!hasVariations && Model.StockQuantity <= 0)
                         {
                             <i class="ti ti-shopping-cart-off"></i> <text>Out of Stock</text>
@@ -201,15 +227,13 @@
                 </form>
 
                 <form asp-controller="Customer"
-                    asp-action="BuyNow"
-                    method="post"
-                    onsubmit="return prepareBuyNow();">
+                      asp-action="BuyNow"
+                      method="post"
+                      onsubmit="return prepareBuyNow();">
                     @Html.AntiForgeryToken()
-
-                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <input type="hidden" name="productId"              value="@Model.ProductId" />
                     <input type="hidden" id="buyNowSelectedVariations" name="selectedVariations" value="{}" />
-                    <input type="hidden" id="buyNowQuantity" name="quantity" value="1" />
-
+                    <input type="hidden" id="buyNowQuantity"           name="quantity" value="1" />
                     <button id="pdBtnBuy"
                             type="submit"
                             class="pd-btn-buy"
@@ -234,297 +258,378 @@
                 </div>
             </div>
 
-            @if (reviews.Any())
-            {
-                <div class="pd-review-section">
-                    <h3 class="pd-review-title">Customer Reviews</h3>
+        </div><!-- /.pd-info -->
+    </div><!-- /.pd-layout -->
+</div><!-- /.pd-page -->
 
-                    @foreach (var r in reviews)
-                    {
-                        var full = r.Rating;
-                        var empty = 5 - full;
+<!-- ═══════════════════════════════════════════
+     REVIEWS MODAL — centred pop-out window
+     ═══════════════════════════════════════════ -->
+@if (totalReviews > 0)
+{
+    <div class="rv-overlay" id="rvBackdrop" role="dialog" aria-modal="true" aria-label="Customer reviews" hidden>
+        <div class="rv-modal" id="rvPanel">
 
-                        <div class="pd-review-card">
-                            
-                            <!-- Stars -->
-                            <div class="pd-review-stars">
-                                @for (int i = 0; i < full; i++) { <span>★</span>; }
-                                @for (int i = 0; i < empty; i++) { <span class="empty">★</span>; }
-                            </div>
+            <!-- Header -->
+            <div class="rv-header">
+                <div class="rv-header-top">
+                    <p class="rv-title">Customer reviews</p>
+                    <button class="rv-close" id="rvCloseBtn" aria-label="Close reviews" type="button">
+                        <i class="ti ti-x" aria-hidden="true"></i>
+                    </button>
+                </div>
 
-                            <!-- Text -->
-                            @if (!string.IsNullOrWhiteSpace(r.ReviewText))
-                            {
-                                <div class="pd-review-text">@r.ReviewText</div>
-                            }
-                            else
-                            {
-                                <div class="pd-review-text muted">No comment provided</div>
-                            }
-
-                            <!-- Date -->
-                            <div class="pd-review-date">
-                                @r.CreatedAt.ToString("dd MMM yyyy")
-                            </div>
-
+                <!-- Score + bar chart -->
+                <div class="rv-summary">
+                    <div class="rv-big-score">
+                        <span class="rv-score-num">@Model.AverageRating.ToString("0.0")</span>
+                        <div class="rv-score-stars" aria-label="@fullStars out of 5 stars">
+                            @for (int s = 0; s < fullStars;  s++) { <span>★</span> }
+                            @for (int s = 0; s < emptyStars; s++) { <span class="empty">★</span> }
                         </div>
-                    }
+                        <span class="rv-score-label">@totalReviews review@(totalReviews == 1 ? "" : "s")</span>
+                    </div>
+                    <div class="rv-bars" aria-label="Rating breakdown">
+                        @foreach (var kv in breakdown)
+                        {
+                            double pct = totalReviews > 0 ? Math.Round((double)kv.Value / totalReviews * 100) : 0;
+                            <div class="rv-bar-row">
+                                <span class="rv-bar-num">@kv.Key</span>
+                                <div class="rv-bar-track">
+                                    <div class="rv-bar-fill" style="width:@pct%"></div>
+                                </div>
+                                <span class="rv-bar-pct">@((int)pct)%</span>
+                            </div>
+                        }
+                    </div>
                 </div>
-            }
-            else
-            {
-                <div class="pd-review-empty">
-                    No reviews yet.
+            </div>
+
+            <!-- Filter chips -->
+            <div class="rv-filters" role="group" aria-label="Filter by star rating">
+                <button class="rv-chip active" data-filter="all" type="button">All</button>
+                @foreach (var kv in breakdown.Where(k => k.Value > 0))
+                {
+                    <button class="rv-chip" data-filter="@kv.Key" type="button">
+                        @kv.Key ★ <span class="rv-chip-count">@kv.Value</span>
+                    </button>
+                }
+            </div>
+
+            <!-- Review list -->
+            <div class="rv-body" id="rvBody">
+                @foreach (var r in reviews)
+                {
+                    <div class="rv-card" data-rating="@r.Rating">
+
+                        <div class="rv-card-author">
+                            <div class="rv-avatar">@(r.OrderItem?.Order?.Customer?.FullName?.Substring(0,1).ToUpper() ?? "C")</div>
+                            <div class="rv-author-info">
+                                <span class="rv-author-name">@(r.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
+                                <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
+                            </div>
+                        </div>
+
+                        <div class="rv-card-stars" aria-label="@r.Rating out of 5 stars">
+                            @for (int i = 0; i < r.Rating; i++) { <span>★</span> }
+                            @for (int i = 0; i < (5 - r.Rating); i++) { <span class="empty">★</span> }
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(r.ReviewText))
+                        {
+                            <p class="rv-card-text">@r.ReviewText</p>
+                        }
+                        else
+                        {
+                            <p class="rv-card-text muted">No comment left.</p>
+                        }
+
+                        @{
+                            var reviewImgs = ParseReviewImages(r.ReviewImagePathsJson);
+                        }
+
+                        @if (reviewImgs.Any())
+                        {
+                            <div class="rv-photos">
+                                @foreach (var img in reviewImgs.Take(4))
+                                {
+                                    <div class="rv-photo-thumb"
+                                        onclick="rvOpenLightbox('@img')"
+                                        title="View image">
+                                        <img src="@img"
+                                            alt="Review photo"
+                                            onerror="this.style.display='none'" />
+                                        <div class="rv-photo-overlay">
+                                            <i class="ti ti-zoom-in"></i>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="rv-empty" id="rvEmpty" style="display:none;">
+                    <i class="ti ti-message-off" aria-hidden="true"></i>
+                    No reviews for this rating.
                 </div>
-            }
+            </div>
 
         </div>
     </div>
+}
+
+<!-- Review image lightbox -->
+<div id="rvLightbox" class="rv-lightbox" onclick="rvCloseLightbox()" hidden>
+    <button class="rv-lightbox-close" onclick="rvCloseLightbox(); event.stopPropagation();">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="rvLightboxImg" src="" alt="Review image" onclick="event.stopPropagation()" />
 </div>
+
 
 <script>
 (function () {
-    // ---------- Helpers ----------
-    function qs(sel, root = document) { return root.querySelector(sel); }
-    function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+    function qs(sel, root) { return (root || document).querySelector(sel); }
+    function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
-    function showToast(message, type = "success") {
-        const toast = document.createElement("div");
-        toast.className = `floating-alert ${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add("hide");
-            setTimeout(() => toast.remove(), 500);
-        }, 3000);
+    /* ── Toast ── */
+    function showToast(msg, type) {
+        var t = document.createElement("div");
+        t.className = "floating-alert" + (type === "error" ? " error" : "");
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function () { t.classList.add("hide"); setTimeout(function () { t.remove(); }, 500); }, 3000);
     }
 
-    // Auto-hide server success alert
+    /* ── Auto-hide server alert ── */
     document.addEventListener("DOMContentLoaded", function () {
-        const alertBox = qs("#floatingAlert");
-        if (!alertBox) return;
-        setTimeout(() => {
-            alertBox.classList.add("hide");
-            setTimeout(() => alertBox.remove(), 500);
-        }, 3000);
+        var a = qs("#floatingAlert");
+        if (!a) return;
+        setTimeout(function () { a.classList.add("hide"); setTimeout(function () { a.remove(); }, 500); }, 3000);
     });
 
-    // ---------- Gallery ----------
-    qsa(".pd-thumb").forEach(thumb => {
-        thumb.addEventListener("click", () => {
-            const src = thumb.getAttribute("data-src");
-            qs("#pdMainImg").src = src;
-            qsa(".pd-thumb").forEach(t => t.classList.remove("active"));
+    /* ── Gallery ── */
+    qsa(".pd-thumb").forEach(function (thumb) {
+        thumb.addEventListener("click", function () {
+            qs("#pdMainImg").src = thumb.getAttribute("data-src");
+            qsa(".pd-thumb").forEach(function (t) { t.classList.remove("active"); });
             thumb.classList.add("active");
         });
     });
 
-    // ---------- Quantity ----------
-    const qtyInput = qs("#pdQty");
-    const qtyHidden = qs("#cartQuantity");
-    const btnMinus = qs("#pdQtyMinus");
-    const btnPlus = qs("#pdQtyPlus");
+    /* ── Quantity ── */
+    var qtyInput  = qs("#pdQty");
+    var qtyHidden = qs("#cartQuantity");
+    var btnMinus  = qs("#pdQtyMinus");
+    var btnPlus   = qs("#pdQtyPlus");
 
-    function clampQty(value) {
-        const min = 1;
-        const max = Math.max(1, parseInt(qtyInput.max || "1", 10));
-        return Math.min(max, Math.max(min, value));
+    function clampQty(v) {
+        return Math.min(Math.max(1, v), Math.max(1, parseInt(qtyInput.max || "1", 10)));
     }
-
-    function setQty(value) {
-        const v = clampQty(value);
-        qtyInput.value = v;
-        qtyHidden.value = v;
+    function setQty(v) {
+        var c = clampQty(v);
+        qtyInput.value = c;
+        if (qtyHidden) qtyHidden.value = c;
     }
+    if (btnMinus) btnMinus.addEventListener("click", function () { setQty(parseInt(qtyInput.value || "1", 10) - 1); });
+    if (btnPlus)  btnPlus.addEventListener("click",  function () { setQty(parseInt(qtyInput.value || "1", 10) + 1); });
 
-    btnMinus?.addEventListener("click", () => setQty(parseInt(qtyInput.value || "1", 10) - 1));
-    btnPlus ?.addEventListener("click", () => setQty(parseInt(qtyInput.value || "1", 10) + 1));
+    /* ── Variations ── */
+    var allCombos   = @Html.Raw(Model.VariationCombosJson ?? "[]");
+    var groupNames  = @Html.Raw(variationGroupNamesJson);
+    var totalGroups = groupNames.length;
+    var selectedKeys = new Array(totalGroups).fill(null);
 
-    // ---------- Variations / Stock ----------
-    const allCombos = @Html.Raw(Model.VariationCombosJson ?? "[]");
-    const groupNames = @Html.Raw(variationGroupNamesJson);
-    const totalGroups = groupNames.length;
-
-    const selectedKeys = new Array(totalGroups).fill(null);
-
-    const badge = qs("#pdStockBadge");
-    const stockNote = qs("#pdVariationStockNote");
-    const btnCart = qs("#pdBtnCart");
-    const btnBuy = qs("#pdBtnBuy");
-    const hiddenSelected = qs("#selectedVariations");
+    var badge     = qs("#pdStockBadge");
+    var stockNote = qs("#pdVariationStockNote");
+    var btnCart   = qs("#pdBtnCart");
+    var btnBuy    = qs("#pdBtnBuy");
+    var hiddenSel = qs("#selectedVariations");
 
     function setBadge(state, text) {
         badge.className = "pd-badge " + state;
         badge.textContent = text;
     }
-
     function updateHiddenSelected() {
-        const obj = {};
-        for (let i = 0; i < totalGroups; i++) {
+        var obj = {};
+        for (var i = 0; i < totalGroups; i++) {
             if (selectedKeys[i] !== null) obj[groupNames[i]] = selectedKeys[i];
         }
-        hiddenSelected.value = JSON.stringify(obj);
+        hiddenSel.value = JSON.stringify(obj);
     }
-
     function findMatchingComboStock() {
-        // Only valid when all selected
-        const match = allCombos.find(c => {
-            if (!c || !Array.isArray(c.keys) || c.keys.length !== totalGroups) return false;
-            return selectedKeys.every((k, i) => c.keys[i] === k);
+        var m = allCombos.find(function (c) {
+            return Array.isArray(c.keys) && c.keys.length === totalGroups &&
+                selectedKeys.every(function (k, i) { return c.keys[i] === k; });
         });
-        return match ? (match.stock || 0) : 0;
+        return m ? (m.stock || 0) : 0;
     }
-
-    function comboHasStockForPartialSelection(partialKeys) {
-        // Partial selection: null means "any"
-        return allCombos.some(c => {
-            if (!c || !Array.isArray(c.keys) || c.keys.length !== totalGroups) return false;
-            for (let i = 0; i < totalGroups; i++) {
-                if (partialKeys[i] !== null && c.keys[i] !== partialKeys[i]) return false;
+    function comboHasStockForPartial(partial) {
+        return allCombos.some(function (c) {
+            if (!Array.isArray(c.keys) || c.keys.length !== totalGroups) return false;
+            for (var i = 0; i < totalGroups; i++) {
+                if (partial[i] !== null && c.keys[i] !== partial[i]) return false;
             }
             return (c.stock || 0) > 0;
         });
     }
-
     function setButtonsEnabled(enabled) {
-        if (btnCart) btnCart.disabled = !enabled;
-        if (btnBuy) btnBuy.disabled = !enabled;
+        if (btnCart)  btnCart.disabled  = !enabled;
+        if (btnBuy)   btnBuy.disabled   = !enabled;
         if (btnMinus) btnMinus.disabled = !enabled;
-        if (btnPlus) btnPlus.disabled = !enabled;
+        if (btnPlus)  btnPlus.disabled  = !enabled;
     }
-
     function updateOptionAvailability() {
-        // For each group, disable options that cannot lead to any in-stock combo
-        for (let gi = 0; gi < totalGroups; gi++) {
-            const groupEl = qs(`.pd-variation-group[data-group-index="${gi}"]`);
+        for (var gi = 0; gi < totalGroups; gi++) {
+            var groupEl = qs('.pd-variation-group[data-group-index="' + gi + '"]');
             if (!groupEl) continue;
-
-            const options = qsa("[data-label]", groupEl);
-
-            options.forEach(opt => {
-                const label = opt.getAttribute("data-label");
-                const trial = selectedKeys.slice();
-                trial[gi] = label;
-
-                const available = comboHasStockForPartialSelection(trial);
-
-                opt.classList.toggle("unavailable", !available);
-
+            qsa("[data-label]", groupEl).forEach(function (opt) {
+                var trial = selectedKeys.slice();
+                trial[gi] = opt.getAttribute("data-label");
+                var avail = comboHasStockForPartial(trial);
+                opt.classList.toggle("unavailable", !avail);
                 if (opt.tagName === "BUTTON") {
-                    opt.disabled = !available;
+                    opt.disabled = !avail;
                 } else {
-                    // Swatches are divs — simulate disable
-                    opt.setAttribute("aria-disabled", String(!available));
-                    opt.style.pointerEvents = available ? "auto" : "none";
+                    opt.setAttribute("aria-disabled", String(!avail));
+                    opt.style.pointerEvents = avail ? "auto" : "none";
                 }
             });
         }
     }
-
     function updateVariationUI() {
-        const allSelected = selectedKeys.every(v => v !== null);
-
+        var allSelected = selectedKeys.every(function (v) { return v !== null; });
         updateHiddenSelected();
         updateOptionAvailability();
-
         if (!allSelected) {
             setBadge("select-options", "Select Options");
             if (stockNote) stockNote.style.display = "none";
-
-            // keep qty max as overall total (already set in HTML), but prevent actions
             setButtonsEnabled(false);
             return;
         }
-
-        const stock = findMatchingComboStock();
-
-        if (stock <= 0) {
-            setBadge("out-of-stock", "Out of Stock");
-        } else if (stock <= 5) {
-            setBadge("low-stock", "Low Stock");
-        } else {
-            setBadge("in-stock", "In Stock");
-        }
-
+        var stock = findMatchingComboStock();
+        if (stock <= 0)      setBadge("out-of-stock", "Out of Stock");
+        else if (stock <= 5) setBadge("low-stock",    "Low Stock");
+        else                 setBadge("in-stock",      "In Stock");
         if (stockNote) {
             stockNote.style.display = "block";
-            stockNote.textContent = stock > 0
-                ? `${stock} left for this option`
-                : "This combination is out of stock";
+            stockNote.textContent = stock > 0 ? (stock + " left for this option") : "This combination is out of stock";
         }
-
         qtyInput.max = Math.max(1, stock);
-        setQty(parseInt(qtyInput.value || "1", 10)); // clamp + sync hidden qty
-
+        setQty(parseInt(qtyInput.value || "1", 10));
         setButtonsEnabled(stock > 0);
     }
-
     function handleVariationClick(el) {
-        const groupIndex = parseInt(el.getAttribute("data-group-index"), 10);
-        const label = el.getAttribute("data-label");
-        if (Number.isNaN(groupIndex) || !label) return;
-
-        const groupEl = el.closest(".pd-variation-group");
+        var gi = parseInt(el.getAttribute("data-group-index"), 10);
+        var label = el.getAttribute("data-label");
+        if (isNaN(gi) || !label) return;
+        var groupEl = el.closest(".pd-variation-group");
         if (!groupEl) return;
-
-        // Toggle active within the group
-        qsa(".pd-variation-btn, .pd-variation-swatch", groupEl).forEach(x => x.classList.remove("active"));
+        qsa(".pd-variation-btn, .pd-variation-swatch", groupEl).forEach(function (x) { x.classList.remove("active"); });
         el.classList.add("active");
-
-        selectedKeys[groupIndex] = label;
+        selectedKeys[gi] = label;
         updateVariationUI();
     }
-
-    // Bind variation clicks (buttons + swatches)
-    qsa(".pd-variation-btn, .pd-variation-swatch").forEach(el => {
-        el.addEventListener("click", () => handleVariationClick(el));
-        el.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleVariationClick(el);
-            }
+    qsa(".pd-variation-btn, .pd-variation-swatch").forEach(function (el) {
+        el.addEventListener("click", function () { handleVariationClick(el); });
+        el.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleVariationClick(el); }
         });
     });
+    if (totalGroups > 0) { setButtonsEnabled(false); updateOptionAvailability(); }
 
-    // Expose validation for form submit
     window.validateVariationsBeforeSubmit = function () {
         if (totalGroups <= 0) return true;
-
-        const allSelected = selectedKeys.every(v => v !== null);
-        if (!allSelected) {
+        if (!selectedKeys.every(function (v) { return v !== null; })) {
             showToast("Please select all product variations before adding to cart.", "error");
             return false;
         }
-
-        const stock = findMatchingComboStock();
-        if (stock <= 0) {
+        if (findMatchingComboStock() <= 0) {
             showToast("This variation combination is out of stock.", "error");
             return false;
         }
-
-        // Ensure hidden selection + qty are correct at submit time
         updateHiddenSelected();
         setQty(parseInt(qtyInput.value || "1", 10));
         return true;
     };
-
     window.prepareBuyNow = function () {
-        if (!validateVariationsBeforeSubmit()) {
-            return false;
-        }
-        const qty = document.getElementById("pdQty")?.value || "1";
-        document.getElementById("buyNowQuantity").value = qty;
-        document.getElementById("buyNowSelectedVariations").value =
-            document.getElementById("selectedVariations").value;
-
+        if (!window.validateVariationsBeforeSubmit()) return false;
+        var qty = qs("#pdQty") ? qs("#pdQty").value : "1";
+        qs("#buyNowQuantity").value = qty;
+        qs("#buyNowSelectedVariations").value = qs("#selectedVariations").value;
         return true;
-    }
+    };
 
-    // Initial state for variation products
-    if (totalGroups > 0) {
-        setButtonsEnabled(false);
-        updateOptionAvailability();
+    window.rvOpenLightbox = function (src) {
+        const box = document.getElementById('rvLightbox');
+        const img = document.getElementById('rvLightboxImg');
+        img.src = src;
+        box.hidden = false;
+        document.body.style.overflow = "hidden";
+    };
+
+    window.rvCloseLightbox = function () {
+        const box = document.getElementById('rvLightbox');
+        const img = document.getElementById('rvLightboxImg');
+        img.src = "";
+        box.hidden = true;
+        document.body.style.overflow = "";
+    };
+
+    /* ── Reviews modal ── */
+    var backdrop   = qs("#rvBackdrop");
+    var triggerBtn = qs("#reviewTriggerBtn");
+    var closeBtn   = qs("#rvCloseBtn");
+
+    if (backdrop && triggerBtn) {
+        function openModal() {
+            backdrop.hidden = false;
+            requestAnimationFrame(function () { backdrop.classList.add("open"); });
+            triggerBtn.setAttribute("aria-expanded", "true");
+            if (closeBtn) closeBtn.focus();
+            document.body.style.overflow = "hidden";
+        }
+        function closeModal() {
+            backdrop.classList.remove("open");
+            backdrop.addEventListener("transitionend", function () {
+                backdrop.hidden = true;
+                document.body.style.overflow = "";
+                triggerBtn.setAttribute("aria-expanded", "false");
+                triggerBtn.focus();
+            }, { once: true });
+        }
+
+        triggerBtn.addEventListener("click", openModal);
+        triggerBtn.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openModal(); }
+        });
+        if (closeBtn) closeBtn.addEventListener("click", closeModal);
+        backdrop.addEventListener("click", function (e) { if (e.target === backdrop) closeModal(); });
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && !backdrop.hidden) closeModal();
+        });
+
+        /* Filter chips */
+        var cards  = qsa(".rv-card");
+        var empty  = qs("#rvEmpty");
+        var chips  = qsa(".rv-chip");
+
+        chips.forEach(function (chip) {
+            chip.addEventListener("click", function () {
+                chips.forEach(function (c) { c.classList.remove("active"); });
+                chip.classList.add("active");
+                var filter = chip.dataset.filter;
+                var visible = 0;
+                cards.forEach(function (card) {
+                    var show = filter === "all" || card.dataset.rating === filter;
+                    card.style.display = show ? "" : "none";
+                    if (show) visible++;
+                });
+                if (empty) empty.style.display = visible === 0 ? "flex" : "none";
+                var body = qs("#rvBody");
+                if (body) body.scrollTop = 0;
+            });
+        });
     }
 })();
 </script>

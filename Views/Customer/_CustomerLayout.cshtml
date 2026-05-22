@@ -1,22 +1,5 @@
 @using System.Security.Claims
 
-@inject EcommerceSystem.Data.AppDbContext _context
-
-@{
-    var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
-
-    var customer = _context.Customers.FirstOrDefault(c => c.Email == email);
-
-    int cartCount = 0;
-
-    if (customer != null)
-    {
-        cartCount = _context.CartItem
-            .Where(ci => ci.Cart.UserId == customer.UserId)
-            .Sum(ci => ci.Quantity);
-    }
-}
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,7 +51,7 @@
                 <i class="ti ti-shopping-cart"></i>
                 <span>Cart</span>
                 <span id="navCartCount" class="cart-count">
-                    @cartCount
+                    @ViewBag.CartCount
                 </span>
                 </a>
                 <div class="nav-divider-v"></div>
@@ -92,9 +75,12 @@
                     <i class="ti ti-user"></i> My Profile
                     </a>
                     <hr class="dropdown-sep" />
-                    <a class="dropdown-item danger" asp-controller="Auth" asp-action="Logout">
-                    <i class="ti ti-logout"></i> Sign out
-                    </a>
+                    <form asp-controller="Auth" asp-action="Logout" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="dropdown-item danger">
+                            <i class="ti ti-logout"></i> Sign out
+                        </button>
+                    </form>
                 </div>
                 </div>
             </div>
@@ -115,7 +101,7 @@
             </div>
 
         </nav>
-        </header>
+    </header>
     <div class="container-fluid p-0">
         <main role="main">
             @RenderBody()

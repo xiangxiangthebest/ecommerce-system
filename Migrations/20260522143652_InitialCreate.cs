@@ -116,7 +116,7 @@ namespace ecommerce_system.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Notifications",
+                name: "Notification",
                 columns: table => new
                 {
                     NotificationId = table.Column<int>(type: "INTEGER", nullable: false)
@@ -131,9 +131,9 @@ namespace ecommerce_system.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Notifications", x => x.NotificationId);
+                    table.PrimaryKey("PK_Notification", x => x.NotificationId);
                     table.ForeignKey(
-                        name: "FK_Notifications_Users_UserId",
+                        name: "FK_Notification_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "UserId",
@@ -263,13 +263,10 @@ namespace ecommerce_system.Migrations
                     ReturnType = table.Column<int>(type: "INTEGER", nullable: true),
                     ReturnImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     ReturnInitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    ReturnInitiatedBy = table.Column<int>(type: "INTEGER", nullable: true),
-                    ReturnStatus = table.Column<int>(type: "INTEGER", nullable: false),
+                    ReturnInitiatedBy = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnStatus = table.Column<string>(type: "TEXT", nullable: false),
                     ReturnRequested = table.Column<bool>(type: "INTEGER", nullable: false),
-                    ReturnApprovedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    ComplaintText = table.Column<string>(type: "TEXT", nullable: true),
-                    ComplaintSubmitted = table.Column<bool>(type: "INTEGER", nullable: false),
-                    ComplaintAt = table.Column<DateTime>(type: "TEXT", nullable: true)
+                    ReturnApprovedAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -399,8 +396,8 @@ namespace ecommerce_system.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Notifications_UserId",
-                table: "Notifications",
+                name: "IX_Notification_UserId",
+                table: "Notification",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
@@ -462,7 +459,7 @@ namespace ecommerce_system.Migrations
                 name: "CustomerService");
 
             migrationBuilder.DropTable(
-                name: "Notifications");
+                name: "Notification");
 
             migrationBuilder.DropTable(
                 name: "Review");

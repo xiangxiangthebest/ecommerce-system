@@ -58,7 +58,8 @@
             </div>
         }
 
-        <form method="post" id="seller-form">
+        <form asp-controller="Auth" asp-action="RegisterSeller" method="post" id="seller-form">
+            @Html.AntiForgeryToken()
 
             <div class="form-step active" id="form-step-1">
 

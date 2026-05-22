@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260521091447_InitialCreate")]
+    [Migration("20260522143652_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -167,7 +167,7 @@ namespace ecommerce_system.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notification", (string)null);
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>
@@ -183,15 +183,6 @@ namespace ecommerce_system.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("CanceledAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ComplaintAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("ComplaintSubmitted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ComplaintText")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CurrentStatus")
@@ -253,8 +244,8 @@ namespace ecommerce_system.Migrations
                     b.Property<DateTime?>("ReturnInitiatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("ReturnInitiatedBy")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ReturnInitiatedBy")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReturnReason")
                         .HasColumnType("TEXT");
@@ -262,8 +253,9 @@ namespace ecommerce_system.Migrations
                     b.Property<bool>("ReturnRequested")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("ReturnStatus")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ReturnStatus")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ReturnType")
                         .HasColumnType("INTEGER");
