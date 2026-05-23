@@ -220,11 +220,13 @@ namespace EcommerceSystem.Controllers
                 model.CategoryId = (await _context.Category.FirstAsync()).CategoryId;
 
             var savedPaths = await SaveImagesAsync(ImageFiles ?? new List<IFormFile>());
+            var slotAssignmentJson = Request.Form["SlotAssignment"].ToString();
+            var mergedPaths = BuildMergedImageList(slotAssignmentJson, new List<string>(), savedPaths, "[]");
 
-            if (savedPaths.Count > 0)
+            if (mergedPaths.Count > 0)
             {
-                model.ImagePath      = savedPaths[0];
-                model.ImagePathsJson = JsonSerializer.Serialize(savedPaths);
+                model.ImagePath      = mergedPaths[0];
+                model.ImagePathsJson = JsonSerializer.Serialize(mergedPaths);
             }
             else
             {
@@ -602,52 +604,52 @@ namespace EcommerceSystem.Controllers
         {
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
-
+ 
             if (!seller.IsApproved)
             {
                 TempData["OrderError"] = "Your account is pending admin approval.";
                 return RedirectToAction("Home", new { tab = "General" });
             }
-
+ 
             var order = await _context.Order
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                      && o.SellerUserId == seller.UserId
                                      && o.CurrentStatus == OrderStatus.RETURN_REFUND);
-
+ 
             if (order == null)
             {
                 TempData["OrderError"] = "Order not found or not in RETURN_REFUND status.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
-
+ 
             if (order.ReturnApprovedAt.HasValue)
             {
                 TempData["OrderError"] = "Return has already been approved for this order.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
-
+ 
             if (approveItemIds == null || approveItemIds.Count == 0)
             {
                 TempData["OrderError"] = "Please select at least one item to approve.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
-
+ 
             // ── Stock restoration logic ──────────────────────────────────────
             // ReturnRefund : customer physically sends item back → add stock back.
             // RefundOnly   : item was never received / partially missing → stock
             //                stays as-is (items were never returned to warehouse).
             bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
                                       StringComparison.OrdinalIgnoreCase);
-
+ 
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
             var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
-
+ 
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
-
+ 
                 if (isReturnRefund)
                 {
                     // Physical return: restore the approved quantity to stock
@@ -657,15 +659,16 @@ namespace EcommerceSystem.Controllers
                 }
                 // RefundOnly: no stock change — items were not physically returned
             }
-
+ 
+            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
             order.ReturnApprovedAt = DateTime.UtcNow;
-
+ 
             await _context.SaveChangesAsync();
-
+ 
             var stockMsg = isReturnRefund
                 ? "Stock has been restored."
                 : "Stock unchanged (Refund Only — items not physically returned).";
-
+ 
             TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
             return RedirectToAction("Home", new { tab = "Order" });
         }

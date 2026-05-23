@@ -468,16 +468,67 @@ function addOption(groupId) {
 
 function removeOption(groupId, idx) {
     groups[groupId].options.splice(idx, 1);
+    // Re-sync stable file inputs: remove all for this group and recreate
+    resyncVarFileInputs(groupId);
     renderOptions(groupId);
     pruneInvalidCombos();
     rebuildComboTable();
     serializeAll();
 }
 
+// Removes and recreates all stable file inputs for a group so that
+// name="VarImg_gi_vi" indices stay in sync after an option is deleted.
+function resyncVarFileInputs(groupId) {
+    let i = 0;
+    while (true) {
+        const old = document.getElementById(`opt-img-${groupId}-${i}`);
+        if (!old) break;
+        old.remove();
+        i++;
+    }
+    groups[groupId].options.forEach((opt, idx) => {
+        const input = getOrCreateVarFileInput(groupId, idx);
+        if (opt.file) {
+            const dt = new DataTransfer();
+            dt.items.add(opt.file);
+            input.files = dt.files;
+        }
+    });
+}
+
+// ── Stable hidden file-input container for variation option images ──────────
+// File inputs are placed OUTSIDE the chip area so renderOptions() (which does
+// innerHTML = '') never destroys a selected file before it reaches the server.
+function getOrCreateVarFileInput(groupId, idx) {
+    const inputId = `opt-img-${groupId}-${idx}`;
+    let input = document.getElementById(inputId);
+    if (!input) {
+        let container = document.getElementById('var-file-inputs');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'var-file-inputs';
+            container.style.display = 'none';
+            document.getElementById('editForm').appendChild(container);
+        }
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id   = inputId;
+        input.name = `VarImg_${groupId}_${idx}`;
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        input.addEventListener('change', () => setOptImg(input, groupId, idx));
+        container.appendChild(input);
+    }
+    return input;
+}
+
 function renderOptions(groupId) {
     const area = document.getElementById('chips-' + groupId);
     area.innerHTML = '';
     groups[groupId].options.forEach((opt, i) => {
+        // Ensure a stable file input exists for this option slot
+        getOrCreateVarFileInput(groupId, i);
+
         const chip = document.createElement('span');
         chip.className = 'var-option-chip';
         if (opt.imagePath) {
@@ -490,9 +541,6 @@ function renderOptions(groupId) {
                 </span>`;
         }
         chip.innerHTML += `
-            <input type="file" id="opt-img-${groupId}-${i}" name="VarImg_${groupId}_${i}"
-                   accept="image/*" style="display:none;"
-                   onchange="setOptImg(this,${groupId},${i})" />
             <span>${escHtml(opt.label)}</span>
             <button type="button" class="chip-del" onclick="removeOption(${groupId},${i})">
                 <i class="fas fa-times"></i>
@@ -502,12 +550,13 @@ function renderOptions(groupId) {
 }
 
 function triggerOptImg(groupId, idx) {
-    document.getElementById(`opt-img-${groupId}-${idx}`)?.click();
+    getOrCreateVarFileInput(groupId, idx).click();
 }
 function setOptImg(input, groupId, idx) {
     if (!input.files[0]) return;
-    const url = URL.createObjectURL(input.files[0]);
-    groups[groupId].options[idx].imagePath = url;
+    // Store the File object on the option so it survives re-renders
+    groups[groupId].options[idx].file      = input.files[0];
+    groups[groupId].options[idx].imagePath = URL.createObjectURL(input.files[0]);
     renderOptions(groupId);
     serializeAll();
 }

@@ -4,6 +4,31 @@
 @using EcommerceSystem.DTOs
 
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
+<style>
+    /* Variation swatch: image + label side-by-side, matching preview modal */
+    .pd-variation-swatch {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px 4px 4px !important;
+    }
+    .pd-variation-swatch img {
+        width: 32px;
+        height: 32px;
+        border-radius: 5px;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+    .pd-swatch-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e1b4b;
+        white-space: nowrap;
+    }
+    .pd-variation-swatch.active .pd-swatch-label {
+        color: inherit;
+    }
+</style>
 
 @{
     var reviews    = ViewBag.Reviews as List<EcommerceSystem.Models.Review> ?? new List<EcommerceSystem.Models.Review>();
@@ -156,7 +181,9 @@
                     {
                         var group = variations[gi];
                         <div class="pd-variation-group" data-group-index="@gi">
-                            <div class="pd-variation-label">@group.Name</div>
+                            <div class="pd-variation-label">
+                                @group.Name<span id="pdSelLabel-@gi" style="font-weight:800; color:#1e1b4b; margin-left:6px;"></span>
+                            </div>
                             <div class="pd-variation-options">
                                 @foreach (var val in group.Values)
                                 {
@@ -167,8 +194,10 @@
                                              tabindex="0"
                                              title="@val.Label"
                                              data-group-index="@gi"
-                                             data-label="@val.Label">
+                                             data-label="@val.Label"
+                                             data-image="@val.ImagePath">
                                             <img src="@val.ImagePath" alt="@val.Label" />
+                                            <span class="pd-swatch-label">@val.Label</span>
                                         </div>
                                     }
                                     else
@@ -528,6 +557,24 @@
         qsa(".pd-variation-btn, .pd-variation-swatch", groupEl).forEach(function (x) { x.classList.remove("active"); });
         el.classList.add("active");
         selectedKeys[gi] = label;
+
+        // Update the inline selected-label span (e.g. "FLAVOUR: Vege")
+        var selLabel = qs("#pdSelLabel-" + gi);
+        if (selLabel) selLabel.textContent = ": " + label;
+
+        // Switch main image to the variation's image if available
+        var varImg = el.getAttribute("data-image");
+        if (varImg) {
+            var mainImg = qs("#pdMainImg");
+            if (mainImg) mainImg.src = varImg;
+            // Update active thumb highlight to match variation image
+            qsa(".pd-thumb").forEach(function (t) { t.classList.remove("active"); });
+            var matchThumb = qsa(".pd-thumb").find(function (t) {
+                return t.getAttribute("data-src") === varImg;
+            });
+            if (matchThumb) matchThumb.classList.add("active");
+        }
+
         updateVariationUI();
     }
     qsa(".pd-variation-btn, .pd-variation-swatch").forEach(function (el) {
