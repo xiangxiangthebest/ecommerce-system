@@ -71,6 +71,56 @@ namespace EcommerceSystem.Services
             }
         }
 
+        // ── Adds quantity back to the matching combo inside VariationCombosJson ──
+        // Mirror of DeductComboStock — used when an order is cancelled.
+        private static string RestoreComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
+                return combosJson;
+
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                               ?? new Dictionary<string, string>();
+
+                if (selected.Count == 0) return combosJson;
+
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+
+                    int stock = 0;
+                    if (combo.TryGetProperty("stock", out var s))
+                    {
+                        stock = s.ValueKind == JsonValueKind.Number
+                            ? (s.TryGetInt32(out var si) ? si : (int)s.GetDouble())
+                            : int.TryParse(s.GetString(), out var sp) ? sp : 0;
+                    }
+
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+
+                    if (isMatch)
+                        stock += quantity;  // add back instead of deduct
+
+                    updated.Add(new { keys, stock });
+                }
+
+                return JsonSerializer.Serialize(updated);
+            }
+            catch
+            {
+                return combosJson;
+            }
+        }
+
         public async Task<OperationResult> PlaceOrderAsync(PlaceOrderRequest request)
         {
             var address = await _context.DeliveryField
@@ -245,12 +295,36 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Please provide a cancellation reason.");
 
             var order = await _context.Order
+                .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                        && o.CustomerUserId == customerId
                                        && o.CurrentStatus == OrderStatus.PENDING);
 
             if (order == null)
                 return OperationResult.Fail("Order cannot be canceled.");
+
+            // ── Restore stock for every item in the cancelled order ──
+            foreach (var item in order.OrderItems)
+            {
+                var product = await _context.Products.FindAsync(item.ProductId);
+                if (product == null) continue;
+
+                // Restore total stock quantity
+                product.StockQuantity += item.Quantity;
+
+                // Also restore the matching combo stock in VariationCombosJson
+                var selectedVars = item.SelectedVariation ?? "{}";
+                if (!string.IsNullOrWhiteSpace(product.VariationCombosJson)
+                    && product.VariationCombosJson != "[]"
+                    && selectedVars != "{}")
+                {
+                    product.VariationCombosJson = RestoreComboStock(
+                        product.VariationCombosJson,
+                        selectedVars,
+                        item.Quantity
+                    );
+                }
+            }
 
             order.CurrentStatus = OrderStatus.CANCELED;
             order.CancelReason = reason.Trim();

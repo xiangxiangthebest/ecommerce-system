@@ -445,29 +445,51 @@
 @if (ViewBag.ActiveTab == "Order" && ViewBag.Orders != null)
 {
     // Parse the structured ReturnReason payload written by CustomerController.
-    // Format: "[<reason text>]||<json-array>||<returnType>"
-    static (string reason, Dictionary<int, int> requestedQtys, string returnType) ParseReturnReason(string? raw)
+    // Format: "[ReturnType] Reason text||description||[{json-array}]"
+    // or legacy: "[reason text]||[{json-array}]||ReturnType"
+    static (string reason, string embeddedType, string description, Dictionary<int, int> requestedQtys, string returnType) ParseReturnReason(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
-            return ("", new Dictionary<int, int>(), "");
+            return ("", "", "", new Dictionary<int, int>(), "");
 
         var sep = raw.IndexOf("||");
         if (sep < 0)
-            return (raw, new Dictionary<int, int>(), "");
+            return (raw, "", "", new Dictionary<int, int>(), "");
 
-        var reasonPart = raw[..sep];
-        // Strip legacy "[]" brackets written by the old controller format
-        reasonPart = reasonPart.Trim();
-        if (reasonPart.StartsWith("[") && reasonPart.EndsWith("]"))
-            reasonPart = reasonPart[1..^1].Trim();
+        var firstPart  = raw[..sep].Trim();
         var rest       = raw[(sep + 2)..];
 
-        // Extract optional return type appended as "||ReturnRefund" etc.
+        // Extract embedded return type from bracket prefix e.g. "[Refund Only] Wrong item received"
+        var embeddedType = "";
+        var reasonText   = firstPart;
+        if (firstPart.StartsWith("["))
+        {
+            var closeBracket = firstPart.IndexOf("]");
+            if (closeBracket > 0)
+            {
+                embeddedType = firstPart[1..closeBracket].Trim();
+                reasonText   = firstPart[(closeBracket + 1)..].Trim();
+            }
+        }
+
+        // Extract optional return type appended as "||ReturnRefund" at end (legacy)
         var returnType = "";
         var sep2 = rest.LastIndexOf("||");
-        if (sep2 >= 0) {
-            returnType = rest[(sep2 + 2)..];
+        // Detect if last segment looks like JSON array (starts with '[') — if not, it's returnType
+        if (sep2 >= 0 && !rest[(sep2 + 2)..].TrimStart().StartsWith("["))
+        {
+            returnType = rest[(sep2 + 2)..].Trim();
             rest       = rest[..sep2];
+        }
+
+        // Check if there's a description segment before the JSON array
+        // Format may be: "description||[{json}]" or just "[{json}]"
+        var description = "";
+        var jsonSep = rest.IndexOf("||");
+        if (jsonSep >= 0)
+        {
+            description = rest[..jsonSep].Trim();
+            rest        = rest[(jsonSep + 2)..];
         }
 
         try
@@ -480,30 +502,56 @@
                 foreach (var el in items)
                 {
                     var id  = el.GetProperty("orderItemId").GetInt32();
-                    var qty = el.GetProperty("qty").GetInt32();
+                    var qty = el.GetProperty("returnQty").GetInt32();
                     dict[id] = qty;
                 }
-            return (reasonPart, dict, returnType);
+            return (reasonText, embeddedType, description, dict, returnType);
         }
         catch
         {
-            return (reasonPart, new Dictionary<int, int>(), returnType);
+            return (reasonText, embeddedType, description, new Dictionary<int, int>(), returnType);
         }
+    }
+
+    static List<string> ParseImagePaths(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+        try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+        catch { return new List<string>(); }
     }
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
         .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                  && !o.ReturnApprovedAt.HasValue)
         .Select(o => {
-            var (_, requestedQtys, returnType) = ParseReturnReason(o.ReturnReason);
+            var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
+
+            // Determine display return type: prefer the bracket-embedded type, then the
+            // dedicated DB column, then the legacy trailing segment.
+            var returnType = !string.IsNullOrWhiteSpace(embeddedType)
+                ? embeddedType
+                : (!string.IsNullOrWhiteSpace(parsedReturnType)
+                    ? parsedReturnType
+                    : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
+
+            var useAllItems = requestedQtys.Count == 0;
+
             return new {
-                orderId    = o.OrderId,
-                returnType = returnType,
-                items      = o.OrderItems
-                    .Where(oi => requestedQtys.ContainsKey(oi.OrderItemId))
+                orderId           = o.OrderId,
+                returnType        = returnType,
+                returnReason      = reasonText,
+                returnDescription = description,
+                returnImages      = ParseImagePaths(o.ReturnImagePathsJson),
+                customerEmail     = o.Customer?.Email ?? "—",
+                customerName      = o.Customer?.FullName ?? "",
+                items = o.OrderItems
+                    .Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId))
                     .Select(oi => new {
                         orderItemId  = oi.OrderItemId,
-                        name         = oi.Product?.Name ?? $"Item #{oi.OrderItemId}",
+                        name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU)
+                                            ? $"[{oi.Product!.SKU}] " : "")
+                                       + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                        sku          = oi.Product?.SKU ?? "—",
                         orderedQty   = oi.Quantity,
                         requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
                         unitPrice    = oi.Price.ToString("F2")
@@ -565,43 +613,96 @@
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
 
-        // Show the return type the customer chose
-        const returnTypeLabel = {
-            'ReturnRefund':  '📦 Return &amp; Refund — customer sends item back, receives money refund',
-            'RefundOnly':    '💰 Refund Only — item not received / missing, no physical return needed'
+        // ── Customer Request Summary banner ──────────────────────────────
+        const typeIconMap = {
+            'Refund Only':      { icon: '💰', label: 'Refund Only' },
+            'RefundOnly':       { icon: '💰', label: 'Refund Only' },
+            'Return & Refund':  { icon: '📦', label: 'Return & Refund' },
+            'ReturnRefund':     { icon: '📦', label: 'Return & Refund' },
         };
-        const rtEl = document.getElementById('approveReturnTypeInfo');
-        if (rtEl) {
-            const label = returnTypeLabel[order.returnType] || order.returnType || 'Not specified';
-            rtEl.innerHTML = `<strong>Customer requested:</strong> ${label}`;
-        }
+        const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
+        const custName   = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
 
-        let html = '';
-        order.items.forEach(item => {
-            html += `
-            <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
-                <input type="checkbox" class="approve-item-chk"
-                       data-order-item-id="${item.orderItemId}" data-max="${item.requestedQty}"
-                       data-unit-price="${item.unitPrice}" data-name="${item.name}"
-                       onchange="syncApproveQty(this);updateRefundBreakdown()"
-                       style="width:16px;height:16px;cursor:pointer" />
-                <label style="flex:1">
-                    <div style="font-weight:600;font-size:13px">${item.name}</div>
-                    <div style="font-size:12px;color:#9a98b6">
-                        Qty in order: ${item.orderedQty} &nbsp;|&nbsp;
-                        <span style="color:#f97316;font-weight:600">Customer requested: ${item.requestedQty}</span>
-                        &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span>
-                    </div>
-                </label>
-                <div style="display:flex;align-items:center;gap:6px">
-                    <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
-                    <input type="number" class="approve-item-qty"
-                           min="1" max="${item.requestedQty}" value="${item.requestedQty}" disabled
-                           oninput="updateRefundBreakdown()"
-                           style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+        let summaryHtml = `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #ffe0b2;">
+                <i class="fas fa-user-circle" style="color:#f97316;font-size:16px;flex-shrink:0"></i>
+                <div>
+                    <div style="font-size:11px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Customer</div>
+                    <div style="font-size:13px;color:#1e1b4b;font-weight:600">${custName}</div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
+                    <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Return Type</div>
+                    <div style="font-size:13px;font-weight:700;color:#1e1b4b">${typeInfo.icon} ${typeInfo.label}</div>
+                </div>
+                <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
+                    <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Reason</div>
+                    <div style="font-size:13px;font-weight:700;color:#1e1b4b">${order.returnReason || '—'}</div>
                 </div>
             </div>`;
-        });
+
+        if (order.returnDescription) {
+            summaryHtml += `
+            <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;margin-bottom:10px;">
+                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">
+                    <i class="fas fa-comment-alt" style="margin-right:4px"></i>Description
+                </div>
+                <div style="font-size:13px;color:#5d4037;line-height:1.5">${order.returnDescription}</div>
+            </div>`;
+        }
+
+        if (order.returnImages && order.returnImages.length > 0) {
+            let imgHtml = order.returnImages.map(src => `
+                <a href="${src}" target="_blank" style="display:block;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid #ffe0b2;flex-shrink:0;">
+                    <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block"
+                         onerror="this.src='/images/placeholder.png'" />
+                </a>`).join('');
+            summaryHtml += `
+            <div>
+                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                    <i class="fas fa-camera" style="margin-right:4px"></i>Photo Proof (${order.returnImages.length})
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">${imgHtml}</div>
+            </div>`;
+        }
+
+        const rtEl = document.getElementById('approveReturnTypeInfo');
+        if (rtEl) rtEl.innerHTML = summaryHtml;
+
+        // ── Item list ────────────────────────────────────────────────────
+        let html = '';
+        if (!order.items || order.items.length === 0) {
+            html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">
+                        No return items found for this order.
+                    </div>`;
+        } else {
+            order.items.forEach(item => {
+                html += `
+                <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
+                    <input type="checkbox" class="approve-item-chk"
+                           data-order-item-id="${item.orderItemId}" data-max="${item.requestedQty}"
+                           data-unit-price="${item.unitPrice}" data-name="${item.name}"
+                           onchange="syncApproveQty(this);updateRefundBreakdown()"
+                           style="width:16px;height:16px;cursor:pointer" />
+                    <label style="flex:1">
+                        <div style="font-weight:600;font-size:13px">${item.name}</div>
+                        <div style="font-size:12px;color:#9a98b6">
+                            Qty in order: ${item.orderedQty} &nbsp;|&nbsp;
+                            <span style="color:#f97316;font-weight:600">Customer requested: ${item.requestedQty}</span>
+                            &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span>
+                        </div>
+                    </label>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
+                        <input type="number" class="approve-item-qty"
+                               min="1" max="${item.requestedQty}" value="${item.requestedQty}" disabled
+                               oninput="updateRefundBreakdown()"
+                               style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+                    </div>
+                </div>`;
+            });
+        }
         document.getElementById('approveItemsWrap').innerHTML = html;
         updateRefundBreakdown();
 
@@ -803,7 +904,7 @@
          class="approve-return-backdrop"></div>
     <div id="approveReturnModal"
          style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-                background:#fff;border-radius:16px;padding:28px;width:min(540px,94vw);
+                background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;
                 z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)"
          class="approve-return-modal">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -813,9 +914,12 @@
                     style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;color:#9a98b6">✕</button>
         </div>
 
-        <!-- Return type info banner -->
+        <!-- Customer Request Summary banner -->
+        <div style="font-size:10px;color:#a16207;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">
+            <i class="fas fa-clipboard-list" style="margin-right:4px"></i>Customer Request Summary
+        </div>
         <div id="approveReturnTypeInfo"
-             style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:10px 14px;
+             style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:12px 14px;
                     font-size:13px;color:#6d4c41;margin-bottom:14px;line-height:1.5"></div>
 
         <p style="font-size:13px;color:#6b6b8a;margin:0 0 16px">

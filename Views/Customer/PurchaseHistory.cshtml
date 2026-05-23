@@ -32,8 +32,12 @@
                                  (o.ReturnReason != null && o.ReturnReason.Contains("||"))
                                  ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
                                  : (o.ReturnReason ?? "")),
-        // FRIEND: return status label + proof images for the richer return notice
-        returnStatus       = o.ReturnStatus.ToString(),
+        // Return status: if seller approved (ReturnApprovedAt set) show Approved
+        // as a fallback even if the ReturnStatus column was not updated by the controller.
+        returnStatus       = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
+                                 ? "Approved"
+                                 : o.ReturnStatus.ToString(),
+        returnApproved     = o.ReturnApprovedAt.HasValue,
         returnImagePath    = ParseReturnImages(o.ReturnImagePathsJson),
         reviewSubmitted    = o.ReviewSubmitted,
         address = o.Address == null ? null : new {
@@ -349,7 +353,13 @@
                         if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
                         returnDisplay = StripReturnReasonBrackets(returnDisplay);
 
-                        <div class="ph-notice-return-v2">
+                        var rnBannerStatus = order.ReturnApprovedAt.HasValue ? "Approved" : order.ReturnStatus.ToString();
+                        var rnBannerClass  = rnBannerStatus switch {
+                            "Approved" or "Refunded" => "ph-notice-return-v2 rn-approved",
+                            "Rejected"               => "ph-notice-return-v2 rn-rejected",
+                            _                        => "ph-notice-return-v2"
+                        };
+                        <div class="@rnBannerClass">
                             <!-- Header strip -->
                             <div class="rn-header">
                                 <div class="rn-icon-wrap">
@@ -357,9 +367,25 @@
                                 </div>
                                 <div class="rn-header-text">
                                     <div class="rn-title">Return / Refund Requested</div>
+                                    @{
+                                        // status vars - @{} is valid here as we're inside HTML context within the @if
+                                        var rtStatus = rnBannerStatus;
+                                        var rtLabel  = rtStatus switch {
+                                            "Approved"  => "✅ Approved — refund is being processed",
+                                            "Rejected"  => "❌ Rejected by seller",
+                                            "Refunded"  => "✅ Refunded",
+                                            "Requested" => "⏳ Requested — awaiting seller review",
+                                            _           => rtStatus
+                                        };
+                                        var rtDotClass = rtStatus switch {
+                                            "Approved" or "Refunded" => "rn-status-dot rn-dot-approved",
+                                            "Rejected"               => "rn-status-dot rn-dot-rejected",
+                                            _                        => "rn-status-dot"
+                                        };
+                                    }
                                     <div class="rn-status">
-                                        <span class="rn-status-dot"></span>
-                                        @ReturnStatusLabel(order.ReturnStatus)
+                                        <span class="@rtDotClass"></span>
+                                        @rtLabel
                                     </div>
                                 </div>
                             </div>
@@ -840,8 +866,14 @@ function openDrawer(orderId) {
                 <div class="rn-header-text">
                     <div class="rn-title">Return / Refund in Progress</div>
                     <div class="rn-status">
-                        <span class="rn-status-dot"></span>
-                        ${esc(order.returnStatus || 'Pending Review')}
+                        <span class="${order.returnStatus==='Approved'||order.returnStatus==='Refunded' ? 'rn-status-dot rn-dot-approved' : order.returnStatus==='Rejected' ? 'rn-status-dot rn-dot-rejected' : 'rn-status-dot'}"></span>
+                        ${esc(
+                        order.returnStatus === 'Approved'  ? '✅ Approved — refund is being processed' :
+                        order.returnStatus === 'Refunded'  ? '✅ Refunded' :
+                        order.returnStatus === 'Rejected'  ? '❌ Rejected by seller' :
+                        order.returnStatus === 'Requested' ? '⏳ Requested — awaiting seller review' :
+                        order.returnStatus || 'Pending Review'
+                    )}
                     </div>
                 </div>
             </div>
@@ -1652,4 +1684,38 @@ document.addEventListener('keydown', e => {
 
 // CSRF token for form (anti-forgery)
 </script>
+
+<style>
+/* Return status dot colours */
+.rn-dot-approved {
+    background: #22c55e !important;   /* green */
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+}
+.rn-dot-rejected {
+    background: #ef4444 !important;   /* red */
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.18);
+}
+
+/* Approved state: tint the notice banner green */
+.ph-notice-return-v2.rn-approved {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+.ph-notice-return-v2.rn-approved .rn-icon-wrap {
+    background: #dcfce7;
+    color: #16a34a;
+}
+.ph-notice-return-v2.rn-approved .rn-status { color: #15803d; font-weight: 700; }
+
+/* Rejected state */
+.ph-notice-return-v2.rn-rejected {
+    background: #fff1f2;
+    border-color: #fecdd3;
+}
+.ph-notice-return-v2.rn-rejected .rn-icon-wrap {
+    background: #ffe4e6;
+    color: #dc2626;
+}
+.ph-notice-return-v2.rn-rejected .rn-status { color: #b91c1c; font-weight: 700; }
+</style>
 @Html.AntiForgeryToken()
