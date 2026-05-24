@@ -1,10 +1,13 @@
-
 <link rel="stylesheet" href="~/css/customer/quick-add-modal.css" asp-append-version="true" />
 
-<!-- ── Backdrop ── -->
+<!-- ════════════════════════════════════════════════════
+     BACKDROP
+     ════════════════════════════════════════════════════ -->
 <div id="qaBackdrop" class="qa-backdrop" aria-hidden="true"></div>
 
-<!-- ── Main drawer ── -->
+<!-- ════════════════════════════════════════════════════
+     MAIN DRAWER
+     ════════════════════════════════════════════════════ -->
 <div id="qaDrawer"
      class="qa-drawer"
      role="dialog"
@@ -18,8 +21,17 @@
 
         <!-- LEFT: Gallery -->
         <div class="qa-gallery">
-            <div class="qa-img-wrap">
+            <div class="qa-img-wrap" id="qaImgWrap" title="Click to enlarge">
                 <img id="qaMainImg" src="" alt="" class="qa-main-img" />
+                <div class="qa-zoom-hint">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                         fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                    </svg>
+                    Click to enlarge
+                </div>
             </div>
             <div class="qa-thumbs" id="qaThumbs"></div>
         </div>
@@ -58,9 +70,12 @@
 
             <!-- Add to Cart form -->
             <form id="qaForm" method="post" action="/Customer/AddToCart">
+                @Html.AntiForgeryToken()
+
                 <input type="hidden" id="qaProductId" name="productId"          value="" />
                 <input type="hidden" id="qaSelVars"   name="selectedVariations" value="{}" />
                 <input type="hidden" id="qaQtyHidden" name="quantity"           value="1" />
+                <input type="hidden" id="qaReturnUrl" name="returnUrl"          value="" />
 
                 <div class="qa-actions">
                     <button id="qaSubmit" type="submit" class="qa-btn-cart" disabled>
@@ -83,7 +98,19 @@
     </div><!-- /.qa-body -->
 </div><!-- /#qaDrawer -->
 
-<!-- ── Skeleton drawer (shown while fetching) ── -->
+<!-- ════════════════════════════════════════════════════
+     GALLERY IMAGE LIGHTBOX
+     ════════════════════════════════════════════════════ -->
+<div id="qaImgLightbox" class="qa-img-lightbox" hidden>
+    <button class="qa-img-lightbox-close" id="qaImgLightboxClose" aria-label="Close image">
+        &#x2715;
+    </button>
+    <img id="qaImgLightboxImg" src="" alt="Product image" />
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SKELETON DRAWER (shown while fetching)
+     ════════════════════════════════════════════════════ -->
 <div id="qaDrawerSkeleton"
      class="qa-drawer"
      aria-hidden="true"
@@ -104,336 +131,4 @@
     </div>
 </div>
 
-<script>
-(function () {
-    /* ── State ────────────────────────────────────────── */
-    let allCombos    = [];
-    let groupNames   = [];
-    let selectedKeys = [];
-
-    /* ── DOM refs ─────────────────────────────────────── */
-    const backdrop    = document.getElementById('qaBackdrop');
-    const drawer      = document.getElementById('qaDrawer');
-    const skeleton    = document.getElementById('qaDrawerSkeleton');
-    const closeBtn    = document.getElementById('qaClose');
-    const mainImg     = document.getElementById('qaMainImg');
-    const thumbsWrap  = document.getElementById('qaThumbs');
-    const shopEl      = document.getElementById('qaShopName');
-    const badge       = document.getElementById('qaStockBadge');
-    const nameEl      = document.getElementById('qaProductName');
-    const priceEl     = document.getElementById('qaPrice');
-    const descEl      = document.getElementById('qaDescription');
-    const varWrap     = document.getElementById('qaVariations');
-    const varNote     = document.getElementById('qaVariationNote');
-    const qtyInput    = document.getElementById('qaQtyInput');
-    const qtyMinus    = document.getElementById('qaQtyMinus');
-    const qtyPlus     = document.getElementById('qaQtyPlus');
-    const stockNote   = document.getElementById('qaStockNote');
-    const form        = document.getElementById('qaForm');
-    const productIdEl = document.getElementById('qaProductId');
-    const selVarsEl   = document.getElementById('qaSelVars');
-    const qtyHiddenEl = document.getElementById('qaQtyHidden');
-    const submitBtn   = document.getElementById('qaSubmit');
-    const viewFullLink = document.getElementById('qaViewFull');
-
-    /* ── Toast ────────────────────────────────────────── */
-    function toast(msg, type = 'success') {
-        const t = document.createElement('div');
-        t.className = 'qa-toast ' + type;
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(() => {
-            t.classList.add('out');
-            setTimeout(() => t.remove(), 350);
-        }, 2800);
-    }
-
-    /* ── Panel open / close ───────────────────────────── */
-    function openPanel(el) {
-        el.style.display = 'flex';
-        requestAnimationFrame(() => el.classList.add('open'));
-    }
-    function closePanel(el) {
-        el.classList.remove('open');
-        setTimeout(() => { el.style.display = 'none'; }, 340);
-    }
-    function closeAll() {
-        backdrop.classList.remove('open');
-        closePanel(drawer);
-        closePanel(skeleton);
-        document.body.style.overflow = '';
-    }
-
-    closeBtn.addEventListener('click', closeAll);
-    backdrop.addEventListener('click', closeAll);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
-
-    /* ── Quantity ─────────────────────────────────────── */
-    function clampQty(v) {
-        const max = Math.max(1, parseInt(qtyInput.max || '1', 10));
-        return Math.min(max, Math.max(1, v));
-    }
-    function setQty(v) {
-        const c = clampQty(v);
-        qtyInput.value = c;
-        qtyHiddenEl.value = c;
-    }
-    qtyMinus.addEventListener('click', () => setQty(parseInt(qtyInput.value, 10) - 1));
-    qtyPlus .addEventListener('click', () => setQty(parseInt(qtyInput.value, 10) + 1));
-
-    /* ── Badge ────────────────────────────────────────── */
-    function setBadge(cls, text) {
-        badge.className = 'qa-badge ' + cls;
-        badge.textContent = text;
-    }
-
-    /* ── Combo helpers (mirrors ProductDetails.cshtml JS) ── */
-    function findComboStock() {
-        const m = allCombos.find(c =>
-            Array.isArray(c.keys) &&
-            c.keys.length === groupNames.length &&
-            selectedKeys.every((k, i) => c.keys[i] === k)
-        );
-        return m ? (m.stock || 0) : 0;
-    }
-
-    function comboReachable(partialKeys) {
-        return allCombos.some(c => {
-            if (!Array.isArray(c.keys) || c.keys.length !== groupNames.length) return false;
-            for (let i = 0; i < groupNames.length; i++) {
-                if (partialKeys[i] !== null && c.keys[i] !== partialKeys[i]) return false;
-            }
-            return (c.stock || 0) > 0;
-        });
-    }
-
-    function updateHidden() {
-        const obj = {};
-        groupNames.forEach((n, i) => { if (selectedKeys[i] !== null) obj[n] = selectedKeys[i]; });
-        selVarsEl.value = JSON.stringify(obj);
-    }
-
-    function updateOptionAvailability() {
-        groupNames.forEach((_, gi) => {
-            const gEl = varWrap.querySelector('[data-qa-gi="' + gi + '"]');
-            if (!gEl) return;
-            gEl.querySelectorAll('[data-qa-label]').forEach(opt => {
-                const label = opt.getAttribute('data-qa-label');
-                const trial = selectedKeys.slice();
-                trial[gi] = label;
-                const avail = comboReachable(trial);
-                opt.classList.toggle('unavailable', !avail);
-                if (opt.tagName === 'BUTTON') {
-                    opt.disabled = !avail;
-                } else {
-                    opt.setAttribute('aria-disabled', String(!avail));
-                    opt.style.pointerEvents = avail ? 'auto' : 'none';
-                }
-            });
-        });
-    }
-
-    function updateVariationUI() {
-        const allSel = selectedKeys.every(v => v !== null);
-        updateHidden();
-
-        if (groupNames.length === 0) return;
-
-        updateOptionAvailability();
-
-        if (!allSel) {
-            setBadge('select-options', 'Select Options');
-            varNote.style.display = 'none';
-            submitBtn.disabled = true;
-            qtyMinus.disabled  = true;
-            qtyPlus.disabled   = true;
-            return;
-        }
-
-        const stock = findComboStock();
-        if (stock <= 0)      setBadge('out-of-stock', 'Out of Stock');
-        else if (stock <= 5) setBadge('low-stock', 'Low Stock');
-        else                 setBadge('in-stock', 'In Stock');
-
-        varNote.style.display = 'block';
-        varNote.textContent = stock > 0
-            ? stock + ' left for this option'
-            : 'This combination is out of stock';
-
-        qtyInput.max = Math.max(1, stock);
-        setQty(parseInt(qtyInput.value, 10));
-
-        const ok = stock > 0;
-        submitBtn.disabled = !ok;
-        qtyMinus.disabled  = !ok;
-        qtyPlus.disabled   = !ok;
-    }
-
-    function handleVarClick(el) {
-        const gi    = parseInt(el.getAttribute('data-qa-gi'), 10);
-        const label = el.getAttribute('data-qa-label');
-        if (isNaN(gi) || !label) return;
-
-        const gEl = varWrap.querySelector('[data-qa-gi="' + gi + '"]');
-        gEl.querySelectorAll('.qa-var-btn, .qa-var-swatch').forEach(x => x.classList.remove('active'));
-        el.classList.add('active');
-
-        selectedKeys[gi] = label;
-        updateVariationUI();
-    }
-
-    /* ── Build variation DOM ──────────────────────────── */
-    function buildVariations(variations) {
-        varWrap.innerHTML = '';
-        varNote.style.display = 'none';
-
-        variations.forEach((grp, gi) => {
-            const gEl = document.createElement('div');
-            gEl.className = 'qa-var-group';
-            gEl.setAttribute('data-qa-gi', gi);
-
-            const lEl = document.createElement('div');
-            lEl.className = 'qa-var-label';
-            lEl.textContent = grp.name;
-            gEl.appendChild(lEl);
-
-            const oEl = document.createElement('div');
-            oEl.className = 'qa-var-options';
-
-            (grp.values || []).forEach(val => {
-                if (val.imagePath) {
-                    const sw = document.createElement('div');
-                    sw.className = 'qa-var-swatch';
-                    sw.setAttribute('data-qa-gi', gi);
-                    sw.setAttribute('data-qa-label', val.label);
-                    sw.setAttribute('tabindex', '0');
-                    sw.setAttribute('title', val.label);
-                    sw.innerHTML = '<img src="' + val.imagePath + '" alt="' + val.label + '" />';
-                    sw.addEventListener('click', () => handleVarClick(sw));
-                    sw.addEventListener('keydown', e => {
-                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVarClick(sw); }
-                    });
-                    oEl.appendChild(sw);
-                } else {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'qa-var-btn';
-                    btn.setAttribute('data-qa-gi', gi);
-                    btn.setAttribute('data-qa-label', val.label);
-                    btn.textContent = val.label;
-                    btn.addEventListener('click', () => handleVarClick(btn));
-                    oEl.appendChild(btn);
-                }
-            });
-
-            gEl.appendChild(oEl);
-            varWrap.appendChild(gEl);
-        });
-    }
-
-    /* ── Populate with API data ───────────────────────── */
-    function populate(p) {
-        allCombos    = JSON.parse(p.variationCombosJson || '[]');
-        groupNames   = (p.variations || []).map(v => v.name);
-        selectedKeys = new Array(groupNames.length).fill(null);
-
-        /* Images */
-        const imgs = (p.images && p.images.length) ? p.images : [];
-        mainImg.src = imgs[0] || '/images/placeholder.png';
-        mainImg.alt = p.name;
-
-        thumbsWrap.innerHTML = '';
-        if (imgs.length > 1) {
-            imgs.forEach((src, i) => {
-                const d = document.createElement('div');
-                d.className = 'qa-thumb' + (i === 0 ? ' active' : '');
-                d.innerHTML = '<img src="' + src + '" alt="' + p.name + ' view ' + (i + 1) + '" />';
-                d.addEventListener('click', () => {
-                    mainImg.style.opacity = '0';
-                    setTimeout(() => { mainImg.src = src; mainImg.style.opacity = '1'; }, 180);
-                    thumbsWrap.querySelectorAll('.qa-thumb').forEach(t => t.classList.remove('active'));
-                    d.classList.add('active');
-                });
-                thumbsWrap.appendChild(d);
-            });
-        }
-
-        /* Text fields */
-        shopEl.textContent   = 'Sold by ' + (p.shopName || 'Unknown Shop');
-        nameEl.textContent   = p.name;
-        priceEl.textContent  = 'RM ' + parseFloat(p.price).toFixed(2);
-        descEl.textContent   = p.description || 'No description provided.';
-        viewFullLink.href    = '/Customer/ProductDetails/' + p.productId;
-        productIdEl.value    = p.productId;
-
-        /* Variations or plain stock */
-        if (groupNames.length > 0) {
-            buildVariations(p.variations);
-            setBadge('select-options', 'Select Options');
-            submitBtn.disabled = true;
-            qtyMinus.disabled  = true;
-            qtyPlus.disabled   = true;
-            stockNote.textContent = '';
-            updateOptionAvailability();
-        } else {
-            varWrap.innerHTML = '';
-            const stock = p.stockQuantity || 0;
-            if (stock <= 0)      setBadge('out-of-stock', 'Out of Stock');
-            else if (stock <= 5) setBadge('low-stock', 'Low Stock');
-            else                 setBadge('in-stock', 'In Stock');
-
-            qtyInput.max = Math.max(1, stock);
-            setQty(1);
-            stockNote.textContent = stock > 0 ? stock + ' left' : '';
-            submitBtn.disabled = stock <= 0;
-            qtyMinus.disabled  = false;
-            qtyPlus.disabled   = false;
-            selVarsEl.value    = '{}';
-        }
-    }
-
-    /* ── Form validation ──────────────────────────────── */
-    form.addEventListener('submit', function (e) {
-        if (groupNames.length > 0) {
-            if (!selectedKeys.every(v => v !== null)) {
-                e.preventDefault();
-                toast('Please select all product variations.', 'error');
-                return;
-            }
-            if (findComboStock() <= 0) {
-                e.preventDefault();
-                toast('This combination is out of stock.', 'error');
-                return;
-            }
-        }
-        updateHidden();
-        setQty(parseInt(qtyInput.value, 10));
-        // Normal form submit → controller → TempData redirect
-    });
-
-    /* ── Public API called by Home.cshtml ─────────────── */
-    window.openQuickAdd = async function (productId) {
-        backdrop.classList.add('open');
-        openPanel(skeleton);
-        drawer.style.display = 'none';
-        drawer.classList.remove('open');
-        document.body.style.overflow = 'hidden';
-
-        try {
-            const res  = await fetch('/Customer/QuickAddData?id=' + productId);
-            if (!res.ok) throw new Error();
-            const data = await res.json();
-
-            populate(data);
-
-            closePanel(skeleton);
-            setTimeout(() => openPanel(drawer), 50);
-        } catch {
-            backdrop.classList.remove('open');
-            closePanel(skeleton);
-            document.body.style.overflow = '';
-            toast('Could not load product details. Please try again.', 'error');
-        }
-    };
-})();
-</script>
+<script src="~/js/customer/quick-add-modal.js" asp-append-version="true"></script>

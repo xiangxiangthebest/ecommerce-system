@@ -23,7 +23,6 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProfileImageStorage, LocalProfileImageStorage>();
 builder.Services.AddScoped<IReturnImageStorage, LocalReturnImageStorage>();
 builder.Services.AddScoped<IReviewImageStorage, LocalReviewImageStorage>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -44,7 +43,6 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProfileImageStorage, LocalProfileImageStorage>();
 builder.Services.AddScoped<IReturnImageStorage, LocalReturnImageStorage>();
 builder.Services.AddScoped<IReviewImageStorage, LocalReviewImageStorage>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())

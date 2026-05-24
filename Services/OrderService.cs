@@ -10,12 +10,10 @@ namespace EcommerceSystem.Services
     public class OrderService : IOrderService
     {
         private readonly AppDbContext _context;
-        private readonly INotificationService _notificationService;
 
-        public OrderService(AppDbContext context, INotificationService notificationService)
+        public OrderService(AppDbContext context)
         {
             _context = context;
-            _notificationService = notificationService;
         }
 
         // ── Deducts stock from the matching combo inside VariationCombosJson ──
@@ -332,14 +330,6 @@ namespace EcommerceSystem.Services
 
             await _context.SaveChangesAsync();
 
-            await _notificationService.CreateAsync(
-                order.CustomerUserId,
-                "Order Cancelled",
-                $"Your order #{order.OrderId} has been cancelled.",
-                "OrderCancelled",
-                order.OrderId
-            );
-
             return OperationResult.Ok();
         }
 
@@ -357,14 +347,6 @@ namespace EcommerceSystem.Services
             order.ReceivedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-
-            await _notificationService.CreateAsync(
-                order.CustomerUserId,
-                "Review Reminder",
-                $"Please review your order #{order.OrderId}.",
-                "ReviewReminder",
-                order.OrderId
-            );
 
             return OperationResult.Ok();
         }
@@ -395,58 +377,6 @@ namespace EcommerceSystem.Services
             order.CurrentStatus = OrderStatus.RETURN_REFUND;
 
             await _context.SaveChangesAsync();
-
-            return OperationResult.Ok();
-        }
-
-        public async Task<OperationResult> UpdateOrderStatusAsync(int orderId, OrderStatus status)
-        {
-            var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId);
-
-            if (order == null)
-                return OperationResult.Fail("Order not found.");
-
-            order.CurrentStatus = status;
-
-            await _context.SaveChangesAsync();
-
-            // =========================
-            // NOTIFICATIONS
-            // =========================
-
-            if (status == OrderStatus.PREPARING)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Preparing",
-                    $"Your order #{order.OrderId} is being prepared.",
-                    "OrderPreparing",
-                    order.OrderId
-                );
-            }
-
-            else if (status == OrderStatus.SHIPPED)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Shipped",
-                    $"Your order #{order.OrderId} has been shipped.",
-                    "OrderShipped",
-                    order.OrderId
-                );
-            }
-
-            else if (status == OrderStatus.DELIVERED)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Delivered",
-                    $"Your order #{order.OrderId} has been delivered.",
-                    "OrderDelivered",
-                    order.OrderId
-                );
-            }
 
             return OperationResult.Ok();
         }

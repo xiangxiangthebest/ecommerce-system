@@ -19,7 +19,6 @@ namespace EcommerceSystem.Controllers
         private readonly IOrderService _orderService;
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
-        private readonly INotificationService _notificationService;
         private readonly IReturnImageStorage _returnImageStorage;
 
         public CustomerController(
@@ -29,7 +28,6 @@ namespace EcommerceSystem.Controllers
             IOrderService orderService,
             IReviewService reviewService,
             IProfileService profileService,
-            INotificationService notificationService,
             IReturnImageStorage returnImageStorage)
         {
             _customerContext = customerContext;
@@ -38,7 +36,6 @@ namespace EcommerceSystem.Controllers
             _orderService = orderService;
             _reviewService = reviewService;
             _profileService = profileService;
-            _notificationService = notificationService;
             _returnImageStorage = returnImageStorage;
         }
 
@@ -49,7 +46,6 @@ namespace EcommerceSystem.Controllers
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
-            ViewBag.NotificationCount = await _notificationService.GetUnreadCountAsync(customer.UserId);
         }
 
         // =========================
@@ -100,21 +96,26 @@ namespace EcommerceSystem.Controllers
         // ADD TO CART (PRODUCT DETAILS PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
+        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}", string? returnUrl = null)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
             var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            {
+                returnUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
+            }
+
             if (!result.Success)
             {
                 TempData["CartError"] = result.Error;
-                return RedirectToAction("ProductDetails", new { id = productId });
+                return Redirect(returnUrl);
             }
 
             TempData["CartSuccess"] = "Product added to cart";
-            return RedirectToAction("ProductDetails", new { id = productId });
+            return Redirect(returnUrl);
         }
 
         // =========================
@@ -185,6 +186,8 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
+            await LoadCartCountAsync();
+
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
@@ -282,7 +285,6 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // CANCEL ORDER (PURCHASE HISTORY PAGE)
-        // Only allowed from PENDING — restores stock for each item
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -297,7 +299,6 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
-        // Allowed from DELIVERED — supports item selection, quantities, and images
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -327,7 +328,6 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
-        // Moves DELIVERED → RECEIVED
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -342,7 +342,6 @@ namespace EcommerceSystem.Controllers
 
         // =========================
         // SUBMIT RATING (PURCHASE HISTORY PAGE)
-        // Only for RECEIVED orders — supports review images
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -397,6 +396,7 @@ namespace EcommerceSystem.Controllers
         {
             var claims = new List<Claim>
             {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Name, user.FullName),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
@@ -484,6 +484,7 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Chat()
         {
             await LoadCartCountAsync();
+
             return View();
         }
 
@@ -493,12 +494,8 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Notifications()
         {
             await LoadCartCountAsync();
-
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
-
-            var notifications = await _notificationService.GetUserNotificationsAsync(customer.UserId);
-            return View(notifications);
+            
+            return View();
         }
     }
 }

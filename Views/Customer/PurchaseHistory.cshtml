@@ -1,45 +1,51 @@
 @model List<EcommerceSystem.Models.Order>
 
+@using System.Text.Json
+
 <link rel="stylesheet" href="~/css/customer/purchase-history.css" asp-append-version="true" />
 
-@using System.Text.Json
-@using System.Text.Json.Serialization
-
 @{
-    var pendingCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
-    var preparingCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
-    var shippedCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
-    var deliveredCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
-    var receivedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
-    var returnCnt     = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
-    var canceledCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
+    var pendingCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
+    var preparingCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
+    var shippedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
+    var deliveredCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
+    var receivedCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
+    var returnCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+    var canceledCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
 
-    var jsonOpts = new JsonSerializerOptions { WriteIndented = false };
-
+    // Build a compact JSON blob for purchase-history.js
     var orderData = Model.Select(o => new {
-        orderId            = o.OrderId,
-        orderTime          = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
-        status             = o.CurrentStatus.ToString().ToUpper(),
-        statusLabel        = StatusLabel(o.CurrentStatus),
-        paymentMethod      = o.PaymentMethod,
-        totalAmount        = o.TotalAmount.ToString("N2"),
-        shopName           = o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop",
-        shopInitial        = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0,1).ToUpper(),
-        customerMessage    = o.CustomerMessage ?? "",
-        cancelReason       = o.CancelReason ?? "",
-        // YOUR FIX: strip the "||<json>" suffix and legacy [ ] brackets so no curly-braces show in the reason column
-        returnReason       = StripReturnReasonBrackets(
-                                 (o.ReturnReason != null && o.ReturnReason.Contains("||"))
-                                 ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
-                                 : (o.ReturnReason ?? "")),
-        // Return status: if seller approved (ReturnApprovedAt set) show Approved
-        // as a fallback even if the ReturnStatus column was not updated by the controller.
-        returnStatus       = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
-                                 ? "Approved"
-                                 : o.ReturnStatus.ToString(),
-        returnApproved     = o.ReturnApprovedAt.HasValue,
-        returnImagePath    = ParseReturnImages(o.ReturnImagePathsJson),
-        reviewSubmitted    = o.ReviewSubmitted,
+        orderId         = o.OrderId,
+        orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
+        status          = o.CurrentStatus.ToString().ToUpper(),
+        statusLabel     = StatusLabel(o.CurrentStatus),
+
+        paymentMethod   = o.PaymentMethod,
+        totalAmount     = o.TotalAmount.ToString("N2"),
+
+        shopName        = o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop",
+        shopInitial     = (o.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "S").Substring(0, 1).ToUpper(),
+
+        customerMessage = o.CustomerMessage ?? "",
+        cancelReason    = o.CancelReason ?? "",
+
+        // Strip "||<json>" suffix and legacy bracket wrapping to avoid weird characters in UI
+        returnReason    = StripReturnReasonBrackets(
+                            (o.ReturnReason != null && o.ReturnReason.Contains("||"))
+                                ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
+                                : (o.ReturnReason ?? "")
+                          ),
+
+        // If approved timestamp exists, show Approved even if enum didn’t update
+        returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
+                            ? "Approved"
+                            : o.ReturnStatus.ToString(),
+
+        returnApproved  = o.ReturnApprovedAt.HasValue,
+        returnImagePath = ParseImageList(o.ReturnImagePathsJson),
+
+        reviewSubmitted = o.ReviewSubmitted,
+
         address = o.Address == null ? null : new {
             recipientName = o.Address.RecipientName,
             phoneNumber   = o.Address.PhoneNumber,
@@ -49,31 +55,36 @@
             postcode      = o.Address.Postcode,
             state         = o.Address.State
         },
+
         items = o.OrderItems.Select(item => new {
-            orderItemId   = item.OrderItemId,
-            productId     = item.ProductId,
-            name          = item.Product?.Name ?? "",
-            image         = item.Product?.ImagePath ?? "",
-            images        = ParseImagePaths(item.Product?.ImagePathsJson, item.Product?.ImagePath),
-            price         = item.Price.ToString("0.00"),
-            qty           = item.Quantity,
-            subtotal      = (item.Price * item.Quantity).ToString("0.00"),
-            category      = item.Product?.Category?.Name ?? "",
-            description   = item.Product?.Description ?? "",
-            sku           = item.Product?.SKU ?? "",
-            rating        = item.Product?.AverageRating ?? 0,
+            orderItemId = item.OrderItemId,
+            productId   = item.ProductId,
+            name        = item.Product?.Name ?? "",
+            image       = item.Product?.ImagePath ?? "",
+            images      = ParseImagePaths(item.Product?.ImagePathsJson, item.Product?.ImagePath),
+
+            price       = item.Price.ToString("0.00"),
+            qty         = item.Quantity,
+            subtotal    = (item.Price * item.Quantity).ToString("0.00"),
+
+            category    = item.Product?.Category?.Name ?? "",
+            description = item.Product?.Description ?? "",
+            sku         = item.Product?.SKU ?? "",
+            rating      = item.Product?.AverageRating ?? 0,
+
             selectedVariation = ParseVariationToString(item.SelectedVariation),
             allVariations     = ParseAllVariations(item.Product?.VariationsJson),
-            // FRIEND: per-item review rating + text + review photos for drawer display
-            reviewRating  = item.Review?.Rating ?? 0,
-            reviewText    = item.Review?.ReviewText ?? "",
-            reviewImages  = ParseReturnImages(item.Review?.ReviewImagePathsJson),
-            // YOUR: max returnable qty kept for any future use
-            maxReturnQty  = item.Quantity
+
+            // Review fields used by drawer UI
+            reviewRating = item.Review?.Rating ?? 0,
+            reviewText   = item.Review?.ReviewText ?? "",
+            reviewImages = ParseImageList(item.Review?.ReviewImagePathsJson),
+
+            maxReturnQty = item.Quantity
         }).ToList()
     }).ToList();
 
-    var orderDataJson = JsonSerializer.Serialize(orderData, jsonOpts);
+    var orderDataJson = JsonSerializer.Serialize(orderData, new JsonSerializerOptions { WriteIndented = false });
 }
 
 @functions {
@@ -88,35 +99,24 @@
         _ => s.ToString()
     };
 
-    // FRIEND: maps ReturnStatus enum to display label for the notice banner
-    string ReturnStatusLabel(EcommerceSystem.Enums.ReturnStatus s) => s switch {
-        EcommerceSystem.Enums.ReturnStatus.None      => "None",
-        EcommerceSystem.Enums.ReturnStatus.Requested => "Requested",
-        EcommerceSystem.Enums.ReturnStatus.Approved  => "Approved",
-        EcommerceSystem.Enums.ReturnStatus.Rejected  => "Rejected",
-        EcommerceSystem.Enums.ReturnStatus.Refunded  => "Refunded",
-        _ => s.ToString()
-    };
-
     string ParseVariationToString(string? json)
     {
         if (string.IsNullOrWhiteSpace(json) || json == "{}" || json == "[]") return "";
         try {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object) {
-                var parts = new List<string>();
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                    parts.Add($"{prop.Name}: {prop.Value}");
-                return string.Join(" · ", parts);
-            }
-        } catch { }
-        return "";
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return "";
+            var parts = new List<string>();
+            foreach (var prop in doc.RootElement.EnumerateObject())
+                parts.Add($"{prop.Name}: {prop.Value}");
+            return string.Join(" · ", parts);
+        } catch { return ""; }
     }
 
     List<string> ParseImagePaths(string? json, string? mainImage)
     {
         var list = new List<string>();
-        if (!string.IsNullOrWhiteSpace(json) && json != "[]") {
+        if (!string.IsNullOrWhiteSpace(json) && json != "[]")
+        {
             try {
                 using var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.ValueKind == JsonValueKind.Array)
@@ -130,8 +130,7 @@
         return list;
     }
 
-    // FRIEND: used for return proof images and review images
-    List<string> ParseReturnImages(string? json)
+    List<string> ParseImageList(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return new List<string>();
         try {
@@ -145,27 +144,32 @@
     {
         var groups = new List<object>();
         if (string.IsNullOrWhiteSpace(json) || json == "[]") return groups;
+
         try {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                foreach (var group in doc.RootElement.EnumerateArray()) {
-                    var name   = group.TryGetProperty("name",   out var n) ? n.GetString() ?? "" : "";
-                    var values = new List<object>();
-                    if (group.TryGetProperty("values", out var vals) && vals.ValueKind == JsonValueKind.Array)
-                        foreach (var v in vals.EnumerateArray()) {
-                            var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
-                            var stock = v.TryGetProperty("stock", out var s) ? s.GetInt32() : 0;
-                            values.Add(new { label, stock });
-                        }
-                    groups.Add(new { name, values });
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return groups;
+
+            foreach (var group in doc.RootElement.EnumerateArray())
+            {
+                var name = group.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                var values = new List<object>();
+
+                if (group.TryGetProperty("values", out var vals) && vals.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var v in vals.EnumerateArray())
+                    {
+                        var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
+                        var stock = v.TryGetProperty("stock", out var s) ? s.GetInt32() : 0;
+                        values.Add(new { label, stock });
+                    }
                 }
+                groups.Add(new { name, values });
+            }
         } catch { }
+
         return groups;
     }
 
-    // YOUR FIX: strips legacy square-bracket wrapping from old ReturnReason entries
-    // Old format stored "[reason text]||..." → extracted part was "[reason text]"
-    // New format stores "reason text||..." — no brackets. Handles both.
     string StripReturnReasonBrackets(string reason)
     {
         if (string.IsNullOrWhiteSpace(reason)) return reason;
@@ -181,9 +185,9 @@
         if (string.IsNullOrWhiteSpace(json) || json == "{}" || json == "[]") return tags;
         try {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object)
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                    tags.Add($"{prop.Name}: {prop.Value}");
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return tags;
+            foreach (var prop in doc.RootElement.EnumerateObject())
+                tags.Add($"{prop.Name}: {prop.Value}");
         } catch { }
         return tags;
     }
@@ -199,7 +203,7 @@
         </div>
     }
 
-    <!-- ── Page Header ── -->
+    <!-- Page Header -->
     <div class="ph-header">
         <div>
             <h1 class="ph-title">My Orders</h1>
@@ -214,9 +218,7 @@
     @if (!Model.Any())
     {
         <div class="ph-empty">
-            <div class="ph-empty-icon">
-                <i class="ti ti-shopping-bag-x"></i>
-            </div>
+            <div class="ph-empty-icon"><i class="ti ti-shopping-bag-x"></i></div>
             <h2>No orders yet</h2>
             <p>You haven't placed any orders. Find something you love and it'll show up here.</p>
             <a href="/Customer/Home" class="ph-btn ph-btn-primary">
@@ -226,37 +228,21 @@
     }
     else
     {
-        <!-- ── Toolbar ── -->
+        <!-- Toolbar -->
         <div class="ph-toolbar">
             <div class="ph-tabs" id="phTabs">
-                <button class="ph-tab active" data-status="ALL">
-                    All <span class="ph-badge">@Model.Count</span>
-                </button>
-                <button class="ph-tab" data-status="PENDING">
-                    Pending <span class="ph-badge">@pendingCnt</span>
-                </button>
-                <button class="ph-tab" data-status="PREPARING">
-                    Preparing <span class="ph-badge">@preparingCnt</span>
-                </button>
-                <button class="ph-tab" data-status="SHIPPED">
-                    Shipped <span class="ph-badge">@shippedCnt</span>
-                </button>
-                <button class="ph-tab" data-status="DELIVERED">
-                    Delivered <span class="ph-badge">@deliveredCnt</span>
-                </button>
-                <button class="ph-tab" data-status="RECEIVED">
-                    Received <span class="ph-badge">@receivedCnt</span>
-                </button>
-                <button class="ph-tab" data-status="RETURN_REFUND">
-                    Return/Refund <span class="ph-badge">@returnCnt</span>
-                </button>
-                <button class="ph-tab" data-status="CANCELED">
-                    Canceled <span class="ph-badge">@canceledCnt</span>
-                </button>
+                <button class="ph-tab active" data-status="ALL">All <span class="ph-badge">@Model.Count</span></button>
+                <button class="ph-tab" data-status="PENDING">Pending <span class="ph-badge">@pendingCnt</span></button>
+                <button class="ph-tab" data-status="PREPARING">Preparing <span class="ph-badge">@preparingCnt</span></button>
+                <button class="ph-tab" data-status="SHIPPED">Shipped <span class="ph-badge">@shippedCnt</span></button>
+                <button class="ph-tab" data-status="DELIVERED">Delivered <span class="ph-badge">@deliveredCnt</span></button>
+                <button class="ph-tab" data-status="RECEIVED">Received <span class="ph-badge">@receivedCnt</span></button>
+                <button class="ph-tab" data-status="RETURN_REFUND">Return/Refund <span class="ph-badge">@returnCnt</span></button>
+                <button class="ph-tab" data-status="CANCELED">Canceled <span class="ph-badge">@canceledCnt</span></button>
             </div>
         </div>
 
-        <!-- ── Order Cards ── -->
+        <!-- Order Cards -->
         <div id="phOrderList">
             @foreach (var order in Model)
             {
@@ -265,18 +251,17 @@
                 var sellerInitial = sellerName.Length > 0 ? sellerName[0].ToString().ToUpper() : "S";
                 var itemCount     = order.OrderItems.Count;
                 var searchHint    = order.OrderId + " " + string.Join(" ", order.OrderItems.Select(i => i.Product?.Name ?? ""));
+                <div class="ph-card"
+                     data-order-id="@order.OrderId"
+                     data-status="@statusKey"
+                     data-search="@searchHint.ToLowerInvariant()">
 
-                <div class="ph-card" data-order-id="@order.OrderId" data-status="@statusKey" data-search="@searchHint.ToLower()">
-
-                    <!-- Card top bar -->
                     <div class="ph-card-bar">
                         <div class="ph-card-bar-left">
                             <span class="ph-order-id">#@order.OrderId</span>
                             <span class="ph-order-date">
                                 <i class="ti ti-clock"></i>
-                                @order.OrderTime.ToString("dd MMM yyyy")
-                                &nbsp;·&nbsp;
-                                @order.OrderTime.ToString("hh:mm tt")
+                                @order.OrderTime.ToString("dd MMM yyyy")&nbsp;·&nbsp;@order.OrderTime.ToString("hh:mm tt")
                             </span>
                         </div>
                         <span class="ph-status-pill ph-s-@statusKey">
@@ -285,7 +270,6 @@
                         </span>
                     </div>
 
-                    <!-- Order timeline (progress bar) -->
                     @{
                         var steps = new[] { "PENDING", "PREPARING", "SHIPPED", "DELIVERED", "RECEIVED" };
                         int currentStep = Array.IndexOf(steps, statusKey);
@@ -297,9 +281,7 @@
                         <div class="ph-progress">
                             @foreach (var (step, idx) in steps.Select((s, i) => (s, i)))
                             {
-                                var stepClass = idx < currentStep ? "done"
-                                              : idx == currentStep ? "active"
-                                              : "upcoming";
+                                var stepClass = idx < currentStep ? "done" : idx == currentStep ? "active" : "upcoming";
                                 var stepLabel = step switch {
                                     "PENDING"   => "Pending",
                                     "PREPARING" => "Preparing",
@@ -317,9 +299,7 @@
                                     _ => "ti-circle"
                                 };
                                 <div class="ph-progress-step @stepClass">
-                                    <div class="ph-progress-node">
-                                        <i class="ti @stepIcon"></i>
-                                    </div>
+                                    <div class="ph-progress-node"><i class="ti @stepIcon"></i></div>
                                     <div class="ph-progress-label">@stepLabel</div>
                                     @if (idx < steps.Length - 1)
                                     {
@@ -330,7 +310,6 @@
                         </div>
                     }
 
-                    <!-- Canceled notice -->
                     @if (isCanceled && !string.IsNullOrWhiteSpace(order.CancelReason))
                     {
                         <div class="ph-notice ph-notice-canceled">
@@ -342,39 +321,34 @@
                         </div>
                     }
 
-                    <!-- FRIEND: Richer Return/Refund notice with status badge + proof photos -->
                     @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
                     {
-                        var returnImgs = ParseReturnImages(order.ReturnImagePathsJson);
+                        var returnImgs = ParseImageList(order.ReturnImagePathsJson);
 
-                        // YOUR FIX: strip "||<json>" and legacy "[...]" so no curly braces appear
-                        var returnDisplay = order.ReturnReason;
+                        var returnDisplay = order.ReturnReason ?? "";
                         var rrSep = returnDisplay.IndexOf("||");
                         if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
                         returnDisplay = StripReturnReasonBrackets(returnDisplay);
 
                         var rnBannerStatus = order.ReturnApprovedAt.HasValue ? "Approved" : order.ReturnStatus.ToString();
-                        var rnBannerClass  = rnBannerStatus switch {
+                        var rnBannerClass = rnBannerStatus switch {
                             "Approved" or "Refunded" => "ph-notice-return-v2 rn-approved",
                             "Rejected"               => "ph-notice-return-v2 rn-rejected",
                             _                        => "ph-notice-return-v2"
                         };
+
                         <div class="@rnBannerClass">
-                            <!-- Header strip -->
                             <div class="rn-header">
-                                <div class="rn-icon-wrap">
-                                    <i class="ti ti-package-off"></i>
-                                </div>
+                                <div class="rn-icon-wrap"><i class="ti ti-package-off"></i></div>
                                 <div class="rn-header-text">
                                     <div class="rn-title">Return / Refund Requested</div>
                                     @{
-                                        // status vars - @{} is valid here as we're inside HTML context within the @if
                                         var rtStatus = rnBannerStatus;
-                                        var rtLabel  = rtStatus switch {
-                                            "Approved"  => "✅ Approved — refund is being processed",
-                                            "Rejected"  => "❌ Rejected by seller",
-                                            "Refunded"  => "✅ Refunded",
-                                            "Requested" => "⏳ Requested — awaiting seller review",
+                                        var rtLabel = rtStatus switch {
+                                            "Approved"  => "Approved",
+                                            "Rejected"  => "Rejected",
+                                            "Refunded"  => "Refunded",
+                                            "Requested" => "Requested",
                                             _           => rtStatus
                                         };
                                         var rtDotClass = rtStatus switch {
@@ -383,20 +357,17 @@
                                             _                        => "rn-status-dot"
                                         };
                                     }
-                                    <div class="rn-status">
-                                        <span class="@rtDotClass"></span>
-                                        @rtLabel
-                                    </div>
+                                    <div class="rn-status"><span class="@rtDotClass"></span>@rtLabel</div>
                                 </div>
                             </div>
-                            <!-- Reason (with YOUR bracket-fix applied) -->
+
                             <div class="rn-body">
                                 <div class="rn-reason">
                                     <div class="rn-reason-label">Your reason</div>
                                     <div class="rn-reason-text">@returnDisplay</div>
                                 </div>
                             </div>
-                            <!-- FRIEND: proof photo strip (only if images exist) -->
+
                             @if (returnImgs.Any())
                             {
                                 <div class="rn-photo-strip">
@@ -404,15 +375,10 @@
                                     <div class="rn-photo-row">
                                         @foreach (var img in returnImgs)
                                         {
-                                            <div class="rn-strip-thumb"
-                                                onclick="rtnOpenLightbox('@img')"
-                                                title="View proof photo">
-                                                <img src="@img"
-                                                    alt="Return proof"
-                                                    onerror="this.closest('.rn-strip-thumb').style.display='none'" />
-                                                <div class="rn-img-badge">
-                                                    <i class="ti ti-zoom-in"></i>
-                                                </div>
+                                            <div class="rn-strip-thumb" onclick="rtnOpenLightbox('@img')" title="View proof photo">
+                                                <img src="@img" alt="Return proof"
+                                                     onerror="this.closest('.rn-strip-thumb').style.display='none'" />
+                                                <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
                                             </div>
                                         }
                                     </div>
@@ -421,7 +387,6 @@
                         </div>
                     }
 
-                    <!-- Seller + items toggle -->
                     <div class="ph-card-seller">
                         <div class="ph-seller-avatar">@sellerInitial</div>
                         <span>Sold by <strong>@sellerName</strong></span>
@@ -431,7 +396,6 @@
                         </button>
                     </div>
 
-                    <!-- Collapsible items -->
                     <div class="ph-collapse">
                         @foreach (var item in order.OrderItems)
                         {
@@ -447,7 +411,9 @@
                                     {
                                         <div class="ph-item-vars">
                                             @foreach (var tag in vtags)
-                                            { <span class="ph-var-tag">@tag</span> }
+                                            {
+                                                <span class="ph-var-tag">@tag</span>
+                                            }
                                         </div>
                                     }
                                     <div class="ph-item-qty">Qty: @item.Quantity &nbsp;·&nbsp; RM @item.Price.ToString("0.00") each</div>
@@ -455,6 +421,7 @@
                                 <div class="ph-item-total">RM @((item.Price * item.Quantity).ToString("0.00"))</div>
                             </div>
                         }
+
                         @if (!string.IsNullOrWhiteSpace(order.CustomerMessage))
                         {
                             <div class="ph-customer-msg">
@@ -464,7 +431,6 @@
                         }
                     </div>
 
-                    <!-- Delivery toggle -->
                     <div class="ph-card-seller ph-card-delivery-toggle">
                         <i class="ti ti-map-pin" style="font-size:14px;color:#aaa"></i>
                         <span style="color:#aaa;font-size:12px;font-weight:500">Delivery</span>
@@ -474,7 +440,6 @@
                         </button>
                     </div>
 
-                    <!-- Collapsible delivery -->
                     <div class="ph-collapse">
                         <div class="ph-delivery">
                             <div class="ph-delivery-row">
@@ -495,55 +460,45 @@
                         </div>
                     </div>
 
-                    <!-- Card footer -->
                     <div class="ph-card-footer">
                         <div class="ph-footer-payment">
                             <i class="ti ti-credit-card"></i>
                             <span>@order.PaymentMethod</span>
                         </div>
+
                         <div class="ph-footer-right">
                             <div class="ph-total-block">
                                 <div class="ph-total-label">Order Total</div>
                                 <div class="ph-total-amt">RM @order.TotalAmount.ToString("N2")</div>
                             </div>
 
-                            <!-- Details button (always visible) -->
-                            <button class="ph-btn ph-btn-ghost"
-                                    onclick="openDrawer(@order.OrderId)">
+                            <button class="ph-btn ph-btn-ghost" onclick="openDrawer(@order.OrderId)">
                                 <i class="ti ti-file-text"></i> Details
                             </button>
 
-                            <!-- PENDING: Cancel button -->
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING)
                             {
-                                <button class="ph-btn ph-btn-danger"
-                                        onclick="openCancelModal(@order.OrderId)">
+                                <button class="ph-btn ph-btn-danger" onclick="openCancelModal(@order.OrderId)">
                                     <i class="ti ti-x"></i> Cancel Order
                                 </button>
                             }
 
-                            <!-- DELIVERED ONLY: Order Received + Request Return/Refund (FRIEND design, YOUR logic)
-                                 NO Complaint button anywhere — removed per both requirements -->
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
                             {
-                                <button class="ph-btn ph-btn-return-trigger"
-                                        onclick="openReturnModal(@order.OrderId)">
+                                <button class="ph-btn ph-btn-return-trigger" onclick="openReturnModal(@order.OrderId)">
                                     <i class="ti ti-package-off"></i> Return / Refund
                                 </button>
 
-                                <button class="ph-btn ph-btn-primary"
-                                        onclick="confirmReceived(@order.OrderId, this)">
+                                <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
                                     <i class="ti ti-circle-check"></i> Order Received
                                 </button>
                             }
 
-                            <!-- RECEIVED: Write Review button (no complaint) -->
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)
                             {
                                 if (!order.ReviewSubmitted)
                                 {
-                                    <button class="ph-btn ph-btn-star js-write-review"
-                                            onclick="openRatingModal(@order.OrderId)">
+                                    <button class="ph-btn ph-btn-star js-write-review" onclick="openRatingModal(@order.OrderId)">
                                         <i class="ti ti-star"></i> Write Review
                                     </button>
                                 }
@@ -554,32 +509,28 @@
                                     </span>
                                 }
                             }
-
                         </div>
                     </div>
 
-                </div><!-- /.ph-card -->
+                </div>
             }
-        </div><!-- /#phOrderList -->
+        </div>
 
         <div id="phNoResults" class="ph-no-results" style="display:none">
             <i class="ti ti-search-off"></i>
             <p>No orders match your search.</p>
         </div>
-
     }
-</div><!-- /.ph-page -->
 
-<!-- ═══════════════════════════════════════════════════════════
-     DRAWER  –  Order Detail
-═══════════════════════════════════════════════════════════ -->
+</div>
+
+<!-- Drawer -->
 <div class="od-backdrop" id="odBackdrop" onclick="closeDrawer()"></div>
 <aside class="od-drawer" id="odDrawer" role="dialog" aria-modal="true" aria-label="Order details">
-
     <div class="od-drawer-header">
         <div>
             <div class="od-drawer-title" id="odTitle"></div>
-            <div class="od-drawer-date"  id="odDate"></div>
+            <div class="od-drawer-date" id="odDate"></div>
         </div>
         <div class="od-drawer-header-right">
             <span class="ph-status-pill" id="odBadge">
@@ -591,15 +542,10 @@
             </button>
         </div>
     </div>
-
     <div class="od-drawer-body" id="odDrawerBody"></div>
-
 </aside>
 
-
-<!-- ═══════════════════════════════════════════════════════════
-     MODAL  –  Cancel Order
-═══════════════════════════════════════════════════════════ -->
+<!-- Cancel Modal -->
 <div class="ph-modal-backdrop" id="cancelBackdrop" onclick="closeCancelModal()"></div>
 <div class="ph-modal" id="cancelModal">
     <div class="ph-modal-header">
@@ -610,12 +556,12 @@
     <p class="ph-modal-sub">Please let us know why you'd like to cancel. Your feedback helps us improve.</p>
 
     <div class="ph-reason-grid" id="cancelReasonGrid">
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Changed my mind</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Found a better price</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Ordered by mistake</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Delivery too slow</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Wrong item ordered</button>
-        <button class="ph-reason-chip" onclick="selectReason(this, 'cancelCustom')">Other</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Changed my mind</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Found a better price</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Ordered by mistake</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Delivery too slow</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Wrong item ordered</button>
+        <button class="ph-reason-chip" onclick="selectReason(this,'cancelCustom')">Other</button>
     </div>
 
     <div class="ph-textarea-wrap">
@@ -632,61 +578,38 @@
     </div>
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════════
-     MODAL – Request Return / Refund  (combined: item select + type + reason + photo)
-═══════════════════════════════════════════════════════════ -->
+<!-- Return Modal -->
 <div class="ph-modal-backdrop" id="returnBackdrop" onclick="closeReturnModal()"></div>
-
 <div class="ph-modal ph-modal-return" id="returnModal">
-
-    <!-- Hero header -->
     <div class="rtn-modal-hero">
-        <div class="rtn-modal-hero-icon">
-            <i class="ti ti-package-off"></i>
-        </div>
+        <div class="rtn-modal-hero-icon"><i class="ti ti-package-off"></i></div>
         <div class="rtn-modal-hero-text">
             <div class="rtn-modal-hero-title">Request Return / Refund</div>
             <div class="rtn-modal-hero-sub">Select the item(s) affected and describe the issue. The seller will review your request.</div>
         </div>
-        <button class="rtn-modal-close" onclick="closeReturnModal()" aria-label="Close">
-            <i class="ti ti-x"></i>
-        </button>
+        <button class="rtn-modal-close" onclick="closeReturnModal()" aria-label="Close"><i class="ti ti-x"></i></button>
     </div>
 
-    <!-- Body -->
     <div class="rtn-modal-body">
-
-        <!-- STEP 1: Item selection list -->
         <div class="rtn-field-group">
-            <label class="rtn-field-label">
-                Item(s) to return <span class="rtn-required">*</span>
-            </label>
+            <label class="rtn-field-label">Item(s) to return <span class="rtn-required">*</span></label>
             <div id="rtnItemList" class="rtn-item-list"></div>
         </div>
 
-        <!-- STEP 2: Return type -->
         <div class="rtn-field-group">
-            <label class="rtn-field-label">
-                Return type <span class="rtn-required">*</span>
-            </label>
+            <label class="rtn-field-label">Return type <span class="rtn-required">*</span></label>
             <div class="rtn-type-row">
                 <button class="rtn-type-btn" data-type="Return &amp; Refund" onclick="rtnSelectType(this)">
-                    <i class="ti ti-package-export"></i>
-                    Return &amp; Refund
+                    <i class="ti ti-package-export"></i> Return &amp; Refund
                 </button>
                 <button class="rtn-type-btn" data-type="Refund Only" onclick="rtnSelectType(this)">
-                    <i class="ti ti-currency-dollar"></i>
-                    Refund Only
+                    <i class="ti ti-currency-dollar"></i> Refund Only
                 </button>
             </div>
         </div>
 
-        <!-- STEP 3: Reason chips -->
         <div class="rtn-field-group">
-            <label class="rtn-field-label">
-                Reason <span class="rtn-required">*</span>
-            </label>
+            <label class="rtn-field-label">Reason <span class="rtn-required">*</span></label>
             <div class="rtn-reason-grid">
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Wrong item received</button>
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Item not delivered</button>
@@ -697,54 +620,39 @@
             </div>
         </div>
 
-        <!-- STEP 4: Description -->
         <div class="rtn-field-group">
             <label class="rtn-field-label" for="returnReason">Description</label>
-            <textarea id="returnReason"
-                      class="rtn-textarea"
-                      placeholder="Describe your issue in more detail…"
-                      rows="3"></textarea>
+            <textarea id="returnReason" class="rtn-textarea" placeholder="Describe your issue in more detail…" rows="3"></textarea>
         </div>
 
-        <!-- STEP 5: Photo proof upload -->
         <div class="rtn-field-group">
             <label class="rtn-field-label">Photo proof</label>
             <div class="rtn-upload-zone" id="rtnUploadZone"
                  ondragover="event.preventDefault();this.classList.add('drag-over')"
                  ondragleave="this.classList.remove('drag-over')"
                  ondrop="rtnHandleDrop(event)">
-                <input type="file" id="returnImage" accept="image/*" multiple
-                       onchange="rtnHandleFiles(this.files)" />
+                <input type="file" id="returnImage" accept="image/*" multiple onchange="rtnHandleFiles(this.files)" />
                 <div class="rtn-upload-inner">
                     <div class="rtn-upload-icon"><i class="ti ti-camera"></i></div>
-                    <div class="rtn-upload-text">
-                        <strong>Click to upload</strong> or drag photos here
-                    </div>
+                    <div class="rtn-upload-text"><strong>Click to upload</strong> or drag photos here</div>
                     <div class="rtn-upload-hint">JPG, PNG, WEBP · Max 5 MB each · Up to 4 photos</div>
                 </div>
             </div>
             <div class="rtn-preview-row" id="rtnPreviewRow"></div>
         </div>
-
     </div>
 
     <input type="hidden" id="returnOrderId" />
 
-    <!-- Footer -->
     <div class="ph-modal-footer">
-        <button class="ph-btn ph-btn-ghost" onclick="closeReturnModal()">
-            Cancel
-        </button>
+        <button class="ph-btn ph-btn-ghost" onclick="closeReturnModal()">Cancel</button>
         <button class="ph-btn ph-btn-return" onclick="submitReturn()">
             <i class="ti ti-send"></i> Submit Request
         </button>
     </div>
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════════
-     MODAL  –  Write Review / Rating  (FRIEND: with photo upload per item)
-═══════════════════════════════════════════════════════════ -->
+<!-- Rating Modal -->
 <div class="ph-modal-backdrop" id="ratingBackdrop" onclick="closeRatingModal()"></div>
 <div class="ph-modal" id="ratingModal">
     <div class="ph-modal-header">
@@ -754,7 +662,6 @@
     </div>
 
     <div id="ratingItemsWrap"></div>
-
     <input type="hidden" id="ratingOrderId" />
 
     <div class="ph-modal-footer">
@@ -765,957 +672,23 @@
     </div>
 </div>
 
-
-<!-- ── Return proof / review lightbox (FRIEND) ── -->
+<!-- Lightbox -->
 <div class="rtn-lightbox" id="rtnLightbox" onclick="rtnCloseLightbox()">
-    <button class="rtn-lightbox-close" onclick="rtnCloseLightbox()" aria-label="Close">
-        <i class="ti ti-x"></i>
-    </button>
-    <img id="rtnLightboxImg" src="" alt="Return proof" onclick="event.stopPropagation()" />
+    <button class="rtn-lightbox-close" onclick="rtnCloseLightbox()" aria-label="Close"><i class="ti ti-x"></i></button>
+    <img id="rtnLightboxImg" src="" alt="Preview" onclick="event.stopPropagation()" />
 </div>
 
+<!-- ✅ Keep the anti-forgery token in DOM so JS can read it -->
+<form id="phAntiForgeryForm" style="display:none">
+    @Html.AntiForgeryToken()
+</form>
 
-<!-- ═══════════════════════════════════════════════════════════
-     SCRIPTS
-═══════════════════════════════════════════════════════════ -->
-<script>
-// ── Toast auto-hide ────────────────────────────────────────
-const _toast = document.getElementById('phToast');
-if (_toast) setTimeout(() => _toast.classList.add('ph-toast-hide'), 3500);
+@section Scripts {
+    <!-- Inject orders for purchase-history.js -->
+    <script>
+        window.PH_ORDERS = @Html.Raw(orderDataJson);
+    </script>
 
-// ── Order data ─────────────────────────────────────────────
-const _orders = @Html.Raw(orderDataJson);
-
-// ── Tab filter ─────────────────────────────────────────────
-document.querySelectorAll('.ph-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        applyFilters();
-    });
-});
-
-// ── Search ─────────────────────────────────────────────────
-document.getElementById('phSearch').addEventListener('input', applyFilters);
-
-function applyFilters() {
-    const status = document.querySelector('.ph-tab.active')?.dataset.status ?? 'ALL';
-    const query  = document.getElementById('phSearch').value.toLowerCase().trim();
-    let visible  = 0;
-    document.querySelectorAll('.ph-card').forEach(card => {
-        const matchStatus = status === 'ALL' || card.dataset.status === status;
-        const matchSearch = !query || card.dataset.search.includes(query);
-        const show = matchStatus && matchSearch;
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
-    });
-    document.getElementById('phNoResults').style.display = visible === 0 ? 'flex' : 'none';
+    <!-- External JS (your cleaned script) -->
+    <script src="~/js/customer/purchase-history.js" asp-append-version="true"></script>
 }
-
-// ── Collapsible sections ───────────────────────────────────
-function toggleCollapse(btn) {
-    btn.classList.toggle('open');
-    const collapse = btn.closest('.ph-card-seller, .ph-card-delivery-toggle')
-                        .nextElementSibling;
-    collapse.style.maxHeight = btn.classList.contains('open')
-        ? collapse.scrollHeight + 'px' : '0';
-}
-
-// ═══════════════════════════════════════════════════════════
-// DRAWER  –  Order Detail
-// (FRIEND: shows review with rating + per-item photos; YOUR: clean returnReason)
-// ═══════════════════════════════════════════════════════════
-function openDrawer(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
-    if (!order) return;
-
-    document.getElementById('odTitle').textContent = 'Order #' + order.orderId;
-    document.getElementById('odDate').textContent  = order.orderTime;
-
-    const badge = document.getElementById('odBadge');
-    badge.className = 'ph-status-pill ph-s-' + order.status;
-    document.getElementById('odBadgeLabel').textContent = order.statusLabel;
-
-    let html = '';
-
-    // FRIEND: richer return/refund notice in drawer with proof photos
-    if (order.status === 'RETURN_REFUND' && order.returnReason) {
-        let photoStripHtml = '';
-        const imgs = Array.isArray(order.returnImagePath) ? order.returnImagePath.filter(Boolean) : [];
-
-        if (imgs.length > 0) {
-            const thumbs = imgs.map(src =>
-                `<div class="rn-strip-thumb" onclick="rtnOpenLightbox('${src.replace(/'/g,"\\'")}')">
-                    <img src="${esc(src)}" alt="Return proof"
-                        onerror="this.closest('.rn-strip-thumb').style.display='none'" />
-                    <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
-                </div>`
-            ).join('');
-
-            photoStripHtml = `
-            <div class="rn-photo-strip">
-                <div class="rn-reason-label">Proof photos</div>
-                <div class="rn-photo-row">${thumbs}</div>
-            </div>`;
-        }
-
-        html += `
-        <div class="ph-notice-return-v2">
-            <div class="rn-header">
-                <div class="rn-icon-wrap"><i class="ti ti-package-off"></i></div>
-                <div class="rn-header-text">
-                    <div class="rn-title">Return / Refund in Progress</div>
-                    <div class="rn-status">
-                        <span class="${order.returnStatus==='Approved'||order.returnStatus==='Refunded' ? 'rn-status-dot rn-dot-approved' : order.returnStatus==='Rejected' ? 'rn-status-dot rn-dot-rejected' : 'rn-status-dot'}"></span>
-                        ${esc(
-                        order.returnStatus === 'Approved'  ? '✅ Approved — refund is being processed' :
-                        order.returnStatus === 'Refunded'  ? '✅ Refunded' :
-                        order.returnStatus === 'Rejected'  ? '❌ Rejected by seller' :
-                        order.returnStatus === 'Requested' ? '⏳ Requested — awaiting seller review' :
-                        order.returnStatus || 'Pending Review'
-                    )}
-                    </div>
-                </div>
-            </div>
-            <div class="rn-body">
-                <div class="rn-reason">
-                    <div class="rn-reason-label">Your reason</div>
-                    <div class="rn-reason-text">${esc(order.returnReason)}</div>
-                </div>
-            </div>
-            ${photoStripHtml}
-        </div>`;
-    }
-
-    if (order.status === 'CANCELED' && order.cancelReason) {
-        html += `
-        <div class="od-notice od-notice-canceled">
-            <i class="ti ti-ban"></i>
-            <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
-        </div>`;
-    }
-
-    // FRIEND: review section with per-item star rating + review text + photos
-    if (order.reviewSubmitted) {
-        const reviewLines = order.items
-            .filter(item => item.reviewRating > 0)
-            .map(item => {
-                const filled   = '★'.repeat(item.reviewRating);
-                const unfilled = '☆'.repeat(5 - item.reviewRating);
-                const labels   = ['','Poor','Fair','Good','Very Good','Excellent'];
-                const label    = labels[item.reviewRating] ?? '';
-                const textLine = item.reviewText
-                    ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>`
-                    : '';
-                const imgs = Array.isArray(item.reviewImages) ? item.reviewImages.filter(Boolean) : [];
-                let photoStripHtml = '';
-
-                if (imgs.length > 0) {
-                    const thumbs = imgs.map(src => `
-                        <div class="rw-strip-thumb"
-                            onclick="rtnOpenLightbox('${String(src).replace(/'/g,"\\'")}')"
-                            title="View review photo">
-                            <img src="${esc(src)}"
-                                alt="Review photo"
-                                onerror="this.closest('.rw-strip-thumb').style.display='none'" />
-                            <div class="rw-img-badge"><i class="ti ti-zoom-in"></i></div>
-                        </div>
-                    `).join('');
-
-                    photoStripHtml = `
-                        <div class="rn-photo-strip" style="margin-top:10px">
-                            <div class="rn-reason-label">Review photos</div>
-                            <div class="rn-photo-row">${thumbs}</div>
-                        </div>
-                    `;
-                }
-
-                return `
-                <div class="od-reviewed-item">
-                    <span class="od-reviewed-item-name">${esc(item.name)}</span>
-                    <span class="od-reviewed-stars">
-                        <span class="od-reviewed-filled">${filled}</span><span class="od-reviewed-unfilled">${unfilled}</span>
-                        <span class="od-reviewed-label">${label}</span>
-                    </span>
-                    ${textLine}
-                    ${photoStripHtml}
-                </div>`;
-            }).join('');
-
-        html += `
-        <div class="od-reviewed-sent">
-            <i class="ti ti-star"></i>
-            <div>
-                <strong>Review Submitted</strong>
-                ${reviewLines}
-            </div>
-        </div>`;
-    }
-
-    // Items
-    order.items.forEach((item, idx) => {
-        const imgs    = (item.images && item.images.length > 0) ? item.images : [item.image];
-        const mainImg = imgs[0] || item.image;
-        const thumbsHtml = imgs.length > 1
-            ? `<div class="od-thumbs">${imgs.map((src, i) =>
-                `<div class="od-thumb ${i===0?'active':''}" onclick="odSwitch(this,'${src.replace(/'/g,"\\'")}')">
-                    <img src="${esc(src)}" onerror="this.src='/images/placeholder.png'" /></div>`
-               ).join('')}</div>` : '';
-
-        const fullStars  = Math.floor(item.rating);
-        const stars = Array(fullStars).fill('★').join('') + Array(5-fullStars).fill('☆').join('');
-
-        const selectedMap = {};
-        if (item.selectedVariation) {
-            item.selectedVariation.split(' · ').forEach(pair => {
-                const ci = pair.indexOf(': ');
-                if (ci > -1) selectedMap[pair.substring(0, ci).trim()] = pair.substring(ci+2).trim();
-            });
-        }
-
-        let varHtml = '';
-        if (item.allVariations && item.allVariations.length > 0) {
-            varHtml = item.allVariations.map(g => {
-                const btns = g.values.map(v => {
-                    const sel = selectedMap[g.name] === v.label;
-                    const oos = v.stock <= 0;
-                    const cls = sel ? 'od-var-btn sel' : oos ? 'od-var-btn oos' : 'od-var-btn';
-                    return `<button class="${cls}" disabled>${esc(v.label)}</button>`;
-                }).join('');
-                return `<div class="od-var-group"><div class="od-var-name">${esc(g.name)}</div><div class="od-var-opts">${btns}</div></div>`;
-            }).join('');
-        }
-
-        const sep = idx > 0 ? `<div class="od-sep"></div>` : '';
-        html += `${sep}
-        <div class="od-item-wrap">
-            <div class="od-gallery">
-                <div class="od-main-img-wrap">
-                    <img src="${esc(mainImg)}" alt="${esc(item.name)}" onerror="this.src='/images/placeholder.png'" />
-                </div>
-                ${thumbsHtml}
-            </div>
-            <div class="od-info">
-                ${item.category ? `<div class="od-category">${esc(item.category)}</div>` : ''}
-                <div class="od-name">${esc(item.name)}</div>
-                <div class="od-stars-row">
-                    <span class="od-stars">${stars}</span>
-                    <span class="od-rating-num">${item.rating.toFixed(1)}</span>
-                </div>
-                <div class="od-divider"></div>
-                <div class="od-shop-row">
-                    <div class="od-shop-ava">${esc(order.shopInitial)}</div>
-                    <span>Sold by <strong>${esc(order.shopName)}</strong></span>
-                </div>
-                <div class="od-price">RM ${esc(item.price)}</div>
-                <div class="od-price-note">× ${item.qty} unit${item.qty>1?'s':''} = <strong>RM ${esc(item.subtotal)}</strong></div>
-                ${item.sku ? `<div class="od-sku">SKU: ${esc(item.sku)}</div>` : ''}
-                <div class="od-divider"></div>
-                ${item.description ? `<p class="od-desc">${esc(item.description)}</p>` : ''}
-                ${varHtml}
-            </div>
-        </div>`;
-    });
-
-    // Customer note
-    if (order.customerMessage) {
-        html += `<div class="od-customer-msg">
-            <div class="od-customer-msg-label"><i class="ti ti-message-circle"></i> Note to Seller</div>
-            <div class="od-customer-msg-text">${esc(order.customerMessage)}</div>
-        </div>`;
-    }
-
-    // Address block
-    if (order.address) {
-        const a = order.address;
-        html += `<div class="od-address-block">
-            <div class="od-address-title"><i class="ti ti-map-pin"></i> Delivery Address</div>
-            <div class="od-address-grid">
-                <div class="od-address-row"><span>Recipient</span>${esc(a.recipientName)}</div>
-                <div class="od-address-row"><span>Phone</span>${esc(a.phoneNumber)}</div>
-                <div class="od-address-row"><span>Address</span>${esc(a.line1)}${a.line2?', '+esc(a.line2):''}, ${esc(a.city)}, ${esc(a.postcode)}, ${esc(a.state)}</div>
-                <div class="od-address-row"><span>Payment</span>${esc(order.paymentMethod)}</div>
-            </div>
-        </div>`;
-    }
-
-    // Order total summary
-    html += `<div class="od-total-bar">
-        <span>Order Total</span>
-        <strong>RM ${esc(order.totalAmount)}</strong>
-    </div>`;
-
-    document.getElementById('odDrawerBody').innerHTML = html;
-    document.getElementById('odBackdrop').classList.add('active');
-    document.getElementById('odDrawer').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function odSwitch(thumbEl, src) {
-    const gallery = thumbEl.closest('.od-gallery');
-    gallery.querySelector('.od-main-img-wrap img').src = src;
-    gallery.querySelectorAll('.od-thumb').forEach(t => t.classList.remove('active'));
-    thumbEl.classList.add('active');
-}
-
-function closeDrawer() {
-    document.getElementById('odBackdrop').classList.remove('active');
-    document.getElementById('odDrawer').classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-// ═══════════════════════════════════════════════════════════
-// CANCEL ORDER
-// ═══════════════════════════════════════════════════════════
-let _cancelSelectedReason = '';
-
-function openCancelModal(orderId) {
-    document.getElementById('cancelOrderId').value = orderId;
-    document.getElementById('cancelCustom').value  = '';
-    _cancelSelectedReason = '';
-    document.querySelectorAll('#cancelReasonGrid .ph-reason-chip')
-            .forEach(c => c.classList.remove('selected'));
-    showModal('cancelBackdrop', 'cancelModal');
-}
-
-function closeCancelModal() { hideModal('cancelBackdrop', 'cancelModal'); }
-
-function selectReason(chip, textareaId) {
-    const grid = chip.parentElement;
-    grid.querySelectorAll('.ph-reason-chip').forEach(c => c.classList.remove('selected'));
-    chip.classList.add('selected');
-    _cancelSelectedReason = chip.textContent.trim();
-    const ta = document.getElementById(textareaId);
-    if (!ta.value.trim()) ta.value = _cancelSelectedReason === 'Other' ? '' : _cancelSelectedReason;
-}
-
-async function submitCancel() {
-    const orderId = document.getElementById('cancelOrderId').value;
-    const reason  = document.getElementById('cancelCustom').value.trim()
-                 || _cancelSelectedReason;
-
-    if (!reason) { showInlineError('cancelModal', 'Please select or enter a cancellation reason.'); return; }
-
-    const btn = document.querySelector('#cancelModal .ph-btn-danger');
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Canceling…';
-
-    try {
-        const res  = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason });
-        if (res.success) {
-            closeCancelModal();
-            showToast('Order canceled successfully.', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
-            showInlineError('cancelModal', res.message || 'Could not cancel order.');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
-        showInlineError('cancelModal', 'Network error — please try again.');
-        console.error('CancelOrder error:', err);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// CONFIRM RECEIVED
-// ═══════════════════════════════════════════════════════════
-async function confirmReceived(orderId, btn) {
-    if (!confirm('Confirm that you have received this order?')) return;
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Confirming…';
-
-    try {
-        const res = await postJson('/Customer/ConfirmReceived', { orderId });
-        if (res.success) {
-            showToast('Order marked as received!', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
-            showToast(res.message || 'Failed to confirm.', 'error');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
-        console.error('ConfirmReceived error:', err);
-    }
-}
-
-function updateProgressToReceived(card) {
-    const steps = ['PENDING','PREPARING','SHIPPED','DELIVERED','RECEIVED'];
-    const currentStep = 4; // RECEIVED
-
-    const stepEls = card.querySelectorAll('.ph-progress-step');
-    stepEls.forEach((el, idx) => {
-        el.classList.remove('done', 'active', 'upcoming');
-        if (idx < currentStep) el.classList.add('done');
-        else if (idx === currentStep) el.classList.add('active');
-        else el.classList.add('upcoming');
-    });
-
-    const lineEls = card.querySelectorAll('.ph-progress-line');
-    lineEls.forEach((line, idx) => {
-        line.classList.toggle('done', idx < currentStep);
-    });
-}
-
-// ═══════════════════════════════════════════════════════════
-// RETURN / REFUND  (combined: item select + type + reason chips + photo upload)
-// ═══════════════════════════════════════════════════════════
-let _rtnFiles        = [];
-let _rtnOrderItems   = [];   // items of current order: { orderItemId, name, image, qty }
-let _rtnSelectedType = '';   // 'Return & Refund' or 'Refund Only'
-let _rtnSelectedReason = ''; // the chip text
-
-function openReturnModal(orderId) {
-    // Find order data
-    const order = _orders.find(o => o.orderId === orderId);
-    if (!order) return;
-
-    _rtnOrderItems   = order.items.map(it => ({
-        orderItemId: it.orderItemId,
-        name:        it.name,
-        image:       it.image,
-        qty:         it.qty
-    }));
-    _rtnFiles           = [];
-    _rtnSelectedType    = '';
-    _rtnSelectedReason  = '';
-
-    document.getElementById('returnOrderId').value = orderId;
-    document.getElementById('returnReason').value  = '';
-
-    // Reset type buttons
-    document.querySelectorAll('.rtn-type-btn').forEach(b => b.classList.remove('active'));
-
-    // Reset reason chips
-    document.querySelectorAll('.rtn-reason-chip').forEach(b => b.classList.remove('selected'));
-
-    // Render item list
-    rtnRenderItemList();
-    rtnRenderPreviews();
-
-    showModal('returnBackdrop', 'returnModal');
-}
-
-function rtnRenderItemList() {
-    const container = document.getElementById('rtnItemList');
-    if (!container) return;
-
-    container.innerHTML = _rtnOrderItems.map((item, idx) => `
-        <div class="rtn-item-row" data-idx="${idx}">
-            <label class="rtn-item-check-wrap">
-                <input type="checkbox" class="rtn-item-checkbox"
-                       data-order-item-id="${item.orderItemId}"
-                       onchange="rtnToggleItemRow(this)"
-                       checked />
-                <img class="rtn-item-img"
-                     src="${esc(item.image)}"
-                     alt="${esc(item.name)}"
-                     onerror="this.src='/images/placeholder.png'" />
-                <div class="rtn-item-info">
-                    <div class="rtn-item-name">${esc(item.name)}</div>
-                    <div class="rtn-item-ordered">Qty ordered: ${item.qty}</div>
-                </div>
-            </label>
-            <div class="rtn-item-qty-wrap">
-                <span class="rtn-item-qty-label">Return qty:</span>
-                <input type="number"
-                       class="rtn-qty-input"
-                       data-order-item-id="${item.orderItemId}"
-                       min="1" max="${item.qty}"
-                       value="1" />
-            </div>
-        </div>`
-    ).join('');
-}
-
-function rtnToggleItemRow(checkbox) {
-    const row     = checkbox.closest('.rtn-item-row');
-    const qtyInp  = row.querySelector('.rtn-qty-input');
-    qtyInp.disabled = !checkbox.checked;
-    row.classList.toggle('rtn-item-row-disabled', !checkbox.checked);
-}
-
-function rtnSelectType(btn) {
-    document.querySelectorAll('.rtn-type-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    _rtnSelectedType = btn.dataset.type;
-}
-
-function rtnSelectReason(btn) {
-    document.querySelectorAll('.rtn-reason-chip').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    _rtnSelectedReason = btn.textContent.trim();
-}
-
-function closeReturnModal() {
-    hideModal('returnBackdrop', 'returnModal');
-    _rtnFiles = [];
-    rtnRenderPreviews();
-}
-
-function rtnHandleFiles(fileList) {
-    const incoming = Array.from(fileList);
-    incoming.forEach(f => {
-        if (_rtnFiles.length >= 4) return;
-        if (!f.type.startsWith('image/')) return;
-        if (f.size > 5 * 1024 * 1024) {
-            showInlineError('returnModal', `"${f.name}" exceeds 5 MB.`);
-            return;
-        }
-        _rtnFiles.push(f);
-    });
-    document.getElementById('returnImage').value = '';
-    rtnRenderPreviews();
-}
-
-function rtnHandleDrop(e) {
-    e.preventDefault();
-    document.getElementById('rtnUploadZone').classList.remove('drag-over');
-    rtnHandleFiles(e.dataTransfer.files);
-}
-
-function rtnRemoveFile(idx) {
-    _rtnFiles.splice(idx, 1);
-    rtnRenderPreviews();
-}
-
-function rtnRenderPreviews() {
-    const row = document.getElementById('rtnPreviewRow');
-    if (!row) return;
-    if (!_rtnFiles.length) { row.innerHTML = ''; return; }
-
-    row.innerHTML = _rtnFiles.map((f, i) => {
-        const url  = URL.createObjectURL(f);
-        const name = f.name.length > 18 ? f.name.slice(0, 15) + '…' : f.name;
-        return `
-        <div class="rtn-preview-chip">
-            <img src="${url}" alt="${esc(name)}" />
-            <span>${esc(name)}</span>
-            <button class="rtn-chip-remove" onclick="rtnRemoveFile(${i})" aria-label="Remove photo">
-                <i class="ti ti-x"></i>
-            </button>
-        </div>`;
-    }).join('');
-}
-
-async function submitReturn() {
-    const orderId    = document.getElementById('returnOrderId').value;
-    const description = document.getElementById('returnReason').value.trim();
-
-    // Validate: at least one item selected
-    const checkedBoxes = document.querySelectorAll('#rtnItemList .rtn-item-checkbox:checked');
-    if (checkedBoxes.length === 0) {
-        showInlineError('returnModal', 'Please select at least one item to return.');
-        return;
-    }
-
-    // Validate: return type
-    if (!_rtnSelectedType) {
-        showInlineError('returnModal', 'Please select a return type (Return & Refund or Refund Only).');
-        return;
-    }
-
-    // Validate: reason chip
-    if (!_rtnSelectedReason) {
-        showInlineError('returnModal', 'Please select a reason for your return.');
-        return;
-    }
-
-    // Build selected items summary
-    const selectedItems = Array.from(checkedBoxes).map(cb => {
-        const row      = cb.closest('.rtn-item-row');
-        const qtyInput = row.querySelector('.rtn-qty-input');
-        const itemId   = cb.dataset.orderItemId;
-        const item     = _rtnOrderItems.find(it => String(it.orderItemId) === String(itemId));
-        const qty      = Math.max(1, Math.min(parseInt(qtyInput.value) || 1, item?.qty ?? 1));
-        return `${item?.name ?? 'Item'} (qty: ${qty})`;
-    });
-
-    // Compose the reason string sent to the controller
-    // Format: "[ReturnType] Reason - Description"
-    let reasonStr = `[${_rtnSelectedType}] ${_rtnSelectedReason}`;
-    if (description) reasonStr += ` - ${description}`;
-    // Append selected items as JSON for backend reference
-    reasonStr += `||${JSON.stringify(
-        Array.from(checkedBoxes).map(cb => {
-            const row     = cb.closest('.rtn-item-row');
-            const qtyInput = row.querySelector('.rtn-qty-input');
-            const itemId  = cb.dataset.orderItemId;
-            const item    = _rtnOrderItems.find(it => String(it.orderItemId) === String(itemId));
-            return {
-                orderItemId: parseInt(itemId),
-                name:        item?.name ?? '',
-                returnQty:   Math.max(1, Math.min(parseInt(qtyInput.value) || 1, item?.qty ?? 1))
-            };
-        })
-    )}`;
-
-    const btn = document.querySelector('#returnModal .ph-btn-return');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
-
-    try {
-        const formData = new FormData();
-        formData.append('orderId', orderId);
-        formData.append('reason',  reasonStr);
-
-        _rtnFiles.forEach(f => formData.append('images', f));
-        if (_rtnFiles.length > 0) formData.append('image', _rtnFiles[0]);
-
-        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-        formData.append('__RequestVerificationToken', token);
-
-        const res  = await fetch('/Customer/RequestReturnRefund', { method: 'POST', body: formData });
-        const data = await res.json();
-
-        if (data.success) {
-            closeReturnModal();
-            showToast('Return request submitted!', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            showInlineError('returnModal', data.message || 'Could not submit request.');
-        }
-    } catch (err) {
-        console.error('ReturnRefund error:', err);
-        showInlineError('returnModal', 'Network error — please try again.');
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
-}
-
-// ── Return proof lightbox (FRIEND) ────────────────────────
-function rtnOpenLightbox(src) {
-    document.getElementById('rtnLightboxImg').src = src;
-    document.getElementById('rtnLightbox').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-function rtnCloseLightbox() {
-    document.getElementById('rtnLightbox').classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-// ═══════════════════════════════════════════════════════════
-// RATING  (FRIEND: with per-item photo upload, max 4 images)
-// ═══════════════════════════════════════════════════════════
-let _ratingFilesByOrderItem = {}; // { [orderItemId]: File[] }
-
-function openRatingModal(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
-    if (!order) return;
-
-    document.getElementById('ratingOrderId').value = orderId;
-
-    // Reset file store each time modal opens
-    _ratingFilesByOrderItem = {};
-
-    let html = '';
-    order.items.forEach((item, idx) => {
-        _ratingFilesByOrderItem[item.orderItemId] = [];
-
-        html += `
-        <div class="ph-rating-item"
-             data-item-idx="${idx}"
-             data-product-id="${item.productId}"
-             data-order-item-id="${item.orderItemId}">
-
-            <div class="ph-rating-item-top">
-                <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
-                <span>${esc(item.name)}</span>
-            </div>
-
-            <div class="ph-star-picker" data-selected="0">
-                ${[1,2,3,4,5].map(n =>
-                    `<button class="ph-star-btn" data-val="${n}" onclick="pickStar(this)">★</button>`
-                ).join('')}
-                <span class="ph-star-hint">Tap to rate</span>
-            </div>
-
-            <div class="ph-textarea-wrap" style="margin-top:10px">
-                <textarea class="ph-review-text" placeholder="Share your experience (optional)…" rows="2"></textarea>
-            </div>
-
-            <!-- FRIEND: Upload zone per item (max 4 photos) -->
-            <div class="ph-review-upload" style="margin-top:12px">
-                <label class="rtn-field-label" style="display:block;margin-bottom:6px">Review photos (optional)</label>
-
-                <div class="rw-upload-zone"
-                     ondragover="event.preventDefault();this.classList.add('drag-over')"
-                     ondragleave="this.classList.remove('drag-over')"
-                     ondrop="ratingHandleDrop(event, ${item.orderItemId})">
-
-                    <input type="file"
-                           class="ph-review-images"
-                           accept="image/*"
-                           multiple
-                           onchange="ratingHandleFiles(this.files, ${item.orderItemId}); this.value='';" />
-
-                    <div class="rw-upload-inner">
-                        <div class="rw-upload-icon"><i class="ti ti-camera"></i></div>
-                        <div class="rw-upload-text">
-                            <strong>Click to upload</strong> or drag photos here
-                        </div>
-                        <div class="rw-upload-hint">JPG, PNG, WEBP · Max 5 MB each · Up to 4 photos</div>
-                    </div>
-                </div>
-
-                <!-- Preview chips -->
-                <div class="rw-preview-row" id="ratingPreviewRow_${item.orderItemId}"></div>
-            </div>
-        </div>
-        ${idx < order.items.length - 1 ? '<div class="od-sep"></div>' : ''}`;
-    });
-
-    document.getElementById('ratingItemsWrap').innerHTML = html;
-    showModal('ratingBackdrop', 'ratingModal');
-}
-
-function ratingHandleFiles(fileList, orderItemId) {
-    const incoming = Array.from(fileList || []);
-    const arr = _ratingFilesByOrderItem[orderItemId] ?? (_ratingFilesByOrderItem[orderItemId] = []);
-
-    incoming.forEach(f => {
-        if (arr.length >= 4) return;              // max 4 per item
-        if (!f.type.startsWith('image/')) return;
-        if (f.size > 5 * 1024 * 1024) {
-            showInlineError('ratingModal', `"${f.name}" exceeds 5 MB.`);
-            return;
-        }
-        arr.push(f);
-    });
-
-    ratingRenderPreviews(orderItemId);
-}
-
-function ratingHandleDrop(e, orderItemId) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
-    ratingHandleFiles(e.dataTransfer.files, orderItemId);
-}
-
-function ratingRemoveFile(orderItemId, idx) {
-    const arr = _ratingFilesByOrderItem[orderItemId] ?? [];
-    arr.splice(idx, 1);
-    ratingRenderPreviews(orderItemId);
-}
-
-function ratingRenderPreviews(orderItemId) {
-    const row = document.getElementById(`ratingPreviewRow_${orderItemId}`);
-    if (!row) return;
-
-    const arr = _ratingFilesByOrderItem[orderItemId] ?? [];
-    if (!arr.length) { row.innerHTML = ''; return; }
-
-    row.innerHTML = arr.map((f, i) => {
-        const url  = URL.createObjectURL(f);
-        const name = f.name.length > 18 ? f.name.slice(0, 15) + '…' : f.name;
-
-        return `
-        <div class="rw-preview-chip">
-            <img src="${url}" alt="${esc(name)}" />
-            <span>${esc(name)}</span>
-            <button class="rw-chip-remove"
-                    onclick="ratingRemoveFile(${orderItemId}, ${i})"
-                    aria-label="Remove photo">
-                <i class="ti ti-x"></i>
-            </button>
-        </div>`;
-    }).join('');
-}
-
-function closeRatingModal() { hideModal('ratingBackdrop', 'ratingModal'); }
-
-function pickStar(btn) {
-    const picker = btn.closest('.ph-star-picker');
-    const val    = parseInt(btn.dataset.val);
-    picker.dataset.selected = val;
-    picker.querySelectorAll('.ph-star-btn').forEach((b, i) => {
-        b.classList.toggle('filled', i < val);
-    });
-    const labels = ['','Poor','Fair','Good','Very Good','Excellent'];
-    picker.querySelector('.ph-star-hint').textContent = labels[val] || '';
-}
-
-async function submitRating() {
-    const orderId = document.getElementById('ratingOrderId').value;
-    const items   = document.querySelectorAll('.ph-rating-item');
-
-    let hasError = false;
-    let allOk    = true;
-    const submitted = [];
-
-    for (const item of items) {
-        const rating      = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
-        const reviewText  = item.querySelector('.ph-review-text').value.trim();
-        const orderItemId = parseInt(item.dataset.orderItemId);
-
-        if (!rating) { hasError = true; continue; }
-
-        try {
-            const formData = new FormData();
-            formData.append('orderItemId', orderItemId);
-            formData.append('rating', rating);
-            formData.append('reviewText', reviewText);
-
-            const files = _ratingFilesByOrderItem[orderItemId] ?? [];
-            files.slice(0, 4).forEach(f => formData.append('images', f));
-
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-            formData.append('__RequestVerificationToken', token);
-
-            const res  = await fetch('/Customer/SubmitRating', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (data.success) {
-                submitted.push({ orderItemId, rating, reviewText });
-            } else {
-                allOk = false;
-                showInlineError('ratingModal', data.message || 'Could not save review.');
-            }
-        } catch (e) {
-            allOk = false;
-            showInlineError('ratingModal', 'Network error — please try again.');
-        }
-    }
-
-    if (hasError) {
-        showInlineError('ratingModal', 'Please give at least 1 star for each item.');
-        return;
-    }
-
-    // Update in-memory order data so drawer reflects new review immediately
-    const order = _orders.find(o => o.orderId === parseInt(orderId));
-    if (order) {
-        submitted.forEach(({ orderItemId, rating, reviewText }) => {
-            const it = order.items.find(i => i.orderItemId === orderItemId);
-            if (it) { it.reviewRating = rating; it.reviewText = reviewText; }
-        });
-        order.reviewSubmitted = true;
-    }
-
-    closeRatingModal();
-    if (allOk) {
-        markReviewWritten(parseInt(orderId));
-        showToast('Review submitted, thank you!', 'success');
-    } else {
-        showToast('Some reviews could not be saved.', 'error');
-    }
-}
-
-function markReviewWritten(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
-    if (order) order.reviewSubmitted = true;
-
-    const card = document.querySelector(`.ph-card[data-order-id="${orderId}"]`);
-    if (!card) return;
-
-    const btn = card.querySelector('.js-write-review');
-    if (btn) {
-        btn.outerHTML = `
-          <span class="ph-btn ph-btn-done">
-            <i class="ti ti-check"></i> Review Submitted
-          </span>`;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// SHARED HELPERS
-// ═══════════════════════════════════════════════════════════
-function esc(str) {
-    const d = document.createElement('div');
-    d.textContent = str ?? '';
-    return d.innerHTML;
-}
-
-async function postJson(url, data) {
-    // ASP.NET MVC [HttpPost] actions bind from the form body, not JSON.
-    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
-    const body  = new URLSearchParams({ ...data, __RequestVerificationToken: token });
-    const res   = await fetch(url, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    body.toString()
-    });
-    return res.json();
-}
-
-function showModal(backdropId, modalId) {
-    document.getElementById(backdropId).classList.add('active');
-    document.getElementById(modalId).classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function hideModal(backdropId, modalId) {
-    document.getElementById(backdropId).classList.remove('active');
-    document.getElementById(modalId).classList.remove('active');
-    document.body.style.overflow = '';
-    document.querySelectorAll(`#${modalId} .ph-inline-err`).forEach(el => el.remove());
-}
-
-function showInlineError(modalId, msg) {
-    const modal = document.getElementById(modalId);
-    let err = modal.querySelector('.ph-inline-err');
-    if (!err) {
-        err = document.createElement('div');
-        err.className = 'ph-inline-err';
-        modal.querySelector('.ph-modal-footer').before(err);
-    }
-    err.innerHTML = `<i class="ti ti-alert-circle"></i> ${msg}`;
-}
-
-function showToast(msg, type='success') {
-    const t = document.createElement('div');
-    t.className = 'ph-toast ' + (type === 'error' ? 'ph-toast-err' : '');
-    t.innerHTML = `<i class="ti ${type==='success'?'ti-circle-check':'ti-alert-circle'}"></i> ${msg}`;
-    document.body.appendChild(t);
-    setTimeout(() => t.classList.add('ph-toast-hide'), 3500);
-    setTimeout(() => t.remove(), 4200);
-}
-
-// Keyboard close
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        closeDrawer();
-        closeCancelModal();
-        closeReturnModal();
-        closeRatingModal();
-        rtnCloseLightbox();
-    }
-});
-
-// CSRF token for form (anti-forgery)
-</script>
-
-<style>
-/* Return status dot colours */
-.rn-dot-approved {
-    background: #22c55e !important;   /* green */
-    box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
-}
-.rn-dot-rejected {
-    background: #ef4444 !important;   /* red */
-    box-shadow: 0 0 0 3px rgba(239,68,68,0.18);
-}
-
-/* Approved state: tint the notice banner green */
-.ph-notice-return-v2.rn-approved {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
-}
-.ph-notice-return-v2.rn-approved .rn-icon-wrap {
-    background: #dcfce7;
-    color: #16a34a;
-}
-.ph-notice-return-v2.rn-approved .rn-status { color: #15803d; font-weight: 700; }
-
-/* Rejected state */
-.ph-notice-return-v2.rn-rejected {
-    background: #fff1f2;
-    border-color: #fecdd3;
-}
-.ph-notice-return-v2.rn-rejected .rn-icon-wrap {
-    background: #ffe4e6;
-    color: #dc2626;
-}
-.ph-notice-return-v2.rn-rejected .rn-status { color: #b91c1c; font-weight: 700; }
-</style>
-@Html.AntiForgeryToken()
