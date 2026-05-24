@@ -461,10 +461,10 @@ namespace EcommerceSystem.Controllers
         // =========================
         // CHAT
         // =========================
-        public async Task<IActionResult> Chat() 
+        public IActionResult Chat()
         {
-            await LoadCartCountAsync();
-            return View();
+            // 顾客点击导航栏的“聊天”或者进入 /Customer/Chat 时，后端自动重定向到 Chat 控制器的 CustomerInbox 方法
+            return RedirectToAction("CustomerInbox", "Chat");
         }
 
         // =========================

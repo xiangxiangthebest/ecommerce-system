@@ -1,0 +1,96 @@
+@model EcommerceSystem.Models.ChatRoom
+@using System.Security.Claims
+
+@{
+    ViewData["Title"] = "正在聊天";
+    var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+}
+
+<div class="container mt-3">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom p-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center">
+        <a asp-controller="Chat" asp-action="CustomerInbox" class="btn btn-link text-dark p-0 me-3">
+            <i class="bi bi-arrow-left fs-4"></i>
+        </a>
+        
+        @{
+            // 💡 安全提取商家名字逻辑：
+            // 如果 Model.Seller 存在就用 ShopName，否则用后台传过来的商户名称（如果有），最差显示 "商家"
+            var sellerName = Model.Seller?.ShopName ?? "商家"; 
+            var firstChar = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
+        }
+
+        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
+            <span class="fw-bold">@firstChar</span>
+        </div>
+
+        <div class="text-truncate">
+            <h6 class="mb-0 fw-bold text-dark">@sellerName</h6>
+        </div>
+    </div>
+</div>
+
+        <div class="card-body bg-light" id="messageBody" style="height: 500px; overflow-y: auto; padding: 20px运行;">
+                @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
+                {
+                    var isMyMessage = msg.SenderId == currentUserId;
+                    
+                    <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
+                        <div class="max-w-75">
+                            <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" 
+                                 style="word-break: break-all;">
+                                @msg.MessageText
+                            </div>
+                            <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
+                                @msg.SentAt.ToLocalTime().ToString("HH:mm")
+                            </small>
+                        </div>
+                    </div>
+            }
+        </div>
+
+<div class="card-footer bg-white border-top p-3">
+    <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group">
+        <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
+        
+        <input type="hidden" name="sellerId" value="@Model.SellerId" />
+        
+        <input type="text" name="message" id="messageInput" autocomplete="off"
+               class="form-control border-end-0 bg-light" 
+               placeholder="请输入消息内容..." required />
+               
+        <button class="btn btn-primary px-4" type="submit" id="sendBtn">
+            <i class="bi bi-send-fill"></i> 发送
+        </button>
+    </form>
+</div>
+    </div>
+</div>
+
+<style>
+    .max-w-75 { max-width: 75%; }
+    #messageBody::-webkit-scrollbar { width: 6px; }
+    #messageBody::-webkit-scrollbar-track { background: transparent; }
+    #messageBody::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
+</style>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var messageBody = document.getElementById("messageBody");
+            if (messageBody) {
+                messageBody.scrollTop = messageBody.scrollHeight;
+            }
+
+            var form = document.getElementById("chatForm");
+            var input = document.getElementById("messageInput");
+
+            form.addEventListener("submit", function(e) {
+                if(input.value.trim() === "") {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+}

@@ -226,25 +226,18 @@
                 </form>
             </div>
 
-            @* <button class="pd-chat-seller-btn secondary">
-    Chat with seller
-</button> *@
-       <form asp-controller="Chat"
-      asp-action="StartConversation"
-      method="post">
 
-    <input type="hidden"
-           name="productId"
-           value="@Model.ProductId" />
+       <form asp-controller="Chat" asp-action="StartConversation" method="post">
+    @Html.AntiForgeryToken()
 
-    <input type="hidden"
-           id="chatVariationJson"
-           name="variationJson" />
+    <input type="hidden" name="sellerId" value="@Model.SellerId" />
 
-    <button class="pd-chat-seller-btn"
-            type="submit">
-        <i class="ti ti-message"></i>
-        Chat with Seller
+    <input type="hidden" name="productId" value="@Model.ProductId" />
+
+    <input type="hidden" id="chatVariationJson" name="variationJson" value="{}" />
+
+    <button class="pd-chat-seller-btn" type="submit">
+        <i class="ti ti-message"></i> Chat with Seller
     </button>
 </form>
 
@@ -471,25 +464,20 @@
             });
         }
     }
-function updateChatVariationJson() {
 
-    const obj = {};
-
-    for (let i = 0; i < totalGroups; i++) {
-
-        if (selectedKeys[i] !== null) {
-            obj[groupNames[i]] = selectedKeys[i];
+    function updateChatVariationJson() {
+        var obj = {};
+        for (var i = 0; i < totalGroups; i++) {
+            if (selectedKeys[i] !== null) {
+                obj[groupNames[i]] = selectedKeys[i];
+            }
+        }
+        
+        var chatInput = document.getElementById("chatVariationJson");
+        if (chatInput) {
+            chatInput.value = JSON.stringify(obj);
         }
     }
-
-    document.getElementById(
-        "chatVariationJson"
-    ).value = JSON.stringify(obj);
-}
-
-    document.getElementById("chatSelectedVariations").value
-        = JSON.stringify(obj);
-}
 
     function updateVariationUI() {
         updateChatVariationJson();
