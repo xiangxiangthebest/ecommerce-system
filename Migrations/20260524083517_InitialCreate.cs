@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ecommerce_system.Migrations
 {
     /// <inheritdoc />
-    public partial class AddReviewAndComplaint : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -232,12 +232,16 @@ namespace ecommerce_system.Migrations
                     DeliveryState = table.Column<string>(type: "TEXT", nullable: false),
                     CancelReason = table.Column<string>(type: "TEXT", nullable: true),
                     CanceledAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DeliveredAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReceivedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
                     ReturnReason = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnType = table.Column<int>(type: "INTEGER", nullable: true),
+                    ReturnImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     ReturnInitiatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
-                    ComplaintText = table.Column<string>(type: "TEXT", nullable: true),
-                    ComplaintSubmitted = table.Column<bool>(type: "INTEGER", nullable: false),
-                    ComplaintAt = table.Column<DateTime>(type: "TEXT", nullable: true)
+                    ReturnInitiatedBy = table.Column<string>(type: "TEXT", nullable: true),
+                    ReturnStatus = table.Column<string>(type: "TEXT", nullable: false),
+                    ReturnRequested = table.Column<bool>(type: "INTEGER", nullable: false),
+                    ReturnApprovedAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -331,6 +335,7 @@ namespace ecommerce_system.Migrations
                     CustomerId = table.Column<int>(type: "INTEGER", nullable: false),
                     Rating = table.Column<int>(type: "INTEGER", nullable: false),
                     ReviewText = table.Column<string>(type: "TEXT", nullable: false),
+                    ReviewImagePathsJson = table.Column<string>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>

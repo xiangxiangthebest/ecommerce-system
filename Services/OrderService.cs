@@ -2,18 +2,121 @@ using EcommerceSystem.Data;
 using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
+using EcommerceSystem.Enums;
+using System.Text.Json;
 
 namespace EcommerceSystem.Services
 {
     public class OrderService : IOrderService
     {
         private readonly AppDbContext _context;
-        private readonly INotificationService _notificationService;
 
-        public OrderService(AppDbContext context, INotificationService notificationService)
+        public OrderService(AppDbContext context)
         {
             _context = context;
-            _notificationService = notificationService;
+        }
+
+        // ── Deducts stock from the matching combo inside VariationCombosJson ──
+        // selectedVariationsJson example: {"Flavour":"Honey(60g)"}
+        // combosJson example: [{"keys":["Honey(60g)"],"stock":250}]
+        private static string DeductComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
+                return combosJson;
+
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                               ?? new Dictionary<string, string>();
+
+                if (selected.Count == 0) return combosJson;
+
+                // Collect all selected variation values, e.g. ["Honey(60g)"]
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+
+                    int stock = 0;
+                    if (combo.TryGetProperty("stock", out var s))
+                    {
+                        stock = s.ValueKind == JsonValueKind.Number
+                            ? (s.TryGetInt32(out var si) ? si : (int)s.GetDouble())
+                            : int.TryParse(s.GetString(), out var sp) ? sp : 0;
+                    }
+
+                    // Match: every key in this combo must appear in the selected values
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+
+                    if (isMatch)
+                        stock = Math.Max(0, stock - quantity);
+
+                    updated.Add(new { keys, stock });
+                }
+
+                return JsonSerializer.Serialize(updated);
+            }
+            catch
+            {
+                return combosJson;
+            }
+        }
+
+        // ── Adds quantity back to the matching combo inside VariationCombosJson ──
+        // Mirror of DeductComboStock — used when an order is cancelled.
+        private static string RestoreComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
+                return combosJson;
+
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                               ?? new Dictionary<string, string>();
+
+                if (selected.Count == 0) return combosJson;
+
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+
+                    int stock = 0;
+                    if (combo.TryGetProperty("stock", out var s))
+                    {
+                        stock = s.ValueKind == JsonValueKind.Number
+                            ? (s.TryGetInt32(out var si) ? si : (int)s.GetDouble())
+                            : int.TryParse(s.GetString(), out var sp) ? sp : 0;
+                    }
+
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+
+                    if (isMatch)
+                        stock += quantity;  // add back instead of deduct
+
+                    updated.Add(new { keys, stock });
+                }
+
+                return JsonSerializer.Serialize(updated);
+            }
+            catch
+            {
+                return combosJson;
+            }
         }
 
         public async Task<OperationResult> PlaceOrderAsync(PlaceOrderRequest request)
@@ -116,10 +219,23 @@ namespace EcommerceSystem.Services
 
                         _context.OrderItems.Add(orderItem);
 
-                        // stock decrement
+                        // Deduct from total stock quantity
                         item.Product!.StockQuantity -= item.Quantity;
 
-                        // remove from cart if from cart
+                        // ── Also deduct from the matching combo's stock in VariationCombosJson ──
+                        var selectedVars = item.SelectedVariations ?? "{}";
+                        if (!string.IsNullOrWhiteSpace(item.Product.VariationCombosJson)
+                            && item.Product.VariationCombosJson != "[]"
+                            && selectedVars != "{}")
+                        {
+                            item.Product.VariationCombosJson = DeductComboStock(
+                                item.Product.VariationCombosJson,
+                                selectedVars,
+                                item.Quantity
+                            );
+                        }
+
+                        // Remove from cart if purchased from cart
                         if (request.Source != "product" && item.CartItemId != 0)
                             _context.CartItem.Remove(item);
                     }
@@ -177,6 +293,7 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Please provide a cancellation reason.");
 
             var order = await _context.Order
+                .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                        && o.CustomerUserId == customerId
                                        && o.CurrentStatus == OrderStatus.PENDING);
@@ -184,19 +301,34 @@ namespace EcommerceSystem.Services
             if (order == null)
                 return OperationResult.Fail("Order cannot be canceled.");
 
+            // ── Restore stock for every item in the cancelled order ──
+            foreach (var item in order.OrderItems)
+            {
+                var product = await _context.Products.FindAsync(item.ProductId);
+                if (product == null) continue;
+
+                // Restore total stock quantity
+                product.StockQuantity += item.Quantity;
+
+                // Also restore the matching combo stock in VariationCombosJson
+                var selectedVars = item.SelectedVariation ?? "{}";
+                if (!string.IsNullOrWhiteSpace(product.VariationCombosJson)
+                    && product.VariationCombosJson != "[]"
+                    && selectedVars != "{}")
+                {
+                    product.VariationCombosJson = RestoreComboStock(
+                        product.VariationCombosJson,
+                        selectedVars,
+                        item.Quantity
+                    );
+                }
+            }
+
             order.CurrentStatus = OrderStatus.CANCELED;
             order.CancelReason = reason.Trim();
             order.CanceledAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-
-            await _notificationService.CreateAsync(
-                order.CustomerUserId,
-                "Order Cancelled",
-                $"Your order #{order.OrderId} has been cancelled.",
-                "OrderCancelled",
-                order.OrderId
-            );
 
             return OperationResult.Ok();
         }
@@ -216,87 +348,35 @@ namespace EcommerceSystem.Services
 
             await _context.SaveChangesAsync();
 
-            await _notificationService.CreateAsync(
-                order.CustomerUserId,
-                "Review Reminder",
-                $"Please review your order #{order.OrderId}.",
-                "ReviewReminder",
-                order.OrderId
-            );
-
             return OperationResult.Ok();
         }
 
-        public async Task<OperationResult> SubmitComplaintAsync(int customerId, int orderId, string complaintText)
+        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths, ReturnInitiatedBy initiatedBy)
         {
-            if (string.IsNullOrWhiteSpace(complaintText))
-                return OperationResult.Fail("Please describe your complaint.");
+            if (string.IsNullOrWhiteSpace(reason))
+                return OperationResult.Fail("Please provide a return/refund reason.");
 
             var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                       && o.CustomerUserId == customerId
-                                       && (o.CurrentStatus == OrderStatus.RECEIVED
-                                           || o.CurrentStatus == OrderStatus.RETURN_REFUND));
-
-            if (order == null)
-                return OperationResult.Fail("Order not eligible for complaint.");
-
-            order.ComplaintText = complaintText.Trim();
-            order.ComplaintSubmitted = true;
-            order.ComplaintAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-            return OperationResult.Ok();
-        }
-
-        public async Task<OperationResult> UpdateOrderStatusAsync(int orderId, OrderStatus status)
-        {
-            var order = await _context.Order
-                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+                .FirstOrDefaultAsync(o =>
+                    o.OrderId == orderId &&
+                    o.CustomerUserId == userId);
 
             if (order == null)
                 return OperationResult.Fail("Order not found.");
 
-            order.CurrentStatus = status;
+            if (order.CurrentStatus != OrderStatus.DELIVERED)
+                return OperationResult.Fail("Only delivered orders can request return/refund.");
+
+            order.ReturnRequested = true;
+            order.ReturnStatus = ReturnStatus.Requested;
+            order.ReturnReason = reason.Trim();
+            order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
+            order.ReturnInitiatedAt = DateTime.UtcNow;
+            order.ReturnInitiatedBy = initiatedBy;
+
+            order.CurrentStatus = OrderStatus.RETURN_REFUND;
 
             await _context.SaveChangesAsync();
-
-            // =========================
-            // NOTIFICATIONS
-            // =========================
-
-            if (status == OrderStatus.PREPARING)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Preparing",
-                    $"Your order #{order.OrderId} is being prepared.",
-                    "OrderPreparing",
-                    order.OrderId
-                );
-            }
-
-            else if (status == OrderStatus.SHIPPED)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Shipped",
-                    $"Your order #{order.OrderId} has been shipped.",
-                    "OrderShipped",
-                    order.OrderId
-                );
-            }
-
-            else if (status == OrderStatus.DELIVERED)
-            {
-                await _notificationService.CreateAsync(
-                    order.CustomerUserId,
-                    "Order Delivered",
-                    $"Your order #{order.OrderId} has been delivered.",
-                    "OrderDelivered",
-                    order.OrderId
-                );
-            }
 
             return OperationResult.Ok();
         }

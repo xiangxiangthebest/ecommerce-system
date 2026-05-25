@@ -17,12 +17,12 @@ namespace EcommerceSystem.Services
 
         public async Task<Customer?> GetCurrentCustomerAsync(ClaimsPrincipal user)
         {
-            var email = user.FindFirst(ClaimTypes.Email)?.Value;
-            if (string.IsNullOrWhiteSpace(email)) return null;
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId)) return null;
 
             return await _context.Users
                 .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.Email == email);
+                .FirstOrDefaultAsync(x => x.UserId == int.Parse(userId));
         }
     }
 }

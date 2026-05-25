@@ -51,25 +51,23 @@
                     var totalPrice = parts.Length > 2 ? parts[2] : "0.00";
                     var orderImg = parts.Length > 3 ? parts[3] : "/images/default-order.png";
                     
-                    // 💡 跳转目标：/Customer/PurchaseHistory?searchString=订单号 或者你前端对应的搜索参数名
-                    // 这里设定跳转参数为 ?searchString=15，如果你的购买历史页面的搜索输入框绑定的参数是别的值（比如 searchOrderId），请自行修改该对应词
                     <div class="product-card-bubble">
                         <a href="/Customer/PurchaseHistory?searchString=@orderId" class="d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-warning-subtle" style="max-width: 260px; transition: transform 0.2s;">
                             <div class="p-1">
                                 <div class="text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between" style="font-size:11px;">
-                                    <span>📋 交易订单</span>
-                                    <span class="text-success fw-bold">点击追踪单号</span>
+                                    <span>📋 Order</span>
+                                    <span class="text-success fw-bold">Click to Track Order</span>
                                 </div>
                                 <div class="d-flex align-items-center mb-2">
                                     <img src="@orderImg" class="rounded border me-2" style="width: 40px; height: 40px; object-fit: cover;" />
                                     <div class="text-truncate" style="line-height: 1.2;">
-                                        <span class="d-block fw-bold text-dark" style="font-size:12px;">订单号: #@orderId</span>
-                                        <small class="text-muted d-block text-truncate" style="font-size:11px;">点击在历史记录中查看</small>
+                                        <span class="d-block fw-bold text-dark" style="font-size:12px;">Order Number: #@orderId</span>
+                                        <small class="text-muted d-block text-truncate" style="font-size:11px;">Click to view order history</small>
                                     </div>
                                 </div>
                                 <div class="text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1" style="font-size:12px;">
-                                    <span>实付款: <b class="text-danger">RM @totalPrice</b></span>
-                                    <span class="text-primary" style="font-size: 11px;">去查询 <i class="bi bi-chevron-right"></i></span>
+                                    <span>Amount Paid: <b class="text-danger">RM @totalPrice</b></span>
+                                    <span class="text-primary" style="font-size: 11px;">View<i class="bi bi-chevron-right"></i></span>
                                 </div>
                             </div>
                         </a>
@@ -78,7 +76,8 @@
                 else if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
                 {
                     var cleanImgHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
-                    <div class="image-bubble">
+                    // 💡 包装一层点击事件，点击时提取内部 img 的 src 并塞给预览模态框
+                    <div class="image-bubble cursor-pointer" onclick="previewChatImage(this)">
                         @Html.Raw(cleanImgHtml)
                     </div>
                 }
@@ -112,7 +111,7 @@
             </div>
             <div>
                 <button type="button" class="btn btn-info btn-sm text-white px-3 rounded-pill fw-bold" id="sendProductLinkBtn">
-                     发送链接
+                    Send
                 </button>
             </div>
         </div>
@@ -131,10 +130,10 @@
             <input type="hidden" name="sellerId" value="@Model.SellerId" />
             
             <input type="text" name="message" id="messageInput" autocomplete="off" 
-                   class="form-control bg-light" placeholder="请输入消息内容..." required style="height: 38px;" />
+                   class="form-control bg-light" placeholder="Type your message..." required style="height: 38px;" />
                    
             <button class="btn btn-primary px-4" type="submit" id="sendBtn">
-                <i class="bi bi-send-fill"></i> 发送
+                <i class="bi bi-send-fill"></i> Send
             </button>
         </form>
     </div>
@@ -144,7 +143,7 @@
             <div class="col-4">
                 <div class="attach-item p-3 bg-white rounded border cursor-pointer" id="attachPhotoBtn">
                     <i class="bi bi-image fs-2 text-success"></i>
-                    <span class="d-block small text-muted mt-1">发照片</span>
+                    <span class="d-block small text-muted mt-1">Send image</span>
                 </div>
                 <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
             </div>
@@ -152,14 +151,14 @@
             <div class="col-4">
                 <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#sellerProductsModal">
                     <i class="bi bi-bag-heart fs-2 text-warning"></i>
-                    <span class="d-block small text-muted mt-1">发商品</span>
+                    <span class="d-block small text-muted mt-1">Send Product</span>
                 </div>
             </div>
             
             <div class="col-4">
                 <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#customerOrdersModal">
                     <i class="bi bi-receipt fs-2 text-info"></i>
-                    <span class="d-block small text-muted mt-1">发订单</span>
+                    <span class="d-block small text-muted mt-1">Send Order</span>
                 </div>
             </div>
         </div>
@@ -172,11 +171,11 @@
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title fw-bold"><i class="bi bi-bag"></i> 推荐店内商品</h6>
+                <h6 class="modal-title fw-bold"><i class="bi bi-bag"></i>Store recommendations</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-2" id="sellerProductsContainer">
-                <div class="text-center py-4 text-muted small">正在加载店内商品...</div>
+                <div class="text-center py-4 text-muted small">Loading store products...</div>
             </div>
         </div>
     </div>
@@ -186,11 +185,22 @@
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title fw-bold"><i class="bi bi-receipt"></i> 选择关联订单</h6>
+                <h6 class="modal-title fw-bold"><i class="bi bi-receipt"></i>Select related order</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-2" id="customerOrdersContainer">
-                <div class="text-center py-4 text-muted small">正在加载您的历史订单...</div>
+                <div class="text-center py-4 text-muted small">Loading your order history...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 text-center position-relative">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <img id="previewModalImage" src="" class="img-fluid rounded shadow" style="max-height: 85vh; object-fit: contain;" />
             </div>
         </div>
     </div>
@@ -312,12 +322,14 @@
                 });
             }
 
-            // 3. 快捷商品栏发送按钮
+// ==========================================
+            // 🛒 3. 修复快捷商品栏发送按钮
+            // ==========================================
             var sendProductBtn = document.getElementById("sendProductLinkBtn");
             if (sendProductBtn) {
                 sendProductBtn.addEventListener("click", function () {
                     sendCustomCard('PRODUCT', 
-                        `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`, 
+                        `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`,
                         `@ViewBag.ChatProduct?.ProductId`, 
                         `@ViewBag.ChatProduct?.Price`, 
                         `@ViewBag.ChatProduct?.ImagePath`);
@@ -330,19 +342,98 @@
             var input = document.getElementById("messageInput");
             var form = document.getElementById("chatForm");
             
-            if(type === 'PRODUCT') {
-                var decodedTitle = decodeURIComponent(title || "");
-                input.value = "[PRODUCT_CARD]<a href='/Customer/ProductDetails/" + id + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-light-subtle' style='max-width: 260px; transition: transform 0.2s;'>\n" +
-                    "  <div class='d-flex align-items-center'>\n" +
-                    "    <img src='" + img + "' class='rounded me-2 border' style='width: 50px; height: 50px; object-fit: cover;' />\n" +
-                    "    <div class='text-truncate' style='line-height: 1.3;'>\n" +
-                    "      <span class='d-block fw-bold text-dark small text-truncate'>" + decodedTitle + "</span>\n" +
-                    "      <span class='text-danger fw-bold small d-block mt-1'>RM " + price + "</span>\n" +
-                    "      <span class='text-muted' style='font-size: 10px;'><i class='bi bi-link-45deg'></i> 点击查看商品</span>\n" +
-                    "    </div>\n" +
-                    "  </div>\n" +
-                    "</a>";
-            } 
+         if(type === 'PRODUCT') {
+
+        input.value =
+            "[PRODUCT_CARD]" +
+
+            "<div class='product-card-bubble'>" +
+
+            "<a href='/Customer/ProductDetails/" + id + "' " +
+            "class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-info-subtle' " +
+            "style='max-width:260px; transition:0.2s;'>"
+
+            +
+
+            "<div class='p-1'>"
+
+            +
+
+            "<div class='text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between' " +
+            "style='font-size:11px;'>"
+
+            +
+
+            "<span>Products</span>" +
+            "<span class='text-primary fw-bold'>Click to view details</span>"
+
+            +
+
+            "</div>"
+
+            +
+
+            "<div class='d-flex align-items-center mb-2'>"
+
+            +
+
+            "<img src='" + img + "' " +
+            "class='rounded border me-2' " +
+            "style='width:55px;height:55px;object-fit:cover;' />"
+
+            +
+
+            "<div class='text-truncate' style='line-height:1.2;'>"
+
+            +
+
+            "<span class='d-block fw-bold text-dark text-truncate' style='font-size:12px;'>"
+            + title +
+            "</span>"
+
+            +
+
+            "<small class='text-muted d-block text-truncate' style='font-size:11px;'>"
+            + "Go to product page" +
+            "</small>"
+
+            +
+
+            "</div>"
+
+            +
+
+            "</div>"
+
+            +
+
+            "<div class='text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1' " +
+            "style='font-size:12px;'>"
+
+            +
+
+            "<span>Price: <b class='text-danger'>RM " + price + "</b></span>" +
+
+            "<span class='text-primary' style='font-size:11px;'>"
+            + "View <i class='bi bi-chevron-right'></i>"
+            + "</span>"
+
+            +
+
+            "</div>"
+
+            +
+
+            "</div>"
+
+            +
+
+            "</a>"
+
+            +
+
+            "</div>";
+    }
             else if(type === 'ORDER') {
                 // 💡【核心改动】：发送订单时不拼 HTML，直接生成纯文本标签格式交给后端，绝对不会引起 JS 报错
                 // 格式： [ORDER_TAG]|订单ID|总价|封面图
@@ -353,5 +444,73 @@
             input.removeAttribute("required");
             form.submit();
         }
+
+        // 💡 点击聊天图片查看大图函数
+        function previewChatImage(element) {
+            // 找到当前气泡里的 img 标签
+            var img = element.querySelector('img');
+            if (img) {
+                var src = img.getAttribute('src');
+                // 将大图模态框的 src 替换为当前图片的路径
+                document.getElementById('previewModalImage').src = src;
+                
+                // 弹出 Bootstrap 模态框
+                var myModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+                myModal.show();
+            }
+        }
+
+        // ==========================================
+            // 📸 4. 修复“发照片”点击以及发送逻辑
+            // ==========================================
+            var attachPhotoBtn = document.getElementById("attachPhotoBtn");
+            var photoFileInput = document.getElementById("photoFileInput");
+
+            if (attachPhotoBtn && photoFileInput) {
+                // 动作A：点击“发照片”小方块时，模拟点击隐藏的 file input
+                attachPhotoBtn.addEventListener("click", function () {
+                    photoFileInput.click();
+                });
+
+                // 动作B：当用户在手机或电脑里选好了照片后触发
+                photoFileInput.addEventListener("change", function () {
+                    var file = this.files[0];
+                    if (!file) return;
+
+                    // 限制只能发图片文件
+                    if (!file.type.startsWith("image/")) {
+                        alert("请选择有效的图片文件！");
+                        return;
+                    }
+
+                    // 限制图片大小（比如最大 5MB），防止太大传失败
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert("图片太大了，请上传 5MB 以内的图片");
+                        return;
+                    }
+
+                    // 💡 底层发图方案：利用 FileReader 将图片转为 Base64 编码，
+                    // 这样可以直接伪装成特殊卡片字符串 [IMAGE_CARD]，用现有的表单直接发走
+                    var reader = new FileReader();
+                    reader.onload = function (e) {
+                        var base64Data = e.target.result;
+                        
+                        var input = document.getElementById("messageInput");
+                        var form = document.getElementById("chatForm");
+                        
+                        if (input && form) {
+                            // 拼装你的图片卡片样式，保持和你们接收端解 [IMAGE_CARD] 一致
+                            input.value = "[IMAGE_CARD]<div class='p-1 bg-white rounded shadow-sm border text-center' style='max-width: 200px;'>\n" +
+                                "  <img src='" + base64Data + "' class='img-fluid rounded' style='max-height: 200px; object-fit: contain;' />\n" +
+                                "</div>";
+
+                            // 移除 required 限制并强行提交
+                            input.removeAttribute("required");
+                            form.submit();
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
     </script>
 }

@@ -25,7 +25,6 @@ public class AppDbContext : DbContext
     public DbSet<Order> Order { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<Review> Reviews { get; set; }
-    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,13 +36,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Cart>().ToTable("Cart");
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
+        modelBuilder.Entity<Order>().Property(o => o.ReturnStatus).HasConversion<string>();
+        modelBuilder.Entity<Order>().Property(o => o.ReturnInitiatedBy).HasConversion<string>();
         modelBuilder.Entity<Order>().Property(o => o.CurrentStatus).HasConversion<string>();
         modelBuilder.Entity<Order>().HasOne(o => o.Address).WithMany().HasForeignKey(o => o.AddressId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Product>().ToTable("Product");
         modelBuilder.Entity<Category>().ToTable("Category");
         modelBuilder.Entity<Review>().ToTable("Review");
-        modelBuilder.Entity<Notification>().ToTable("Notification");
-        modelBuilder.Entity<ChatRoom>().ToTable("ChatRoom");
-        modelBuilder.Entity<ChatMessage>().ToTable("ChatMessages");
     }
 }

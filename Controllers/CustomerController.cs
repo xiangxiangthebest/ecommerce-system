@@ -1,13 +1,12 @@
 using System.Security.Claims;
-using EcommerceSystem.DTOs;
-using EcommerceSystem.Interfaces;
+using EcommerceSystem.Enums;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
-using EcommerceSystem.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
@@ -20,7 +19,7 @@ namespace EcommerceSystem.Controllers
         private readonly IOrderService _orderService;
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
-        private readonly INotificationService _notificationService;
+        private readonly IReturnImageStorage _returnImageStorage;
 
         public CustomerController(
             ICustomerContext customerContext,
@@ -29,7 +28,7 @@ namespace EcommerceSystem.Controllers
             IOrderService orderService,
             IReviewService reviewService,
             IProfileService profileService,
-            INotificationService notificationService)
+            IReturnImageStorage returnImageStorage)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -37,7 +36,7 @@ namespace EcommerceSystem.Controllers
             _orderService = orderService;
             _reviewService = reviewService;
             _profileService = profileService;
-            _notificationService = notificationService;
+            _returnImageStorage = returnImageStorage;
         }
 
         // =========================
@@ -47,7 +46,6 @@ namespace EcommerceSystem.Controllers
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
-            ViewBag.NotificationCount = await _notificationService.GetUnreadCountAsync(customer.UserId);
         }
 
         // =========================
@@ -98,21 +96,26 @@ namespace EcommerceSystem.Controllers
         // ADD TO CART (PRODUCT DETAILS PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
+        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}", string? returnUrl = null)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
             var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            {
+                returnUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
+            }
+
             if (!result.Success)
             {
                 TempData["CartError"] = result.Error;
-                return RedirectToAction("ProductDetails", new { id = productId });
+                return Redirect(returnUrl);
             }
 
             TempData["CartSuccess"] = "Product added to cart";
-            return RedirectToAction("ProductDetails", new { id = productId });
+            return Redirect(returnUrl);
         }
 
         // =========================
@@ -183,6 +186,8 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
+            await LoadCartCountAsync();
+
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
@@ -251,7 +256,6 @@ namespace EcommerceSystem.Controllers
 
         private Dictionary<string, string> ExtractSellerMessagesFromForm(IFormCollection form)
         {
-            // Keeps controller responsibility: HTTP form parsing
             var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var key in form.Keys)
@@ -294,6 +298,35 @@ namespace EcommerceSystem.Controllers
         }
 
         // =========================
+        // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            List<string> imagePaths = new();
+
+            if (images != null && images.Count > 4)
+                return Json(new { success = false, message = "Maximum 4 images allowed." });
+
+            if (images != null && images.Any())
+                imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
+
+            var result = await _orderService.RequestReturnRefundAsync(
+                customer.UserId,
+                orderId,
+                reason,
+                imagePaths,
+                ReturnInitiatedBy.Customer
+            );
+
+            return Json(new { success = result.Success, message = result.Error });
+        }
+
+        // =========================
         // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
         // =========================
         [HttpPost]
@@ -312,36 +345,22 @@ namespace EcommerceSystem.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText)
+        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText, List<IFormFile> images)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText);
+            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText, images);
             return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // SUBMIT COMPLAINT (PURCHASE HISTORY PAGE)
-        // =========================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitComplaint(int orderId, string complaintText)
-        {
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
-
-            var result = await _orderService.SubmitComplaintAsync(customer.UserId, orderId, complaintText);
-            return Json(new { success = result.Success, message = result.Error });
-        }
-
-        // =========================
-        // PROFILE
+        // PROFILE PAGE
         // =========================
         public async Task<IActionResult> Profile()
         {
             await LoadCartCountAsync();
-            
+
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
@@ -377,6 +396,7 @@ namespace EcommerceSystem.Controllers
         {
             var claims = new List<Claim>
             {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Name, user.FullName),
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role)
@@ -473,16 +493,8 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Notifications()
         {
             await LoadCartCountAsync();
-
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-
-            if (customer == null)
-                return Unauthorized();
-
-            var notifications =
-                await _notificationService.GetUserNotificationsAsync(customer.UserId);
-
-            return View(notifications);
+            
+            return View();
         }
     }
 }

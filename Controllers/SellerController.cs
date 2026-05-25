@@ -56,7 +56,6 @@ namespace EcommerceSystem.Controllers
         }
 
         // ── Sum all combination stocks from VariationCombosJson ──
-        // Returns 0 if no combinations defined.
         private static int SumComboStock(string combosJson)
         {
             if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
@@ -81,7 +80,6 @@ namespace EcommerceSystem.Controllers
         }
 
         // ── Fallback: sum stocks from the old flat VariationsJson format ──
-        // Used only for backward-compatibility with products saved before the combo system.
         private static int SumVariationStock(string variationsJson)
         {
             if (string.IsNullOrWhiteSpace(variationsJson) || variationsJson == "[]")
@@ -129,6 +127,8 @@ namespace EcommerceSystem.Controllers
                 {
                     var orders = await _context.Order
                         .Include(o => o.Customer)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Product)
                         .Where(o => o.SellerUserId == seller.UserId)
                         .OrderByDescending(o => o.OrderTime)
                         .ToListAsync();
@@ -202,12 +202,10 @@ namespace EcommerceSystem.Controllers
             model.SKU         = model.SKU         ?? string.Empty;
             model.IsDraft     = isDraft;
 
-            // ── Read variation groups (names + option labels + optional images) ──
             model.VariationsJson = Request.Form["VariationsJson"].ToString();
             if (string.IsNullOrWhiteSpace(model.VariationsJson))
                 model.VariationsJson = "[]";
 
-            // ── Read variation combinations (stock per combo) ──
             model.VariationCombosJson = Request.Form["VariationCombosJson"].ToString();
             if (string.IsNullOrWhiteSpace(model.VariationCombosJson))
                 model.VariationCombosJson = "[]";
@@ -222,11 +220,13 @@ namespace EcommerceSystem.Controllers
                 model.CategoryId = (await _context.Category.FirstAsync()).CategoryId;
 
             var savedPaths = await SaveImagesAsync(ImageFiles ?? new List<IFormFile>());
+            var slotAssignmentJson = Request.Form["SlotAssignment"].ToString();
+            var mergedPaths = BuildMergedImageList(slotAssignmentJson, new List<string>(), savedPaths, "[]");
 
-            if (savedPaths.Count > 0)
+            if (mergedPaths.Count > 0)
             {
-                model.ImagePath      = savedPaths[0];
-                model.ImagePathsJson = JsonSerializer.Serialize(savedPaths);
+                model.ImagePath      = mergedPaths[0];
+                model.ImagePathsJson = JsonSerializer.Serialize(mergedPaths);
             }
             else
             {
@@ -234,10 +234,8 @@ namespace EcommerceSystem.Controllers
                 model.ImagePathsJson = "[]";
             }
 
-            // Process variation option images (strips base64, saves real files)
             model.VariationsJson = await ProcessVariationImagesAsync(model.VariationsJson, Request.Form.Files);
 
-            // Auto-sum StockQuantity from combination stocks when combinations are present
             var comboStockSum = SumComboStock(model.VariationCombosJson);
             if (comboStockSum > 0)
                 model.StockQuantity = comboStockSum;
@@ -296,11 +294,9 @@ namespace EcommerceSystem.Controllers
             existing.StockQuantity = model.StockQuantity;
             existing.IsDraft       = actionType == "Draft";
 
-            // ── Variation groups ──
             var variationsJson = Request.Form["VariationsJson"].ToString();
             existing.VariationsJson = string.IsNullOrWhiteSpace(variationsJson) ? "[]" : variationsJson;
 
-            // ── Variation combinations ──
             var combosJson = Request.Form["VariationCombosJson"].ToString();
             existing.VariationCombosJson = string.IsNullOrWhiteSpace(combosJson) ? "[]" : combosJson;
 
@@ -312,7 +308,6 @@ namespace EcommerceSystem.Controllers
                     existing.CategoryId = category.CategoryId;
             }
 
-            // Rebuild image list from slot assignment
             var existingOrderJson = Request.Form["ExistingImageOrder"].ToString();
             var keptPaths = new List<string>();
             if (!string.IsNullOrWhiteSpace(existingOrderJson))
@@ -333,7 +328,6 @@ namespace EcommerceSystem.Controllers
 
             existing.VariationsJson = await ProcessVariationImagesAsync(existing.VariationsJson, Request.Form.Files);
 
-            // Auto-sum StockQuantity from combination stocks when combinations are present
             var comboStockSum = SumComboStock(existing.VariationCombosJson);
             if (comboStockSum > 0)
                 existing.StockQuantity = comboStockSum;
@@ -344,8 +338,6 @@ namespace EcommerceSystem.Controllers
         }
 
         // ── ProcessVariationImagesAsync ───────────────────────────────────────
-        // Variation groups no longer carry stock — only label + imagePath.
-        // Stock lives in VariationCombosJson.
         private async Task<string> ProcessVariationImagesAsync(string variationsJson, IFormFileCollection allFiles)
         {
             try
@@ -372,7 +364,6 @@ namespace EcommerceSystem.Controllers
                         if (v.TryGetProperty("imagePath", out var ip)) existingImg = ip.GetString() ?? "";
                         else if (v.TryGetProperty("image", out var img)) existingImg = img.GetString() ?? "";
 
-                        // Discard blob/base64 preview URLs — only real server paths are stored
                         if (existingImg.StartsWith("data:")) existingImg = "";
                         if (existingImg.StartsWith("blob:"))  existingImg = "";
 
@@ -386,7 +377,6 @@ namespace EcommerceSystem.Controllers
                             if (saved.Count > 0) imagePath = saved[0];
                         }
 
-                        // NOTE: no 'stock' field here — stock is in combos
                         newValues.Add(new { label, imagePath });
                     }
 
@@ -450,6 +440,39 @@ namespace EcommerceSystem.Controllers
             return result;
         }
 
+        private static string RestoreComboStock(string combosJson, string selectedVariationsJson, int quantity)
+        {
+            if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]") return combosJson;
+            try
+            {
+                var selected = JsonSerializer.Deserialize<Dictionary<string, string>>(selectedVariationsJson)
+                            ?? new Dictionary<string, string>();
+                if (selected.Count == 0) return combosJson;
+
+                var selectedValues = new HashSet<string>(selected.Values, StringComparer.OrdinalIgnoreCase);
+                var combos = JsonSerializer.Deserialize<List<JsonElement>>(combosJson);
+                if (combos == null) return combosJson;
+
+                var updated = new List<object>();
+                foreach (var combo in combos)
+                {
+                    var keys = combo.TryGetProperty("keys", out var k)
+                        ? k.EnumerateArray().Select(x => x.GetString() ?? "").ToList()
+                        : new List<string>();
+                    int stock = combo.TryGetProperty("stock", out var s)
+                        ? (s.ValueKind == JsonValueKind.Number ? s.GetInt32() : int.Parse(s.GetString() ?? "0"))
+                        : 0;
+
+                    bool isMatch = keys.Count > 0 && keys.All(key => selectedValues.Contains(key));
+                    if (isMatch) stock += quantity;
+
+                    updated.Add(new { keys, stock });
+                }
+                return JsonSerializer.Serialize(updated);
+            }
+            catch { return combosJson; }
+        }
+
         [HttpPost]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -488,7 +511,27 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("Home", new { tab = "Product" });
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // UPDATE ORDER STATUS
+        // Only the seller can push statuses that belong to their workflow:
+        // ─────────────────────────────────────────────────────────────────────
+        // UPDATE ORDER STATUS  (Seller-side only)
+        //
+        // The seller can only push orders forward along their own path:
+        //   PENDING   → PREPARING   (accept the order)
+        //   PREPARING → SHIPPED     (hand to courier)
+        //   SHIPPED   → DELIVERED   (courier delivered to address)
+        //
+        // The following are BLOCKED for sellers:
+        //   CANCELED      — customer-only action (only while PENDING)
+        //   RECEIVED      — triggered by customer "Received" button or AutoReceiveOrdersJob
+        //   RETURN_REFUND — initiated by customer only
+        //
+        // Any attempt to submit a status outside SellerAllowedTransitions is
+        // rejected server-side even if someone bypasses the UI.
+        // ─────────────────────────────────────────────────────────────────────
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, OrderStatus newStatus)
         {
             var seller = await GetCurrentSellerAsync();
@@ -496,24 +539,138 @@ namespace EcommerceSystem.Controllers
 
             if (!seller.IsApproved)
             {
-                TempData["Error"] = "Your account is pending admin approval.";
+                TempData["OrderError"] = "Your account is pending admin approval.";
                 return RedirectToAction("Home", new { tab = "General" });
             }
 
+            // Load order and verify it belongs to this seller
             var order = await _context.Order
                 .Include(o => o.Customer)
                 .Include(o => o.Seller)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+                .FirstOrDefaultAsync(o => o.OrderId == orderId && o.SellerUserId == seller.UserId);
 
-            if (order == null) return NotFound();
+            if (order == null)
+            {
+                TempData["OrderError"] = "Order not found.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
 
+            // Role check: seller is not allowed to set CANCELED or RETURN_REFUND.
+            // This is enforced server-side regardless of what the UI shows.
+            if (newStatus == OrderStatus.CANCELED || newStatus == OrderStatus.RETURN_REFUND)
+            {
+                TempData["OrderError"] = $"Sellers cannot set an order to {newStatus}. " +
+                                          "This action can only be performed by the customer.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
+
+            // Check against the seller-specific transition map
+            var sellerAllowed = Order.SellerAllowedTransitions.TryGetValue(
+                order.CurrentStatus, out var sellerNext) && sellerNext.Contains(newStatus);
+
+            if (!sellerAllowed)
+            {
+                TempData["OrderError"] =
+                    $"Cannot update order #{orderId} from {order.CurrentStatus} to {newStatus}.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
+
+            // Attach observers — they are called inside SetStatus()
             order.Attach(new CustomerDashboardObserver());
             order.Attach(new SellerDashboardObserver());
             order.Attach(new AdminPanelObserver());
+
+            // SetStatus does the final validation, stamps timestamps, notifies observers
             order.SetStatus(newStatus);
 
             await _context.SaveChangesAsync();
-            return RedirectToAction("Home", new { tab = "Orders" });
+
+            TempData["OrderSuccess"] = $"Order #{orderId} has been updated to {newStatus}.";
+            return RedirectToAction("Home", new { tab = "Order" });
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // APPROVE RETURN / REFUND  (Seller-side)
+        //
+        // When the seller approves a RETURN_REFUND request the quantities
+        // selected by the customer are added back to the product stock.
+        // The order stays in RETURN_REFUND status (terminal for both sides);
+        // ReturnApprovedAt is stamped so the admin / dashboard can track it.
+        // ─────────────────────────────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveReturn(int orderId,
+            List<int> approveItemIds, List<int> approveQtys, string? returnType)
+        {
+            var seller = await GetCurrentSellerAsync();
+            if (seller == null) return RedirectToAction("Login", "Auth");
+ 
+            if (!seller.IsApproved)
+            {
+                TempData["OrderError"] = "Your account is pending admin approval.";
+                return RedirectToAction("Home", new { tab = "General" });
+            }
+ 
+            var order = await _context.Order
+                .Include(o => o.OrderItems)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                     && o.SellerUserId == seller.UserId
+                                     && o.CurrentStatus == OrderStatus.RETURN_REFUND);
+ 
+            if (order == null)
+            {
+                TempData["OrderError"] = "Order not found or not in RETURN_REFUND status.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
+ 
+            if (order.ReturnApprovedAt.HasValue)
+            {
+                TempData["OrderError"] = "Return has already been approved for this order.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
+ 
+            if (approveItemIds == null || approveItemIds.Count == 0)
+            {
+                TempData["OrderError"] = "Please select at least one item to approve.";
+                return RedirectToAction("Home", new { tab = "Order" });
+            }
+ 
+            // ── Stock restoration logic ──────────────────────────────────────
+            // ReturnRefund : customer physically sends item back → add stock back.
+            // RefundOnly   : item was never received / partially missing → stock
+            //                stays as-is (items were never returned to warehouse).
+            bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
+                                      StringComparison.OrdinalIgnoreCase);
+ 
+            var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
+            var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+ 
+            foreach (var (itemId, qty) in pairs)
+            {
+                if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
+                if (qty <= 0 || qty > orderItem.Quantity) continue;
+ 
+                if (isReturnRefund)
+                {
+                    // Physical return: restore the approved quantity to stock
+                    var product = await _context.Products.FindAsync(orderItem.ProductId);
+                    if (product != null)
+                        product.StockQuantity += qty;
+                }
+                // RefundOnly: no stock change — items were not physically returned
+            }
+ 
+            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
+            order.ReturnApprovedAt = DateTime.UtcNow;
+ 
+            await _context.SaveChangesAsync();
+ 
+            var stockMsg = isReturnRefund
+                ? "Stock has been restored."
+                : "Stock unchanged (Refund Only — items not physically returned).";
+ 
+            TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
+            return RedirectToAction("Home", new { tab = "Order" });
         }
     }
 }

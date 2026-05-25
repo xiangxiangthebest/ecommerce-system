@@ -110,6 +110,7 @@
                         }
                     </div>
                     <p class="img-hint">Drag thumbnails to reorder</p>
+                    <input type="hidden" name="SlotAssignment" id="slot-assignment" value="[]" />
 
                     <!-- CATEGORY -->
                     <div class="form-section-label">Category</div>
@@ -282,26 +283,50 @@
 
 <script>
 // ════════════════════════════════════════════════════════════
+// SLOT TRACKING
+// slots[0] = cover, slots[1..4] = content images
+// ════════════════════════════════════════════════════════════
+const slots = Array(5).fill(null).map(() => ({ src: null, file: null }));
+
+// Rebuilds SlotAssignment hidden field so the server knows the correct
+// position for each uploaded file (independent of DOM submission order).
+function updateSlotAssignment() {
+    const assignment = [];
+    let newIdx = 0;
+    for (let i = 0; i < 5; i++) {
+        if (slots[i] && slots[i].src) {
+            assignment.push({ slot: i, source: 'new', index: newIdx++ });
+        }
+    }
+    document.getElementById('slot-assignment').value = JSON.stringify(assignment);
+}
+
+// ════════════════════════════════════════════════════════════
 // COVER IMAGE
 // ════════════════════════════════════════════════════════════
 function setCover(input) {
     if (!input.files[0]) return;
+    const file = input.files[0];
     const reader = new FileReader();
     reader.onload = e => {
+        slots[0] = { src: e.target.result, file };
         document.getElementById('cover-preview').src = e.target.result;
         document.getElementById('cover-preview').style.display = 'block';
         document.getElementById('cover-empty').style.display = 'none';
         document.getElementById('cover-remove').style.display = 'flex';
+        updateSlotAssignment();
     };
-    reader.readAsDataURL(input.files[0]);
+    reader.readAsDataURL(file);
 }
 function removeCover(event) {
     event.stopPropagation();
+    slots[0] = { src: null, file: null };
     document.getElementById('cover-file').value = '';
     document.getElementById('cover-preview').style.display = 'none';
     document.getElementById('cover-preview').src = '';
     document.getElementById('cover-empty').style.display = 'flex';
     document.getElementById('cover-remove').style.display = 'none';
+    updateSlotAssignment();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -309,33 +334,35 @@ function removeCover(event) {
 // ════════════════════════════════════════════════════════════
 function setContent(input, i) {
     if (!input.files[0]) return;
+    const file = input.files[0];
+    const slotIdx = i + 1; // slots[1..4] correspond to content inputs 0..3
     const reader = new FileReader();
     reader.onload = e => {
+        slots[slotIdx] = { src: e.target.result, file };
         const preview = document.getElementById('content-preview-' + i);
         preview.src = e.target.result;
         preview.style.display = 'block';
         document.getElementById('content-empty-' + i).style.display = 'none';
         document.getElementById('content-remove-' + i).style.display = 'flex';
+        updateSlotAssignment();
     };
-    reader.readAsDataURL(input.files[0]);
+    reader.readAsDataURL(file);
 }
 function removeContent(event, i) {
     event.stopPropagation();
+    slots[i + 1] = { src: null, file: null };
     document.getElementById('content-file-' + i).value = '';
     document.getElementById('content-preview-' + i).style.display = 'none';
     document.getElementById('content-preview-' + i).src = '';
     document.getElementById('content-empty-' + i).style.display = 'flex';
     document.getElementById('content-remove-' + i).style.display = 'none';
+    updateSlotAssignment();
 }
 function hasImage() {
-    if (document.getElementById('cover-file').files.length > 0) return true;
-    for (let i = 0; i < 4; i++) {
-        if (document.getElementById('content-file-' + i)?.files.length > 0) return true;
-    }
-    return false;
+    return slots.some(s => s && s.src);
 }
 
-// Drag reorder
+// Drag reorder (content slots only: i = 0..3 → slotIdx 1..4)
 let dragIdx = null;
 function dragStart(e, i) { dragIdx = i; e.currentTarget.style.opacity = '0.4'; }
 function dragOver(e, i)  { e.preventDefault(); document.getElementById('content-slot-' + i).classList.add('drag-over'); }
@@ -366,6 +393,9 @@ function swapSlots(a, b) {
     if (fB.files[0]) dtA.items.add(fB.files[0]);
     if (fA.files[0]) dtB.items.add(fA.files[0]);
     fA.files = dtA.files; fB.files = dtB.files;
+    // Swap slots array entries (slotIdx = content index + 1)
+    const tmp = slots[a + 1]; slots[a + 1] = slots[b + 1]; slots[b + 1] = tmp;
+    updateSlotAssignment();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -461,6 +491,8 @@ function addOption(groupId) {
 
 function removeOption(groupId, idx) {
     groups[groupId].options.splice(idx, 1);
+    // Re-sync stable file inputs: remove all for this group and recreate
+    resyncVarFileInputs(groupId);
     renderOptions(groupId);
     // Remove combos involving this option
     pruneInvalidCombos();
@@ -468,18 +500,68 @@ function removeOption(groupId, idx) {
     serializeAll();
 }
 
+// Removes and recreates all stable file inputs for a group so that
+// name="VarImg_gi_vi" indices stay in sync after an option is deleted.
+function resyncVarFileInputs(groupId) {
+    // Remove all existing inputs for this group
+    let i = 0;
+    while (true) {
+        const old = document.getElementById(`opt-img-${groupId}-${i}`);
+        if (!old) break;
+        old.remove();
+        i++;
+    }
+    // Recreate for the current options (preserving File objects already stored)
+    groups[groupId].options.forEach((opt, idx) => {
+        const input = getOrCreateVarFileInput(groupId, idx);
+        if (opt.file) {
+            // Re-attach the stored File to the new input via DataTransfer
+            const dt = new DataTransfer();
+            dt.items.add(opt.file);
+            input.files = dt.files;
+        }
+    });
+}
+
+// ── Stable hidden file-input container for variation option images ──────────
+// File inputs are placed OUTSIDE the chip area so renderOptions() (which does
+// innerHTML = '') never destroys a selected file before it reaches the server.
+function getOrCreateVarFileInput(groupId, idx) {
+    const inputId = `opt-img-${groupId}-${idx}`;
+    let input = document.getElementById(inputId);
+    if (!input) {
+        let container = document.getElementById('var-file-inputs');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'var-file-inputs';
+            container.style.display = 'none';
+            document.getElementById('productForm').appendChild(container);
+        }
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id   = inputId;
+        input.name = `VarImg_${groupId}_${idx}`;
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        input.addEventListener('change', () => setOptImg(input, groupId, idx));
+        container.appendChild(input);
+    }
+    return input;
+}
+
 function renderOptions(groupId) {
     const area = document.getElementById('chips-' + groupId);
     area.innerHTML = '';
     groups[groupId].options.forEach((opt, i) => {
+        // Ensure a stable file input exists for this option slot
+        getOrCreateVarFileInput(groupId, i);
+
         const chip = document.createElement('span');
         chip.className = 'var-option-chip';
 
-        // Image part
-        if (opt.imagePath && !opt.imagePath.startsWith('blob:') && !opt.imagePath.startsWith('data:')) {
+        // Image part — show preview if we have a URL (blob, data, or server path)
+        if (opt.imagePath) {
             chip.innerHTML += `<img src="${opt.imagePath}" title="Option image" />`;
-        } else if (opt.imagePath) {
-            chip.innerHTML += `<img src="${opt.imagePath}" title="Option image (preview)" />`;
         } else {
             chip.innerHTML += `
                 <span class="chip-img-placeholder" title="Add image"
@@ -489,9 +571,6 @@ function renderOptions(groupId) {
         }
 
         chip.innerHTML += `
-            <input type="file" id="opt-img-${groupId}-${i}" name="VarImg_${groupId}_${i}"
-                   accept="image/*" style="display:none;"
-                   onchange="setOptImg(this,${groupId},${i})" />
             <span>${escHtml(opt.label)}</span>
             <button type="button" class="chip-del" onclick="removeOption(${groupId},${i})">
                 <i class="fas fa-times"></i>
@@ -501,12 +580,13 @@ function renderOptions(groupId) {
 }
 
 function triggerOptImg(groupId, idx) {
-    document.getElementById(`opt-img-${groupId}-${idx}`)?.click();
+    getOrCreateVarFileInput(groupId, idx).click();
 }
 function setOptImg(input, groupId, idx) {
     if (!input.files[0]) return;
-    const url = URL.createObjectURL(input.files[0]);
-    groups[groupId].options[idx].imagePath = url;
+    // Store the File object on the option so it survives re-renders
+    groups[groupId].options[idx].file      = input.files[0];
+    groups[groupId].options[idx].imagePath = URL.createObjectURL(input.files[0]);
     renderOptions(groupId);
     serializeAll();
 }
@@ -671,6 +751,7 @@ function escHtml(str) {
 // ════════════════════════════════════════════════════════════
 function submitForm(type) {
     serializeAll();
+    updateSlotAssignment();
     const banner = document.getElementById('val-banner');
     banner.style.display = 'none';
 
