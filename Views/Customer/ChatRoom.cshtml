@@ -2,7 +2,7 @@
 @using System.Security.Claims
 
 @{
-    ViewData["Title"] = "正在聊天";
+    @* ViewData["Title"] = "正在聊天"; *@
     var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 }
 
@@ -17,7 +17,7 @@
         @{
             // 💡 安全提取商家名字逻辑：
             // 如果 Model.Seller 存在就用 ShopName，否则用后台传过来的商户名称（如果有），最差显示 "商家"
-            var sellerName = Model.Seller?.ShopName ?? "商家"; 
+            var sellerName = Model.Seller?.ShopName ?? "Seller"; 
             var firstChar = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
         }
 
@@ -33,27 +33,60 @@
 
         <div class="card-body bg-light" id="messageBody" style="height: 500px; overflow-y: auto; padding: 20px运行;">
                 @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
-                {
-                    var isMyMessage = msg.SenderId == currentUserId;
-                    
-                    <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
-                        <div class="max-w-75">
-                            <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" 
-                                 style="word-break: break-all;">
-                                @msg.MessageText
-                            </div>
-                            <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
-                                @msg.SentAt.ToLocalTime().ToString("HH:mm")
-                            </small>
-                        </div>
-                    </div>
+{
+    var isMyMessage = msg.SenderId == currentUserId;
+    
+    <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
+        <div class="max-w-75">
+            
+            @if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
+            {
+                // 去掉特殊标记前缀，将纯 HTML 框架渲染到页面上
+                var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
+                
+                <div class="product-card-bubble" style="cursor: pointer;">
+                    @Html.Raw(cleanHtml)
+                </div>
             }
+            else
+            {
+                <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" 
+                     style="word-break: break-all;">
+                    @msg.MessageText
+                </div>
+            }
+            
+            <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
+                @msg.SentAt.ToLocalTime().ToString("HH:mm")
+            </small>
+        </div>
+    </div>
+}
         </div>
 
 <div class="card-footer bg-white border-top p-3">
+    
+    @if (ViewBag.ChatProduct != null)
+    {
+        var prod = ViewBag.ChatProduct as EcommerceSystem.Models.Product;
+        <div class="product-mini-card d-flex align-items-center justify-content-between p-2 mb-3 bg-light rounded border border-info-subtle shadow-sm">
+            <div class="d-flex align-items-center text-truncate me-2">
+                <img src="@prod.ImagePath" alt="product" class="rounded me-2 border bg-white" style="width: 50px; height: 50px; object-fit: cover;" />
+                <div class="text-truncate">
+                    <span class="d-block text-dark fw-bold small text-truncate" style="max-width: 250px;">@prod.Name</span>
+                    <span class="text-danger fw-bold small">RM @prod.Price</span>
+                </div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-info btn-sm text-white px-3 rounded-pill fw-bold" id="sendProductLinkBtn">
+                     发送链接
+                </button>
+            </div>
+        </div>
+    }
+
     <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group">
         <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
-        
         <input type="hidden" name="sellerId" value="@Model.SellerId" />
         
         <input type="text" name="message" id="messageInput" autocomplete="off"
@@ -65,32 +98,61 @@
         </button>
     </form>
 </div>
-    </div>
-</div>
 
 <style>
     .max-w-75 { max-width: 75%; }
     #messageBody::-webkit-scrollbar { width: 6px; }
     #messageBody::-webkit-scrollbar-track { background: transparent; }
     #messageBody::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
+    
+    /* 💡 新增：商品卡片气泡悬停特效 */
+    .product-card-bubble a:hover {
+        transform: scale(1.03);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        border-color: #0dcaf0 !important; /* 悬停时边框变蓝 */
+    }
 </style>
 
 @section Scripts {
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             var messageBody = document.getElementById("messageBody");
-            if (messageBody) {
-                messageBody.scrollTop = messageBody.scrollHeight;
+            if (messageBody) { messageBody.scrollTop = messageBody.scrollHeight; }
+
+            var sendProductBtn = document.getElementById("sendProductLinkBtn");
+            var messageInput = document.getElementById("messageInput");
+            var chatForm = document.getElementById("chatForm");
+
+            if (sendProductBtn && messageInput && chatForm) {
+                sendProductBtn.addEventListener("click", function () {
+                    // 1. 获取商品的各项属性
+                    var productTitle = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")";
+                    var productId = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).ProductId : "")";
+                    var productPrice = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Price : "")";
+                    var productImage = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).ImagePath : "")";
+                    
+                    // 2. 🔥【核心核心】：将消息组装成带有特殊前缀和完整跳转 A 标签的 HTML 框架
+                    var htmlCard = "[PRODUCT_CARD]<a href='/Customer/ProductDetails/" + productId + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-light-subtle' style='max-width: 260px; transition: transform 0.2s;'>\n" +
+                        "  <div class='d-flex align-items-center'>\n" +
+                        "    <img src='" + productImage + "' class='rounded me-2 border' style='width: 50px; height: 50px; object-fit: cover;' />\n" +
+                        "    <div class='text-truncate' style='line-height: 1.3;'>\n" +
+                        "      <span class='d-block fw-bold text-dark small text-truncate' style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>" + productTitle + "</span>\n" +
+                        "      <span class='text-danger fw-bold small d-block mt-1'>RM " + productPrice + "</span>\n" +
+                        "      <span class='text-muted' style='font-size: 10px;'><i class='bi bi-link-45deg'></i> 点击查看商品</span>\n" +
+                        "    </div>\n" +
+                        "  </div>\n" +
+                        "</a>";
+                    
+                    // 3. 填入输入框并提交
+                    messageInput.value = htmlCard;
+                    
+                    // 保持页面刷新后小框继续存在
+                    var currentAction = chatForm.getAttribute("action");
+                    chatForm.setAttribute("action", currentAction + "?productId=" + productId);
+                    
+                    chatForm.submit();
+                });
             }
-
-            var form = document.getElementById("chatForm");
-            var input = document.getElementById("messageInput");
-
-            form.addEventListener("submit", function(e) {
-                if(input.value.trim() === "") {
-                    e.preventDefault();
-                }
-            });
         });
     </script>
 }
