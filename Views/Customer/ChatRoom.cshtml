@@ -1,68 +1,101 @@
 @model EcommerceSystem.Models.ChatRoom
 @using System.Security.Claims
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 @{
-    @* ViewData["Title"] = "正在聊天"; *@
     var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 }
 
 <div class="container mt-3">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-white border-bottom p-3 d-flex align-items-center justify-content-between">
-    <div class="d-flex align-items-center">
-        <a asp-controller="Chat" asp-action="CustomerInbox" class="btn btn-link text-dark p-0 me-3">
-            <i class="bi bi-arrow-left fs-4"></i>
-        </a>
-        
-        @{
-            // 💡 安全提取商家名字逻辑：
-            // 如果 Model.Seller 存在就用 ShopName，否则用后台传过来的商户名称（如果有），最差显示 "商家"
-            var sellerName = Model.Seller?.ShopName ?? "Seller"; 
-            var firstChar = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
-        }
-
-        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
-            <span class="fw-bold">@firstChar</span>
-        </div>
-
-        <div class="text-truncate">
-            <h6 class="mb-0 fw-bold text-dark">@sellerName</h6>
-        </div>
-    </div>
-</div>
-
-        <div class="card-body bg-light" id="messageBody" style="height: 500px; overflow-y: auto; padding: 20px运行;">
-                @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
-{
-    var isMyMessage = msg.SenderId == currentUserId;
-    
-    <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
-        <div class="max-w-75">
-            
-            @if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
-            {
-                // 去掉特殊标记前缀，将纯 HTML 框架渲染到页面上
-                var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
+            <div class="d-flex align-items-center">
+                <a asp-controller="Chat" asp-action="CustomerInbox" class="btn btn-link text-dark p-0 me-3">
+                    <i class="bi bi-arrow-left fs-4"></i>
+                </a>
                 
-                <div class="product-card-bubble" style="cursor: pointer;">
-                    @Html.Raw(cleanHtml)
+                @{
+                    var sellerName = Model.Seller?.ShopName ?? "Seller"; 
+                    var firstChar = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
+                }
+
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
+                    <span class="fw-bold">@firstChar</span>
                 </div>
-            }
-            else
-            {
-                <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" 
-                     style="word-break: break-all;">
-                    @msg.MessageText
+
+                <div class="text-truncate">
+                    <h6 class="mb-0 fw-bold text-dark">@sellerName</h6>
                 </div>
-            }
-            
-            <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
-                @msg.SentAt.ToLocalTime().ToString("HH:mm")
-            </small>
+            </div>
         </div>
-    </div>
-}
+
+<div class="card-body bg-light" id="messageBody" style="height: 500px; overflow-y: auto; padding: 20px;">
+    @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
+    {
+        var isMyMessage = msg.SenderId == currentUserId;
+        <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
+            <div class="max-w-75">
+                
+                @if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
+                {
+                    var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
+                    <div class="product-card-bubble">
+                        @Html.Raw(cleanHtml)
+                    </div>
+                }
+                @if (msg.MessageText != null && msg.MessageText.StartsWith("[ORDER_TAG]"))
+                {
+                    var parts = msg.MessageText.Split('|');
+                    var orderId = parts.Length > 1 ? parts[1] : "0";
+                    var totalPrice = parts.Length > 2 ? parts[2] : "0.00";
+                    var orderImg = parts.Length > 3 ? parts[3] : "/images/default-order.png";
+                    
+                    // 💡 跳转目标：/Customer/PurchaseHistory?searchString=订单号 或者你前端对应的搜索参数名
+                    // 这里设定跳转参数为 ?searchString=15，如果你的购买历史页面的搜索输入框绑定的参数是别的值（比如 searchOrderId），请自行修改该对应词
+                    <div class="product-card-bubble">
+                        <a href="/Customer/PurchaseHistory?searchString=@orderId" class="d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-warning-subtle" style="max-width: 260px; transition: transform 0.2s;">
+                            <div class="p-1">
+                                <div class="text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between" style="font-size:11px;">
+                                    <span>📋 交易订单</span>
+                                    <span class="text-success fw-bold">点击追踪单号</span>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <img src="@orderImg" class="rounded border me-2" style="width: 40px; height: 40px; object-fit: cover;" />
+                                    <div class="text-truncate" style="line-height: 1.2;">
+                                        <span class="d-block fw-bold text-dark" style="font-size:12px;">订单号: #@orderId</span>
+                                        <small class="text-muted d-block text-truncate" style="font-size:11px;">点击在历史记录中查看</small>
+                                    </div>
+                                </div>
+                                <div class="text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1" style="font-size:12px;">
+                                    <span>实付款: <b class="text-danger">RM @totalPrice</b></span>
+                                    <span class="text-primary" style="font-size: 11px;">去查询 <i class="bi bi-chevron-right"></i></span>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                }
+                else if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
+                {
+                    var cleanImgHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
+                    <div class="image-bubble">
+                        @Html.Raw(cleanImgHtml)
+                    </div>
+                }
+                else if (msg.MessageText != null && !msg.MessageText.StartsWith("[PRODUCT_CARD]") && !msg.MessageText.StartsWith("[ORDER_TAG]"))
+                {
+                    <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" style="word-break: break-all;">
+                        @msg.MessageText
+                    </div>
+                }
+                
+                <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
+                    @msg.SentAt.ToLocalTime().ToString("HH:mm")
+                </small>
+            </div>
         </div>
+    }
+</div>
 
 <div class="card-footer bg-white border-top p-3">
     
@@ -85,18 +118,82 @@
         </div>
     }
 
-    <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group">
-        <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
-        <input type="hidden" name="sellerId" value="@Model.SellerId" />
+    <div class="d-flex align-items-center gap-2">
         
-        <input type="text" name="message" id="messageInput" autocomplete="off"
-               class="form-control border-end-0 bg-light" 
-               placeholder="请输入消息内容..." required />
-               
-        <button class="btn btn-primary px-4" type="submit" id="sendBtn">
-            <i class="bi bi-send-fill"></i> 发送
-        </button>
-    </form>
+        <button class="btn btn-light border px-3 text-primary d-flex align-items-center justify-content-center" type="button" 
+        onclick="var p = document.getElementById('myAttachPanel'); if(p) p.classList.toggle('d-none');" 
+        style="height: 38px; width: 45px; border-radius: 6px; font-weight: bold; font-size: 20px;" title="更多功能">
+    ＋
+</button>
+
+        <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group m-0 flex-grow-1">
+            <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
+            <input type="hidden" name="sellerId" value="@Model.SellerId" />
+            
+            <input type="text" name="message" id="messageInput" autocomplete="off" 
+                   class="form-control bg-light" placeholder="请输入消息内容..." required style="height: 38px;" />
+                   
+            <button class="btn btn-primary px-4" type="submit" id="sendBtn">
+                <i class="bi bi-send-fill"></i> 发送
+            </button>
+        </form>
+    </div>
+
+    <div class="attach-panel d-none mt-3 p-3 bg-light rounded border border-light-subtle shadow-inner" id="myAttachPanel">
+        <div class="row g-3 text-center">
+            <div class="col-4">
+                <div class="attach-item p-3 bg-white rounded border cursor-pointer" id="attachPhotoBtn">
+                    <i class="bi bi-image fs-2 text-success"></i>
+                    <span class="d-block small text-muted mt-1">发照片</span>
+                </div>
+                <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
+            </div>
+            
+            <div class="col-4">
+                <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#sellerProductsModal">
+                    <i class="bi bi-bag-heart fs-2 text-warning"></i>
+                    <span class="d-block small text-muted mt-1">发商品</span>
+                </div>
+            </div>
+            
+            <div class="col-4">
+                <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#customerOrdersModal">
+                    <i class="bi bi-receipt fs-2 text-info"></i>
+                    <span class="d-block small text-muted mt-1">发订单</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+
+<div class="modal fade" id="sellerProductsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-bag"></i> 推荐店内商品</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2" id="sellerProductsContainer">
+                <div class="text-center py-4 text-muted small">正在加载店内商品...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="customerOrdersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="bi bi-receipt"></i> 选择关联订单</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2" id="customerOrdersContainer">
+                <div class="text-center py-4 text-muted small">正在加载您的历史订单...</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -105,54 +202,156 @@
     #messageBody::-webkit-scrollbar-track { background: transparent; }
     #messageBody::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
     
-    /* 💡 新增：商品卡片气泡悬停特效 */
     .product-card-bubble a:hover {
-        transform: scale(1.03);
+        transform: scale(1.02);
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-        border-color: #0dcaf0 !important; /* 悬停时边框变蓝 */
+        border-color: #0dcaf0 !important;
+    }
+
+    .attach-item {
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    .attach-item:hover {
+        background-color: #f8f9fa !important;
+        border-color: #0d6efd !important;
+        transform: translateY(-2px);
+    }
+    .cursor-pointer { cursor: pointer; }
+    
+    /* 保证图片在气泡里不会撑破自适应样式 */
+    .image-bubble img {
+        max-width: 100%;
+        height: auto;
+        display: block;
     }
 </style>
 
 @section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             var messageBody = document.getElementById("messageBody");
             if (messageBody) { messageBody.scrollTop = messageBody.scrollHeight; }
 
-            var sendProductBtn = document.getElementById("sendProductLinkBtn");
-            var messageInput = document.getElementById("messageInput");
-            var chatForm = document.getElementById("chatForm");
+            var sellerId = "@Model.SellerId";
+            var chatRoomId = "@Model.ChatRoomId";
 
-            if (sendProductBtn && messageInput && chatForm) {
+            // 1. 动态获取匹配商家的产品列表
+            var sellerProductsModal = document.getElementById('sellerProductsModal');
+            if (sellerProductsModal) {
+                sellerProductsModal.addEventListener('show.bs.modal', function () {
+                    var container = document.getElementById("sellerProductsContainer");
+                    fetch(`/Chat/GetSellerProducts?sellerId=${sellerId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if(data.length === 0){
+                                container.innerHTML = '<div class="text-center py-3 text-muted">该商家暂未上架其他商品</div>';
+                                return;
+                            }
+                            let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
+                            data.forEach(p => {
+                                html += `
+                                    <div class="list-group-item d-flex align-items-center justify-content-between p-2 cursor-pointer border-bottom" onclick="sendCustomCard('PRODUCT','${encodeURIComponent(p.name)}','${p.productId}','${p.price}','${p.imagePath}')">
+                                        <div class="d-flex align-items-center text-truncate me-2">
+                                            <img src="${p.imagePath}" class="rounded border me-2" style="width:40px;height:40px;object-fit:cover;"/>
+                                            <div class="text-truncate" style="font-size:13px;">
+                                                <b class="d-block text-dark text-truncate" style="max-width:240px;">${p.name}</b>
+                                                <span class="text-danger">RM ${p.price}</span>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-primary btn-sm rounded-pill px-3" style="font-size:11px;">发送</button>
+                                    </div>`;
+                            });
+                            html += '</div>';
+                            container.innerHTML = html;
+                        }).catch(() => {
+                            container.innerHTML = '<div class="text-center py-3 text-danger">产品加载失败</div>';
+                        });
+                });
+            }
+
+            // 2. 动态获取匹配商家的历史订单列表
+            var customerOrdersModal = document.getElementById('customerOrdersModal');
+            if (customerOrdersModal) {
+                customerOrdersModal.addEventListener('show.bs.modal', function () {
+                    var container = document.getElementById("customerOrdersContainer");
+                    fetch(`/Chat/GetCustomerOrders?sellerId=${sellerId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if(data.length === 0){
+                                container.innerHTML = '<div class="text-center py-3 text-muted">暂无与该商家相关的订单记录</div>';
+                                return;
+                            }
+                            let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
+                            data.forEach(o => {
+                                // 💡 彻底修复：点击时不再传递容易冲突的名字字符串，只传ID、价格和图片，名字在 C# 端查
+                                html += `
+                                    <div class="list-group-item d-flex align-items-center justify-content-between p-2 border-bottom">
+                                        <div class="d-flex align-items-center text-truncate me-2" style="flex-grow:1;">
+                                            <img src="${o.coverImage || '/images/default-order.png'}" class="rounded border me-2" style="width:45px;height:45px;object-fit:cover;"/>
+                                            <div class="text-truncate" style="font-size:12px; line-height:1.3;">
+                                                <b class="text-dark d-block">订单号: #${o.orderId}</b>
+                                                <span class="text-muted d-block text-truncate" style="max-width:200px;">${o.coverName}</span>
+                                                <span class="text-danger fw-bold">RM ${o.totalAmount}</span>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-info text-white btn-sm rounded-pill py-1 px-3" style="font-size:11px;" 
+                                                onclick="sendCustomCard('ORDER', '', '${o.orderId}', '${o.totalAmount}', '${o.coverImage || ''}')">
+                                            发送
+                                        </button>
+                                    </div>`;
+                            });
+                            html += '</div>';
+                            container.innerHTML = html;
+                        }).catch(() => {
+                            container.innerHTML = '<div class="text-center py-3 text-danger">订单加载失败</div>';
+                        });
+                });
+            }
+
+            // 3. 快捷商品栏发送按钮
+            var sendProductBtn = document.getElementById("sendProductLinkBtn");
+            if (sendProductBtn) {
                 sendProductBtn.addEventListener("click", function () {
-                    // 1. 获取商品的各项属性
-                    var productTitle = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")";
-                    var productId = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).ProductId : "")";
-                    var productPrice = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Price : "")";
-                    var productImage = "@(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).ImagePath : "")";
-                    
-                    // 2. 🔥【核心核心】：将消息组装成带有特殊前缀和完整跳转 A 标签的 HTML 框架
-                    var htmlCard = "[PRODUCT_CARD]<a href='/Customer/ProductDetails/" + productId + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-light-subtle' style='max-width: 260px; transition: transform 0.2s;'>\n" +
-                        "  <div class='d-flex align-items-center'>\n" +
-                        "    <img src='" + productImage + "' class='rounded me-2 border' style='width: 50px; height: 50px; object-fit: cover;' />\n" +
-                        "    <div class='text-truncate' style='line-height: 1.3;'>\n" +
-                        "      <span class='d-block fw-bold text-dark small text-truncate' style='white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>" + productTitle + "</span>\n" +
-                        "      <span class='text-danger fw-bold small d-block mt-1'>RM " + productPrice + "</span>\n" +
-                        "      <span class='text-muted' style='font-size: 10px;'><i class='bi bi-link-45deg'></i> 点击查看商品</span>\n" +
-                        "    </div>\n" +
-                        "  </div>\n" +
-                        "</a>";
-                    
-                    // 3. 填入输入框并提交
-                    messageInput.value = htmlCard;
-                    
-                    // 保持页面刷新后小框继续存在
-                    var currentAction = chatForm.getAttribute("action");
-                    chatForm.setAttribute("action", currentAction + "?productId=" + productId);
-                    
-                    chatForm.submit();
+                    sendCustomCard('PRODUCT', 
+                        `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`, 
+                        `@ViewBag.ChatProduct?.ProductId`, 
+                        `@ViewBag.ChatProduct?.Price`, 
+                        `@ViewBag.ChatProduct?.ImagePath`);
                 });
             }
         });
+
+        // 💡 4. 统一底层发卡函数（完美规避 JS 字符串报错漏洞）
+        function sendCustomCard(type, title, id, price, img) {
+            var input = document.getElementById("messageInput");
+            var form = document.getElementById("chatForm");
+            
+            if(type === 'PRODUCT') {
+                var decodedTitle = decodeURIComponent(title || "");
+                input.value = "[PRODUCT_CARD]<a href='/Customer/ProductDetails/" + id + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-light-subtle' style='max-width: 260px; transition: transform 0.2s;'>\n" +
+                    "  <div class='d-flex align-items-center'>\n" +
+                    "    <img src='" + img + "' class='rounded me-2 border' style='width: 50px; height: 50px; object-fit: cover;' />\n" +
+                    "    <div class='text-truncate' style='line-height: 1.3;'>\n" +
+                    "      <span class='d-block fw-bold text-dark small text-truncate'>" + decodedTitle + "</span>\n" +
+                    "      <span class='text-danger fw-bold small d-block mt-1'>RM " + price + "</span>\n" +
+                    "      <span class='text-muted' style='font-size: 10px;'><i class='bi bi-link-45deg'></i> 点击查看商品</span>\n" +
+                    "    </div>\n" +
+                    "  </div>\n" +
+                    "</a>";
+            } 
+            else if(type === 'ORDER') {
+                // 💡【核心改动】：发送订单时不拼 HTML，直接生成纯文本标签格式交给后端，绝对不会引起 JS 报错
+                // 格式： [ORDER_TAG]|订单ID|总价|封面图
+                input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img;
+            }
+            
+            // 移除了 required 校验限制，强行提交表单发出去
+            input.removeAttribute("required");
+            form.submit();
+        }
     </script>
 }

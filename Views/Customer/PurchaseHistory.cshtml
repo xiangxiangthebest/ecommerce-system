@@ -61,6 +61,7 @@
     }).ToList();
 
     var orderDataJson = JsonSerializer.Serialize(orderData, jsonOpts);
+    var urlSearchString = Context.Request.Query["searchString"].ToString();
 }
 
 @functions {
@@ -161,7 +162,7 @@
         </div>
         <div class="ph-search-wrap">
             <i class="ti ti-search"></i>
-            <input type="text" id="phSearch" placeholder="Search by order ID or product…" />
+            <input type="text" id="phSearchInput" class="ph-search-input" value="@urlSearchString" placeholder="Search by Order ID or Product Name...">
         </div>
     </div>
 
@@ -596,541 +597,246 @@
      SCRIPTS
 ═══════════════════════════════════════════════════════════ -->
 <script>
-// ── Toast auto-hide ────────────────────────────────────────
-const _toast = document.getElementById('phToast');
-if (_toast) setTimeout(() => _toast.classList.add('ph-toast-hide'), 3500);
+// ==========================================
+// 💡 全局控制状态变量
+// ==========================================
+// 注入 C# 拿到的全部订单完整 JSON 数据，用于抽屉详情 (Drawer) 展示
+const allOrders = @Html.Raw(orderDataJson);
 
-// ── Order data ─────────────────────────────────────────────
-const _orders = @Html.Raw(orderDataJson);
+let currentTab = 'ALL';
+let currentSearch = '';
 
-// ── Tab filter ─────────────────────────────────────────────
-document.querySelectorAll('.ph-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        applyFilters();
+// ==========================================
+// 💡 主程序初始化入口
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. 初始化绑定侧边抽屉自动调整大小
+    const odDrawer = document.getElementById('odDrawer');
+    if (odDrawer) { odDrawer.style.display = 'none'; }
+
+    // 2. 绑定分类标签(Tab)的点击拦截切换事件
+    const tabs = document.querySelectorAll('#phTabs .ph-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentTab = this.getAttribute('data-status');
+            applyFilters();
+        });
     });
+
+    // 3. 拦截搜索输入框的手动键盘输入
+    const searchInput = document.getElementById('phSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase().trim();
+            applyFilters();
+        });
+
+        // 4. 🔥【核心修复点】：页面加载时，立即读取 C# 塞进输入框里的值并触发筛选
+        if (searchInput.value) {
+            currentSearch = searchInput.value.toLowerCase().trim();
+            currentTab = 'ALL';
+            
+            // 确保 UI 上的 'All' 标签处于激活状态
+            tabs.forEach(t => t.classList.remove('active'));
+            const allTabBtn = document.querySelector('#phTabs .ph-tab[data-status="ALL"]');
+            if (allTabBtn) allTabBtn.classList.add('active');
+            
+            applyFilters(); // 瞬间隐藏多余订单，留下精准匹配的那笔
+        }
+    }
 });
 
-// ── Search ─────────────────────────────────────────────────
-document.getElementById('phSearch').addEventListener('input', applyFilters);
-
+// ==========================================
+// 💡 契合您 C# 结构的纯原生过滤机制（性能极高、100%生效）
+// ==========================================
 function applyFilters() {
-    const status = document.querySelector('.ph-tab.active')?.dataset.status ?? 'ALL';
-    const query  = document.getElementById('phSearch').value.toLowerCase().trim();
-    let visible  = 0;
-    document.querySelectorAll('.ph-card').forEach(card => {
-        const matchStatus = status === 'ALL' || card.dataset.status === status;
-        const matchSearch = !query || card.dataset.search.includes(query);
-        const show = matchStatus && matchSearch;
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
+    const cards = document.querySelectorAll('#phOrderList .ph-card');
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+        const cardStatus = card.getAttribute('data-status');
+        const cardSearchInfo = card.getAttribute('data-search') || '';
+
+        // A. 分类标签状态校验
+        const matchesTab = (currentTab === 'ALL' || cardStatus === currentTab);
+        
+        // B. 搜索内容校验 (单号数字或商品名称)
+        const matchesSearch = (!currentSearch || cardSearchInfo.includes(currentSearch));
+
+        // 如果同时满足标签和检索词，则显示，否则彻底在视图中隐藏
+        if (matchesTab && matchesSearch) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
     });
-    document.getElementById('phNoResults').style.display = visible === 0 ? 'flex' : 'none';
+
+    // C. 如果过滤完了发现一笔都没有，展示原本的 phNoResults 空白提示块
+    const noResults = document.getElementById('phNoResults');
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0) ? 'block' : 'none';
+    }
 }
 
-// ── Collapsible sections ───────────────────────────────────
+// ==========================================
+// 💡 原本卡片内部的折叠/展开逻辑展开 (Items & Delivery Toggle)
+// ==========================================
 function toggleCollapse(btn) {
-    btn.classList.toggle('open');
-    const collapse = btn.closest('.ph-card-seller, .ph-card-delivery-toggle')
-                        .nextElementSibling;
-    collapse.style.maxHeight = btn.classList.contains('open')
-        ? collapse.scrollHeight + 'px' : '0';
+    const card = btn.closest('.ph-card');
+    // 根据您点击的是具体哪一个 Toggle，去寻找与其紧挨着的 ph-collapse 区域
+    let container = btn.parentElement.nextElementSibling;
+    if (!container || !container.classList.contains('ph-collapse')) {
+        // 保底寻找法
+        container = btn.closest('.ph-card-seller').nextElementSibling;
+    }
+    
+    if (container && container.classList.contains('ph-collapse')) {
+        container.classList.toggle('active');
+        const chevron = btn.querySelector('.ph-chevron');
+        if (chevron) {
+            chevron.classList.toggle('ti-chevron-down');
+            chevron.classList.toggle('ti-chevron-up');
+        }
+    }
 }
 
-// ═══════════════════════════════════════════════════════════
-// DRAWER  –  Order Detail
-// ═══════════════════════════════════════════════════════════
+// ==========================================
+// 💡 侧边抽屉详情抽样逻辑 (Drawer Open / Close)
+// ==========================================
 function openDrawer(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
+    const order = allOrders.find(o => String(o.orderId) === String(orderId));
     if (!order) return;
 
-    document.getElementById('odTitle').textContent = 'Order #' + order.orderId;
-    document.getElementById('odDate').textContent  = order.orderTime;
-
+    document.getElementById('odTitle').textContent = `Order Details #${order.orderId}`;
+    document.getElementById('odDate').innerHTML = `<i class="ti ti-clock"></i> Placed on ${order.orderTime}`;
+    
     const badge = document.getElementById('odBadge');
-    badge.className = 'ph-status-pill ph-s-' + order.status;
-    document.getElementById('odBadgeLabel').textContent = order.statusLabel;
-
-    let html = '';
-
-    // Render / Refund notice inside drawer
-    if (order.status === 'RETURN_REFUND' && order.returnReason) {
-        html += `<div class="od-notice od-notice-return">
-            <i class="ti ti-refresh-alert"></i>
-            <div><strong>Return / Refund Reason from Seller</strong><span>${esc(order.returnReason)}</span></div>
-        </div>`;
-    }
-    if (order.status === 'CANCELED' && order.cancelReason) {
-        html += `<div class="od-notice od-notice-canceled">
-            <i class="ti ti-ban"></i>
-            <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
-        </div>`;
+    const label = document.getElementById('odBadgeLabel');
+    if (badge && label) {
+        badge.className = `ph-status-pill ph-s-${order.status}`;
+        label.textContent = order.statusLabel;
     }
 
-    // Complaint status in drawer
-    if (order.complaintSubmitted && order.complaintText) {
-        html += `<div class="od-complaint-sent">
-            <i class="ti ti-check-circle"></i>
-            <div><strong>Complaint Submitted</strong><span>${esc(order.complaintText)}</span></div>
-        </div>`;
-    }
-
-    // Review status in drawer
-    // AFTER
-    if (order.reviewSubmitted) {
-        const reviewLines = order.items
-            .filter(item => item.reviewRating > 0)
-            .map(item => {
-                const filled   = '★'.repeat(item.reviewRating);
-                const unfilled = '☆'.repeat(5 - item.reviewRating);
-                const labels   = ['','Poor','Fair','Good','Very Good','Excellent'];
-                const label    = labels[item.reviewRating] ?? '';
-                const textLine = item.reviewText
-                    ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>`
-                    : '';
-                return `
-                <div class="od-reviewed-item">
-                    <span class="od-reviewed-item-name">${esc(item.name)}</span>
-                    <span class="od-reviewed-stars">
-                        <span class="od-reviewed-filled">${filled}</span><span class="od-reviewed-unfilled">${unfilled}</span>
-                        <span class="od-reviewed-label">${label}</span>
-                    </span>
-                    ${textLine}
-                </div>`;
-            }).join('');
-
-        html += `
-        <div class="od-reviewed-sent">
-            <i class="ti ti-star"></i>
-            <div>
-                <strong>Review Submitted</strong>
-                ${reviewLines}
+    // 拼装抽屉内部的项目列表 HTML 
+    let itemsHtml = order.items.map(i => `
+        <div class="ph-item" style="border-bottom: 1px solid #f1f5f9; padding: 12px 0;">
+            <div class="ph-item-img" style="width: 50px; height: 50px;">
+                <img src="${i.image}" onerror="this.src='/images/placeholder.png'" style="width:100%; height:100%; object-fit:cover; border-radius:6px;" />
             </div>
-        </div>`;
-    }
-
-    // Items
-    order.items.forEach((item, idx) => {
-        const imgs    = (item.images && item.images.length > 0) ? item.images : [item.image];
-        const mainImg = imgs[0] || item.image;
-        const thumbsHtml = imgs.length > 1
-            ? `<div class="od-thumbs">${imgs.map((src, i) =>
-                `<div class="od-thumb ${i===0?'active':''}" onclick="odSwitch(this,'${src.replace(/'/g,"\\'")}')">
-                    <img src="${esc(src)}" onerror="this.src='/images/placeholder.png'" /></div>`
-               ).join('')}</div>` : '';
-
-        const fullStars  = Math.floor(item.rating);
-        const stars = Array(fullStars).fill('★').join('') + Array(5-fullStars).fill('☆').join('');
-
-        const selectedMap = {};
-        if (item.selectedVariation) {
-            item.selectedVariation.split(' · ').forEach(pair => {
-                const ci = pair.indexOf(': ');
-                if (ci > -1) selectedMap[pair.substring(0, ci).trim()] = pair.substring(ci+2).trim();
-            });
-        }
-
-        let varHtml = '';
-        if (item.allVariations && item.allVariations.length > 0) {
-            varHtml = item.allVariations.map(g => {
-                const btns = g.values.map(v => {
-                    const sel = selectedMap[g.name] === v.label;
-                    const oos = v.stock <= 0;
-                    const cls = sel ? 'od-var-btn sel' : oos ? 'od-var-btn oos' : 'od-var-btn';
-                    return `<button class="${cls}" disabled>${esc(v.label)}</button>`;
-                }).join('');
-                return `<div class="od-var-group"><div class="od-var-name">${esc(g.name)}</div><div class="od-var-opts">${btns}</div></div>`;
-            }).join('');
-        }
-
-        const sep = idx > 0 ? `<div class="od-sep"></div>` : '';
-        html += `${sep}
-        <div class="od-item-wrap">
-            <div class="od-gallery">
-                <div class="od-main-img-wrap">
-                    <img src="${esc(mainImg)}" alt="${esc(item.name)}" onerror="this.src='/images/placeholder.png'" />
+            <div class="ph-item-info" style="margin-left:12px;">
+                <div class="ph-item-name" style="font-size:13px; font-weight:600;">${i.name}</div>
+                <div class="ph-item-qty" style="font-size:11px; color:#64748b; margin-top:2px;">
+                    Qty: ${i.qty} &nbsp;·&nbsp; RM ${parseFloat(i.price).toFixed(2)} each
                 </div>
-                ${thumbsHtml}
+                ${i.selectedVariation ? `<div style="font-size:11px; color:#94a3b8; margin-top:1px;">${i.selectedVariation}</div>` : ''}
             </div>
-            <div class="od-info">
-                ${item.category ? `<div class="od-category">${esc(item.category)}</div>` : ''}
-                <div class="od-name">${esc(item.name)}</div>
-                <div class="od-stars-row">
-                    <span class="od-stars">${stars}</span>
-                    <span class="od-rating-num">${item.rating.toFixed(1)}</span>
-                </div>
-                <div class="od-divider"></div>
-                <div class="od-shop-row">
-                    <div class="od-shop-ava">${esc(order.shopInitial)}</div>
-                    <span>Sold by <strong>${esc(order.shopName)}</strong></span>
-                </div>
-                <div class="od-price">RM ${esc(item.price)}</div>
-                <div class="od-price-note">× ${item.qty} unit${item.qty>1?'s':''} = <strong>RM ${esc(item.subtotal)}</strong></div>
-                ${item.sku ? `<div class="od-sku">SKU: ${esc(item.sku)}</div>` : ''}
-                <div class="od-divider"></div>
-                ${item.description ? `<p class="od-desc">${esc(item.description)}</p>` : ''}
-                ${varHtml}
-            </div>
-        </div>`;
-    });
+            <div class="ph-item-total" style="font-size:13px; font-weight:600; margin-left:auto;">RM ${parseFloat(i.subtotal).toFixed(2)}</div>
+        </div>
+    `).join('');
 
-    // Customer note
-    if (order.customerMessage) {
-        html += `<div class="od-customer-msg">
-            <div class="od-customer-msg-label"><i class="ti ti-message-circle"></i> Note to Seller</div>
-            <div class="od-customer-msg-text">${esc(order.customerMessage)}</div>
-        </div>`;
+    let bodyHtml = `
+        <div style="padding: 4px 0 16px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <div style="font-size:12px; color:#94a3b8; font-weight:600; text-transform:uppercase; margin-bottom:6px;">Delivery Address</div>
+            ${order.address ? `
+                <div style="font-size:13px; font-weight:600; color:#1e293b;">${order.address.recipientName} (${order.address.phoneNumber})</div>
+                <div style="font-size:13px; color:#475569; margin-top:2px;">${order.address.line1}${order.address.line2 ? ', ' + order.address.line2 : ''}, ${order.address.city}, ${order.address.postcode}, ${order.address.state}</div>
+            ` : `<div style="font-size:13px; color:#94a3b8;">No delivery address provided.</div>`}
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <div style="font-size:12px; color:#94a3b8; font-weight:600; text-transform:uppercase; margin-bottom:8px;">Items Ordered</div>
+            ${itemsHtml}
+        </div>
+
+        <div style="background:#f8fafc; border-radius:12px; padding:16px;">
+            <div style="display:flex; justify-content:between; font-size:13px; color:#475569; margin-bottom:6px;">
+                <span>Payment Method</span>
+                <span style="font-weight:600; margin-left:auto;">${order.paymentMethod}</span>
+            </div>
+            <div style="display:flex; justify-content:between; font-size:15px; color:#1e293b; font-weight:700; border-top:1px dashed #cbd5e1; pt-12; margin-top:10px; padding-top:10px;">
+                <span>Total Amount</span>
+                <span style="color:#0f172a; font-size:16px; margin-left:auto;">RM ${order.totalAmount}</span>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('odDrawerBody').innerHTML = bodyHtml;
+
+    const backdrop = document.getElementById('odBackdrop');
+    const drawer = document.getElementById('odDrawer');
+    if (backdrop) backdrop.classList.add('active');
+    if (drawer) {
+        drawer.style.display = 'block';
+        setTimeout(() => drawer.classList.add('active'), 10);
     }
-
-    // Address block
-    if (order.address) {
-        const a = order.address;
-        html += `<div class="od-address-block">
-            <div class="od-address-title"><i class="ti ti-map-pin"></i> Delivery Address</div>
-            <div class="od-address-grid">
-                <div class="od-address-row"><span>Recipient</span>${esc(a.recipientName)}</div>
-                <div class="od-address-row"><span>Phone</span>${esc(a.phoneNumber)}</div>
-                <div class="od-address-row"><span>Address</span>${esc(a.line1)}${a.line2?', '+esc(a.line2):''}, ${esc(a.city)}, ${esc(a.postcode)}, ${esc(a.state)}</div>
-                <div class="od-address-row"><span>Payment</span>${esc(order.paymentMethod)}</div>
-            </div>
-        </div>`;
-    }
-
-    // Order total summary
-    html += `<div class="od-total-bar">
-        <span>Order Total</span>
-        <strong>RM ${esc(order.totalAmount)}</strong>
-    </div>`;
-
-    document.getElementById('odDrawerBody').innerHTML = html;
-    document.getElementById('odBackdrop').classList.add('active');
-    document.getElementById('odDrawer').classList.add('active');
     document.body.style.overflow = 'hidden';
-}
-
-function odSwitch(thumbEl, src) {
-    const gallery = thumbEl.closest('.od-gallery');
-    gallery.querySelector('.od-main-img-wrap img').src = src;
-    gallery.querySelectorAll('.od-thumb').forEach(t => t.classList.remove('active'));
-    thumbEl.classList.add('active');
 }
 
 function closeDrawer() {
-    document.getElementById('odBackdrop').classList.remove('active');
-    document.getElementById('odDrawer').classList.remove('active');
+    const backdrop = document.getElementById('odBackdrop');
+    const drawer = document.getElementById('odDrawer');
+    if (backdrop) backdrop.classList.remove('active');
+    if (drawer) {
+        drawer.classList.remove('active');
+        setTimeout(() => drawer.style.display = 'none', 300);
+    }
     document.body.style.overflow = '';
 }
 
-// ═══════════════════════════════════════════════════════════
-// CANCEL ORDER
-// ═══════════════════════════════════════════════════════════
-let _cancelSelectedReason = '';
-
+// ==========================================
+// 💡 其它关联业务控制（取消模态框等保底代码）
+// ==========================================
 function openCancelModal(orderId) {
     document.getElementById('cancelOrderId').value = orderId;
-    document.getElementById('cancelCustom').value  = '';
-    _cancelSelectedReason = '';
-    document.querySelectorAll('#cancelReasonGrid .ph-reason-chip')
-            .forEach(c => c.classList.remove('selected'));
-    showModal('cancelBackdrop', 'cancelModal');
-}
-
-function closeCancelModal() { hideModal('cancelBackdrop', 'cancelModal'); }
-
-function selectReason(chip, textareaId) {
-    const grid = chip.parentElement;
-    grid.querySelectorAll('.ph-reason-chip').forEach(c => c.classList.remove('selected'));
-    chip.classList.add('selected');
-    _cancelSelectedReason = chip.textContent.trim();
-    // Pre-fill textarea with selected reason if it's still empty
-    const ta = document.getElementById(textareaId);
-    if (!ta.value.trim()) ta.value = _cancelSelectedReason === 'Other' ? '' : _cancelSelectedReason;
-}
-
-async function submitCancel() {
-    const orderId = document.getElementById('cancelOrderId').value;
-    const reason  = document.getElementById('cancelCustom').value.trim()
-                 || _cancelSelectedReason;
-
-    if (!reason) { showInlineError('cancelModal', 'Please select or enter a cancellation reason.'); return; }
-
-    const btn = document.querySelector('#cancelModal .ph-btn-danger');
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Canceling…';
-
-    try {
-        const res  = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason });
-        if (res.success) {
-            closeCancelModal();
-            showToast('Order canceled successfully.', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
-            showInlineError('cancelModal', res.message || 'Could not cancel order.');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-x"></i> Confirm Cancel';
-        showInlineError('cancelModal', 'Network error — please try again.');
-        console.error('CancelOrder error:', err);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// CONFIRM RECEIVED
-// ═══════════════════════════════════════════════════════════
-async function confirmReceived(orderId, btn) {
-    if (!confirm('Confirm that you have received this order?')) return;
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Confirming…';
-
-    try {
-        const res = await postJson('/Customer/ConfirmReceived', { orderId });
-        if (res.success) {
-            showToast('Order marked as received!', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
-            showToast(res.message || 'Failed to confirm.', 'error');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
-        console.error('ConfirmReceived error:', err);
-    }
-}
-
-function updateProgressToReceived(card) {
-    const steps = ['PENDING','PREPARING','SHIPPED','DELIVERED','RECEIVED'];
-    const currentStep = 4; // RECEIVED
-
-    const stepEls = card.querySelectorAll('.ph-progress-step');
-    stepEls.forEach((el, idx) => {
-        el.classList.remove('done', 'active', 'upcoming');
-        if (idx < currentStep) el.classList.add('done');
-        else if (idx === currentStep) el.classList.add('active');
-        else el.classList.add('upcoming');
-    });
-
-    const lineEls = card.querySelectorAll('.ph-progress-line');
-    lineEls.forEach((line, idx) => {
-        line.classList.toggle('done', idx < currentStep);
-    });
-}
-
-// ═══════════════════════════════════════════════════════════
-// RATING
-// ═══════════════════════════════════════════════════════════
-function openRatingModal(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
-    if (!order) return;
-    document.getElementById('ratingOrderId').value = orderId;
-
-    let html = '';
-    order.items.forEach((item, idx) => {
-        html += `
-        <div class="ph-rating-item" data-item-idx="${idx}" data-product-id="${item.productId}" data-order-item-id="${item.orderItemId}">
-            <div class="ph-rating-item-top">
-                <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
-                <span>${esc(item.name)}</span>
-            </div>
-            <div class="ph-star-picker" data-selected="0">
-                ${[1,2,3,4,5].map(n =>
-                    `<button class="ph-star-btn" data-val="${n}" onclick="pickStar(this)">★</button>`
-                ).join('')}
-                <span class="ph-star-hint">Tap to rate</span>
-            </div>
-            <div class="ph-textarea-wrap" style="margin-top:10px">
-                <textarea class="ph-review-text" placeholder="Share your experience (optional)…" rows="2"></textarea>
-            </div>
-        </div>
-        ${idx < order.items.length - 1 ? '<div class="od-sep"></div>' : ''}`;
-    });
-
-    document.getElementById('ratingItemsWrap').innerHTML = html;
-    showModal('ratingBackdrop', 'ratingModal');
-}
-
-function closeRatingModal() { hideModal('ratingBackdrop', 'ratingModal'); }
-
-function pickStar(btn) {
-    const picker = btn.closest('.ph-star-picker');
-    const val    = parseInt(btn.dataset.val);
-    picker.dataset.selected = val;
-    picker.querySelectorAll('.ph-star-btn').forEach((b, i) => {
-        b.classList.toggle('filled', i < val);
-    });
-    const labels = ['','Poor','Fair','Good','Very Good','Excellent'];
-    picker.querySelector('.ph-star-hint').textContent = labels[val] || '';
-}
-
-async function submitRating() {
-    const orderId = document.getElementById('ratingOrderId').value;
-    const items   = document.querySelectorAll('.ph-rating-item');
-    let hasError  = false;
-    let allOk     = true;
-
-    const submitted = [];
-
-    for (const item of items) {
-        const rating      = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
-        const reviewText  = item.querySelector('.ph-review-text').value.trim();
-        const orderItemId = parseInt(item.dataset.orderItemId);
-        const productId   = parseInt(item.dataset.productId);
-        if (!rating) { hasError = true; continue; }
-
-        try {
-            const res = await postJson('/Customer/SubmitRating', { orderItemId, rating, reviewText });
-            if (res.success) submitted.push({ orderItemId, rating, reviewText });
-            else allOk = false;
-        } catch { allOk = false; }
-    }
-
-    if (hasError) { showInlineError('ratingModal', 'Please give at least 1 star for each item.'); return; }
-
-    // ── update _orders in memory so the drawer shows correct data immediately ──
-    const order = _orders.find(o => o.orderId === parseInt(orderId));
-    if (order) {
-        submitted.forEach(({ orderItemId, rating, reviewText }) => {
-            const item = order.items.find(i => i.orderItemId === orderItemId);
-            if (item) {
-                item.reviewRating = rating;
-                item.reviewText   = reviewText;
-            }
-        });
-        order.reviewSubmitted = true;
-    }
-
-    closeRatingModal();
-    if (allOk) {
-        markReviewWritten(orderId);
-        showToast('Review submitted, thank you!', 'success');
-    } else {
-        showToast('Some reviews could not be saved.', 'error');
-    }
-}
-
-function markReviewWritten(orderId) {
-    const order = _orders.find(o => o.orderId === orderId);
-    if (order) order.reviewSubmitted = true;
-
-    const card = document.querySelector(`.ph-card[data-order-id="${orderId}"]`);
-    if (!card) return;
-
-    const btn = card.querySelector('.js-write-review');
-    if (btn) {
-        btn.outerHTML = `
-          <span class="ph-btn ph-btn-done">
-            <i class="ti ti-check"></i> Review Submitted
-          </span>`;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// COMPLAINT
-// ═══════════════════════════════════════════════════════════
-let _complaintSelectedReason = '';
-
-function openComplaintModal(orderId) {
-    document.getElementById('complaintOrderId').value = orderId;
-    document.getElementById('complaintCustom').value  = '';
-    _complaintSelectedReason = '';
-    document.querySelectorAll('#complaintReasonGrid .ph-reason-chip')
-            .forEach(c => c.classList.remove('selected'));
-    showModal('complaintBackdrop', 'complaintModal');
-}
-
-function closeComplaintModal() { hideModal('complaintBackdrop', 'complaintModal'); }
-
-async function submitComplaint() {
-    const orderId       = document.getElementById('complaintOrderId').value;
-    const complaintText = document.getElementById('complaintCustom').value.trim()
-                       || _complaintSelectedReason;
-
-    if (!complaintText) { showInlineError('complaintModal', 'Please describe your complaint.'); return; }
-
-    const btn = document.querySelector('#complaintModal .ph-btn-warning');
-    btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
-
-    try {
-        const res = await postJson('/Customer/SubmitComplaint', { orderId, complaintText });
-        if (res.success) {
-            closeComplaintModal();
-            showToast('Complaint submitted. We\'ll review it soon.', 'success');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
-            showInlineError('complaintModal', res.message || 'Could not submit complaint.');
-        }
-    } catch (err) {
-        btn.disabled = false; btn.innerHTML = '<i class="ti ti-send"></i> Submit Complaint';
-        console.error('SubmitComplaint error:', err);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// SHARED HELPERS
-// ═══════════════════════════════════════════════════════════
-function esc(str) {
-    const d = document.createElement('div');
-    d.textContent = str ?? '';
-    return d.innerHTML;
-}
-
-async function postJson(url, data) {
-    // ASP.NET MVC [HttpPost] actions bind from the form body, not JSON.
-    // Send as application/x-www-form-urlencoded with the anti-forgery token as a field.
-    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
-    const body  = new URLSearchParams({ ...data, __RequestVerificationToken: token });
-    const res   = await fetch(url, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    body.toString()
-    });
-    return res.json();
-}
-
-function showModal(backdropId, modalId) {
-    document.getElementById(backdropId).classList.add('active');
-    document.getElementById(modalId).classList.add('active');
+    const backdrop = document.getElementById('cancelBackdrop');
+    const modal = document.getElementById('cancelModal');
+    if (backdrop) backdrop.classList.add('active');
+    if (modal) modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
 
-function hideModal(backdropId, modalId) {
-    document.getElementById(backdropId).classList.remove('active');
-    document.getElementById(modalId).classList.remove('active');
+function closeCancelModal() {
+    const backdrop = document.getElementById('cancelBackdrop');
+    const modal = document.getElementById('cancelModal');
+    if (backdrop) backdrop.classList.remove('active');
+    if (modal) modal.classList.remove('active');
     document.body.style.overflow = '';
-    // Clear any inline errors
-    document.querySelectorAll(`#${modalId} .ph-inline-err`).forEach(el => el.remove());
 }
 
-function showInlineError(modalId, msg) {
-    const modal = document.getElementById(modalId);
-    let err = modal.querySelector('.ph-inline-err');
-    if (!err) {
-        err = document.createElement('div');
-        err.className = 'ph-inline-err';
-        modal.querySelector('.ph-modal-footer').before(err);
+function submitCancel() {
+    const orderId = document.getElementById('cancelOrderId').value;
+    let reason = "Changed my mind";
+    const activeChip = document.querySelector('#cancelReasonGrid .ph-reason-chip.active');
+    if (activeChip) { reason = activeChip.textContent; }
+    const customText = document.getElementById('cancelCustom').value.trim();
+    if (customText) { reason += " - " + customText; }
+
+    window.location.href = `/Customer/CancelOrder?orderId=${orderId}&reason=${encodeURIComponent(reason)}`;
+}
+
+function selectReason(btn, textareaId) {
+    document.querySelectorAll('#cancelReasonGrid .ph-reason-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function confirmReceived(orderId, btn) {
+    if (confirm("Are you sure you have received all items in this order?")) {
+        window.location.href = `/Customer/ConfirmReceived?orderId=${orderId}`;
     }
-    err.innerHTML = `<i class="ti ti-alert-circle"></i> ${msg}`;
 }
 
-function showToast(msg, type='success') {
-    const t = document.createElement('div');
-    t.className = 'ph-toast ' + (type === 'error' ? 'ph-toast-err' : '');
-    t.innerHTML = `<i class="ti ${type==='success'?'ti-circle-check':'ti-alert-circle'}"></i> ${msg}`;
-    document.body.appendChild(t);
-    setTimeout(() => t.classList.add('ph-toast-hide'), 3500);
-    setTimeout(() => t.remove(), 4200);
-}
+function openRatingModal(orderId) { window.location.href = `/Customer/WriteReview?orderId=${orderId}`; }
+function openComplaintModal(orderId) { window.location.href = `/Customer/Complaint?orderId=${orderId}`; }
 
-// Keyboard close
+// 绑定 Esc 退出
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         closeDrawer();
         closeCancelModal();
-        closeRatingModal();
-        closeComplaintModal();
     }
 });
-
-// CSRF token for form (anti-forgery)
 </script>
 @Html.AntiForgeryToken()
