@@ -2,33 +2,33 @@
 
 <link rel="stylesheet" href="~/css/customer/profile.css" asp-append-version="true" />
 
-<div class="profile-page">
+@if (TempData["ProfileSuccess"] != null)
+{
+    <div class="floating-alert js-floating-alert">@TempData["ProfileSuccess"]</div>
+}
+@if (TempData["PasswordSuccess"] != null)
+{
+    <div class="floating-alert js-floating-alert">@TempData["PasswordSuccess"]</div>
+}
 
+<div class="profile-page">
     <div class="profile-layout">
 
-        <!-- Sidebar -->
+        <!-- ── Sidebar ── -->
         <div class="profile-sidebar">
-
             <div class="avatar-card">
                 <div class="avatar-wrap">
-
                     @if (string.IsNullOrWhiteSpace(Model.ProfilePicture))
                     {
-                        <div class="avatar-placeholder">
-                            Upload your profile picture
-                        </div>
+                        <div class="avatar-placeholder">Upload your profile picture</div>
                     }
                     else
                     {
-                        <img src="@Url.Content(Model.ProfilePicture)"
-                            alt=""
-                            class="avatar-img" />
+                        <img src="@Url.Content(Model.ProfilePicture)" alt="" class="avatar-img" />
                     }
-
                     <label for="profileImageInput" class="avatar-upload">
                         <i class="ti ti-camera"></i>
                     </label>
-
                 </div>
                 <div>
                     <p class="avatar-name">@Model.FullName</p>
@@ -56,94 +56,326 @@
                     </div>
                 </div>
             </div>
-
         </div>
 
-        <!-- Form -->
-        <form asp-action="UpdateProfile" method="post" enctype="multipart/form-data" class="form-card" id="profileForm">
+        <!-- ── Main column ── -->
+        <div class="profile-main">
 
-            <input type="hidden" asp-for="UserId" />
-            <input type="file" id="profileImageInput" name="profileImage" style="display:none" />
+            <!-- ── Profile Form  ── -->
+            <form asp-action="UpdateProfile"
+                  method="post"
+                  enctype="multipart/form-data"
+                  class="form-card"
+                  id="profileForm">
 
-            <div class="form-section">
-                <p class="section-label">Personal info</p>
-                <div class="field-grid">
-                    <div class="field">
-                        <label asp-for="FullName">Full Name</label>
-                        <input asp-for="FullName" required/>
-                        <span asp-validation-for="FullName" class="text-danger"></span>
-                    </div>
-                    <div class="field">
-                        <label asp-for="Gender">Gender</label>
-                        <div class="select-wrap">
-                            <select asp-for="Gender" required>
-                                <option value="" disabled selected>Select gender</option>
-                                <option>Male</option>
-                                <option>Female</option>
-                            </select>
-                            <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                <input type="hidden" asp-for="UserId" />
+                <input type="file" id="profileImageInput" name="profileImage" style="display:none" />
+
+                <!-- Personal info -->
+                <div class="form-section">
+                    <p class="section-label">Personal info</p>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label asp-for="FullName">Full Name</label>
+                            <input asp-for="FullName" required />
+                            <span asp-validation-for="FullName" class="text-danger"></span>
                         </div>
-                        <span asp-validation-for="Gender" class="text-danger"></span>
+
+                        <div class="field">
+                            <label asp-for="Gender">Gender</label>
+                            <div class="select-wrap">
+                                <select asp-for="Gender" required>
+                                    <option value="" disabled selected>Select gender</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                </select>
+                                <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                            </div>
+                            <span asp-validation-for="Gender" class="text-danger"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Birthday">Birthday</label>
+                            <input asp-for="Birthday" type="date" required />
+                            <span asp-validation-for="Birthday" class="text-danger"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="Phone">Phone</label>
+                            <input asp-for="Phone" required />
+                            <span asp-validation-for="Phone" class="text-danger"></span>
+                        </div>
                     </div>
-                    <div class="field">
-                        <label asp-for="Birthday">Birthday</label>
-                        <input asp-for="Birthday" type="date" required />
-                        <span asp-validation-for="Birthday" class="text-danger"></span>
+                </div>
+
+                <!-- Account -->
+                <div class="form-section">
+                    <p class="section-label">Account</p>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label asp-for="Email">Email</label>
+                            <input asp-for="Email" readonly />
+                        </div>
+                        <div class="field">
+                            <label>Status</label>
+                            <input value="@(Model.IsActive ? "Active" : "Inactive")" readonly />
+                        </div>
                     </div>
-                    <div class="field">
-                        <label asp-for="Phone">Phone</label>
-                        <input asp-for="Phone" required/>
-                        <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+
+            </form>
+
+            <!-- ── Delivery Address Card ── -->
+            <div class="form-card">
+                <div class="form-section">
+                    <p class="section-label">Delivery address</p>
+
+                    <div class="field full">
+
+                        @if (Model.Addresses == null || Model.Addresses.Count < 3)
+                        {
+                            <button type="button" id="showAddressFormBtn" class="add-address-btn">
+                                <i class="ti ti-plus"></i> Add New Address
+                            </button>
+                        }
+
+                        <!-- Slot where Add/Edit forms will be inserted -->
+                        <div id="addressInlineSlot"></div>
+
+                        @if (Model.Addresses != null && Model.Addresses.Any())
+                        {
+                            <div class="address-pills-list">
+                                @foreach (var address in Model.Addresses.OrderByDescending(x => x.IsDefault))
+                                {
+                                    <div class="addr-pill @(address.IsDefault ? "addr-pill--default" : "")" data-pill-addressid="@address.AddressId">
+
+                                        <div class="addr-pill-inner">
+                                            <div class="addr-pill-icon">
+                                                <i class="ti ti-map-pin"></i>
+                                            </div>
+
+                                            <div class="addr-pill-text">
+                                                <div class="addr-pill-top">
+                                                    <span class="addr-pill-name">@address.RecipientName</span>
+                                                    <span class="addr-pill-phone">@address.PhoneNumber</span>
+
+                                                    @if (address.IsDefault)
+                                                    {
+                                                        <span class="addr-pill-badge">Default</span>
+                                                    }
+                                                </div>
+
+                                                <span class="addr-pill-line">
+                                                    @address.AddressLine1
+                                                    @(!string.IsNullOrWhiteSpace(address.AddressLine2) ? ", " + address.AddressLine2 : "")
+                                                </span>
+
+                                                <span class="addr-pill-line">
+                                                    @address.Postcode, @address.City, @address.State
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div class="addr-pill-actions">
+                                            <button type="button"
+                                                    class="addr-action-btn addr-action-edit editAddressBtn"
+                                                    data-addressid="@address.AddressId"
+                                                    data-recipient="@address.RecipientName"
+                                                    data-phone="@address.PhoneNumber"
+                                                    data-line1="@address.AddressLine1"
+                                                    data-line2="@address.AddressLine2"
+                                                    data-city="@address.City"
+                                                    data-postcode="@address.Postcode"
+                                                    data-state="@address.State"
+                                                    data-default="@address.IsDefault.ToString().ToLower()">
+                                                <i class="ti ti-edit"></i> Edit
+                                            </button>
+
+                                            <div class="addr-pill-actions-spacer"></div>
+
+                                            <form asp-action="RemoveAddress"
+                                                  method="post"
+                                                  style="display:inline;"
+                                                  onsubmit="return confirm('Remove this address?');">
+                                                <input type="hidden" name="addressId" value="@address.AddressId" />
+                                                <button type="submit" class="addr-action-btn addr-action-remove">
+                                                    <i class="ti ti-trash"></i> Remove
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                    </div>
+                                }
+                            </div>
+                        }
+
                     </div>
                 </div>
             </div>
 
-            <div class="form-section">
-                <p class="section-label">Account</p>
-                <div class="field-grid">
-                    <div class="field">
-                        <label asp-for="Email">Email</label>
-                        <input asp-for="Email" readonly />
-                    </div>
-                    <div class="field">
-                        <label>Status</label>
-                        <input value="@(Model.IsActive ? "Active" : "Inactive")" readonly />
-                    </div>
+            <!-- ── Action buttons card ── -->
+            <div class="form-card">
+                <div class="form-actions">
+                    <a asp-action="ChangePassword" class="btn-change-pass">
+                        <i class="ti ti-lock" aria-hidden="true"></i> Change password
+                    </a>
+
+                    <button type="submit" class="btn-save" form="profileForm">
+                        <i class="ti ti-check" aria-hidden="true"></i> Save changes
+                    </button>
                 </div>
             </div>
 
-            <div class="form-section">
-                <p class="section-label">Delivery address</p>
-                <div class="field full">
-                    <label asp-for="Address">Address</label>
-                    <textarea asp-for="Address" required></textarea>
-                    <span asp-validation-for="Address" class="text-danger"></span>
-                </div>
-            </div>
-
-            <div class="form-actions">
-                <a asp-action="ChangePassword" class="btn-change-pass">
-                    <i class="ti ti-lock" aria-hidden="true"></i> Change password
-                </a>
-                <button type="submit" class="btn-save">
-                    <i class="ti ti-check" aria-hidden="true"></i> Save changes
-                </button>
-            </div>
-
-        </form>
+        </div>
     </div>
 </div>
 
+<!-- Add Address Form -->
+<form asp-action="AddAddress"
+      method="post"
+      id="addAddressForm"
+      class="add-address-form-wrap"
+      style="display:none;">
+    <div class="add-address-inner-form">
+        <input type="hidden" name="userId" value="@Model.UserId" />
+
+        <div class="addr-form-grid two-col">
+            <div class="addr-form-field">
+                <label class="addr-form-label">Full Name <span class="req">*</span></label>
+                <input type="text" name="RecipientName" class="addr-form-input" placeholder="e.g. Ali bin Ahmad" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">Phone Number <span class="req">*</span></label>
+                <input type="text" name="PhoneNumber" class="addr-form-input" placeholder="e.g. 012-3456789" required />
+            </div>
+        </div>
+
+        <div class="addr-form-field">
+            <label class="addr-form-label">Street Address <span class="req">*</span></label>
+            <input type="text" name="AddressLine1" class="addr-form-input" placeholder="House / unit no., street name" required />
+        </div>
+
+        <div class="addr-form-field">
+            <label class="addr-form-label">Address Line 2 <span class="optional">(optional)</span></label>
+            <input type="text" name="AddressLine2" class="addr-form-input" placeholder="Apartment, suite, floor, etc." />
+        </div>
+
+        <div class="addr-form-grid three-col">
+            <div class="addr-form-field">
+                <label class="addr-form-label">City <span class="req">*</span></label>
+                <input type="text" name="City" class="addr-form-input" placeholder="e.g. Cyberjaya" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">Postal Code <span class="req">*</span></label>
+                <input type="text" name="Postcode" class="addr-form-input" placeholder="e.g. 63000" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">State <span class="req">*</span></label>
+                <div class="select-wrap">
+                    <select name="State" class="addr-form-input addr-form-select" required>
+                        <option value="">Select state</option>
+                        @foreach (var state in new[]{ "Johor","Kedah","Kelantan","Melaka","Negeri Sembilan","Pahang","Perak","Perlis","Pulau Pinang","Sabah","Sarawak","Selangor","Terengganu","Kuala Lumpur","Labuan","Putrajaya" })
+                        {
+                            <option value="@state">@state</option>
+                        }
+                    </select>
+                    <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                </div>
+            </div>
+        </div>
+
+        <label class="default-check-label">
+            <input type="checkbox" name="IsDefault" value="true" class="default-check-input" />
+            <span>Set as default address</span>
+        </label>
+
+        <div class="addr-form-actions">
+            <button type="button" id="cancelAddressBtn" class="addr-cancel-btn">Cancel</button>
+            <button type="submit" class="addr-save-btn">
+                <i class="ti ti-check"></i> Save Address
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- Edit Address Form -->
+<form asp-action="EditAddress"
+      method="post"
+      id="editAddressForm"
+      class="add-address-form-wrap"
+      style="display:none;">
+
+    <div class="add-address-inner-form">
+
+        <input type="hidden" name="AddressId" id="editAddressId" />
+        <input type="hidden" name="UserId" value="@Model.UserId" />
+
+        <div class="addr-form-grid two-col">
+            <div class="addr-form-field">
+                <label class="addr-form-label">Full Name</label>
+                <input type="text" name="RecipientName" id="editRecipient" class="addr-form-input" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">Phone Number</label>
+                <input type="text" name="PhoneNumber" id="editPhone" class="addr-form-input" required />
+            </div>
+        </div>
+
+        <div class="addr-form-field">
+            <label class="addr-form-label">Street Address</label>
+            <input type="text" name="AddressLine1" id="editLine1" class="addr-form-input" required />
+        </div>
+
+        <div class="addr-form-field">
+            <label class="addr-form-label">Address Line 2</label>
+            <input type="text" name="AddressLine2" id="editLine2" class="addr-form-input" />
+        </div>
+
+        <div class="addr-form-grid three-col">
+            <div class="addr-form-field">
+                <label class="addr-form-label">City</label>
+                <input type="text" name="City" id="editCity" class="addr-form-input" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">Postal Code</label>
+                <input type="text" name="Postcode" id="editPostcode" class="addr-form-input" required />
+            </div>
+            <div class="addr-form-field">
+                <label class="addr-form-label">State</label>
+                <div class="select-wrap">
+                    <select name="State" id="editState" class="addr-form-input addr-form-select" required>
+                        <option value="">Select state</option>
+                        @foreach (var state in new[]{
+                            "Johor","Kedah","Kelantan","Melaka",
+                            "Negeri Sembilan","Pahang","Perak","Perlis",
+                            "Pulau Pinang","Sabah","Sarawak","Selangor",
+                            "Terengganu","Kuala Lumpur","Labuan","Putrajaya"
+                        })
+                        {
+                            <option value="@state">@state</option>
+                        }
+                    </select>
+                    <i class="ti ti-chevron-down select-chevron"></i>
+                </div>
+            </div>
+        </div>
+
+        <label class="default-check-label">
+            <input type="checkbox" name="IsDefault" id="editIsDefault" value="true" class="default-check-input" />
+            <span>Set as default address</span>
+        </label>
+
+        <div class="addr-form-actions">
+            <button type="button" id="cancelEditAddressBtn" class="addr-cancel-btn">Cancel</button>
+            <button type="submit" class="addr-save-btn">
+                <i class="ti ti-check"></i> Save Changes
+            </button>
+        </div>
+
+    </div>
+</form>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-
-    <script>
-        document.getElementById("profileImageInput")
-            .addEventListener("change", function () {
-
-                if (this.files.length > 0) {
-                    document.getElementById("profileForm").submit();
-                }
-            });
-    </script>
+    <script src="~/js/customer/profile.js" asp-append-version="true"></script>
 }

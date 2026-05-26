@@ -1,44 +1,76 @@
 @model EcommerceSystem.Models.Product
 @using EcommerceSystem.Models
 @using System.Text.Json
+@using EcommerceSystem.DTOs
 
 <link rel="stylesheet" href="~/css/customer/product-details.css" asp-append-version="true" />
 
 @{
-    var images      = ViewBag.Images as List<string> ?? new List<string>();
-    var variations  = ViewBag.Variations as List<Product.VariationGroup> ?? new List<Product.VariationGroup>();
-    var firstImage  = images.Count > 0 ? images[0] : Model.ImagePath;
+    var reviews    = ViewBag.Reviews as List<EcommerceSystem.Models.Review> ?? new List<EcommerceSystem.Models.Review>();
+    var images     = ViewBag.Images as List<string> ?? new List<string>();
+    var variations = ViewBag.Variations as List<VariationGroupDto> ?? new List<VariationGroupDto>();
+    var firstImage = images.Count > 0 ? images[0] : Model.ImagePath;
     var shopInitial = (Model.Seller?.ShopName ?? "?").Substring(0, 1).ToUpper();
 
+    var combos = new List<Product.VariationCombo>();
+    try {
+        combos = JsonSerializer.Deserialize<List<Product.VariationCombo>>(Model.VariationCombosJson ?? "[]")
+                 ?? new List<Product.VariationCombo>();
+    } catch { }
+
+    bool hasVariations = variations.Count > 0;
+
     string stockClass, stockLabel;
-    if (Model.StockQuantity <= 0) {
-        stockClass = "out-of-stock"; stockLabel = "Out of Stock";
-    } else if (Model.StockQuantity <= 5) {
-        stockClass = "low-stock";    stockLabel = "Low Stock";
+    if (!hasVariations) {
+        if (Model.StockQuantity <= 0)      { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
+        else if (Model.StockQuantity <= 5) { stockClass = "low-stock";    stockLabel = "Low Stock"; }
+        else                               { stockClass = "in-stock";      stockLabel = "In Stock"; }
     } else {
-        stockClass = "in-stock";     stockLabel = "In Stock";
+        stockClass = "select-options"; stockLabel = "Select Options";
     }
 
-    // Star rendering helpers
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
+
+    int totalVariationStock = hasVariations ? combos.Sum(c => c.Stock) : Model.StockQuantity;
+
+    var variationGroupNamesJson = JsonSerializer.Serialize(variations.Select(v => v.Name).ToList());
+
+    var breakdown = Enumerable.Range(1, 5).OrderByDescending(s => s).ToDictionary(
+        s => s,
+        s => reviews.Count(r => r.Rating == s)
+    );
+    int totalReviews = reviews.Count;
 }
 
-<div class="pd-page">
+@functions {
+    List<string> ParseReviewImages(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json == "[]") return new List<string>();
+        try { return JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>(); }
+        catch { return new List<string>(); }
+    }
+}
 
-    <!-- Main layout -->
+
+@* ── Server-rendered toast (cart success, etc.) ── *@
+@if (TempData["CartSuccess"] != null)
+{
+    <div id="floatingAlert" class="floating-alert">@TempData["CartSuccess"]</div>
+}
+
+
+<div class="pd-page">
     <div class="pd-layout">
 
-        <!-- ── LEFT: Gallery ── -->
+        <!-- ════════════════════════════════
+             LEFT: Gallery
+             ════════════════════════════════ -->
         <div class="pd-gallery">
-
-            <div class="pd-main-img-wrap">
-                <img id="pdMainImg"
-                     src="@firstImage"
-                     alt="@Model.Name"
-                     class="pd-main-img" />
+            <div class="pd-main-img-wrap" id="pdMainImgWrap" title="Click to enlarge">
+                <img id="pdMainImg" src="@firstImage" alt="@Model.Name" class="pd-main-img" />
                 <div class="pd-zoom-hint">
-                    <i class="ti ti-zoom-in"></i> Hover to zoom
+                    <i class="ti ti-zoom-in"></i> Click to enlarge
                 </div>
             </div>
 
@@ -47,31 +79,28 @@
                 <div class="pd-thumbnails">
                     @for (int i = 0; i < images.Count; i++)
                     {
-                        <div class="pd-thumb @(i == 0 ? "active" : "")"
-                             onclick="switchImage('@images[i]', this)">
+                        <div class="pd-thumb @(i == 0 ? "active" : "")" data-src="@images[i]">
                             <img src="@images[i]" alt="@Model.Name view @(i + 1)" />
                         </div>
                     }
                 </div>
             }
-
         </div>
 
-        <!-- ── RIGHT: Info ── -->
+        <!-- ════════════════════════════════
+             RIGHT: Info
+             ════════════════════════════════ -->
         <div class="pd-info">
 
-            <!-- Category + stock badge -->
             <div class="pd-top-row">
                 <span class="pd-category">@(Model.Category?.Name ?? "Uncategorised")</span>
                 <div class="pd-badges">
-                    <span class="pd-badge @stockClass">@stockLabel</span>
+                    <span id="pdStockBadge" class="pd-badge @stockClass">@stockLabel</span>
                 </div>
             </div>
 
-            <!-- Name -->
             <h1 class="pd-name">@Model.Name</h1>
 
-            <!-- Rating -->
             <div class="pd-rating-row">
                 <div class="pd-stars">
                     @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
@@ -79,12 +108,22 @@
                 </div>
                 <span class="pd-rating-text">@Model.AverageRating.ToString("0.0")</span>
                 <div class="pd-rating-sep"></div>
-                <span class="pd-rating-text">0 reviews</span>
+                <button class="pd-review-trigger"
+                        id="reviewTriggerBtn"
+                        type="button"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        @(totalReviews == 0 ? "disabled" : "")>
+                    @Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")
+                    @if (totalReviews > 0)
+                    {
+                        <i class="ti ti-chevron-right" aria-hidden="true"></i>
+                    }
+                </button>
             </div>
 
             <div class="pd-divider"></div>
 
-            <!-- Shop -->
             <div class="pd-shop-row">
                 <div class="pd-shop-avatar">@shopInitial</div>
                 <span class="pd-shop-name">
@@ -92,13 +131,11 @@
                 </span>
             </div>
 
-            <!-- Price -->
             <div class="pd-price-block">
                 <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
                 <div class="pd-price-note">Price includes SST where applicable</div>
             </div>
 
-            <!-- SKU -->
             @if (!string.IsNullOrWhiteSpace(Model.SKU))
             {
                 <div class="pd-sku">SKU: @Model.SKU</div>
@@ -106,37 +143,43 @@
 
             <div class="pd-divider"></div>
 
-            <!-- Description -->
             <p class="pd-description">
-                @(string.IsNullOrWhiteSpace(Model.Description)
-                    ? "No description provided."
-                    : Model.Description)
+                @(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)
             </p>
 
-            <!-- Variations -->
-            @if (variations.Count > 0)
+            @* ── Variations ── *@
+            @if (hasVariations)
             {
-                <div class="pd-variations">
-                    @foreach (var group in variations)
+                <div class="pd-variations" id="pdVariations">
+                    @for (int gi = 0; gi < variations.Count; gi++)
                     {
-                        <div class="pd-variation-group">
-                            <div class="pd-variation-label">@group.Name</div>
+                        var group = variations[gi];
+                        <div class="pd-variation-group" data-group-index="@gi">
+                            <div class="pd-variation-label">
+                                @group.Name
+                            </div>
                             <div class="pd-variation-options">
                                 @foreach (var val in group.Values)
                                 {
-                                    @if (!string.IsNullOrWhiteSpace(val.ImagePath))
+                                    if (!string.IsNullOrWhiteSpace(val.ImagePath))
                                     {
                                         <div class="pd-variation-swatch"
+                                             role="button"
+                                             tabindex="0"
                                              title="@val.Label"
-                                             onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                             data-group-index="@gi"
+                                             data-label="@val.Label"
+                                             data-image="@val.ImagePath">
                                             <img src="@val.ImagePath" alt="@val.Label" />
+                                            <span class="pd-swatch-label">@val.Label</span>
                                         </div>
                                     }
                                     else
                                     {
                                         <button class="pd-variation-btn"
-                                                @(val.Stock <= 0 ? "disabled" : "")
-                                                onclick="selectVariation(this, '@group.Name', '@val.Label')">
+                                                type="button"
+                                                data-group-index="@gi"
+                                                data-label="@val.Label">
                                             @val.Label
                                         </button>
                                     }
@@ -145,40 +188,66 @@
                         </div>
                     }
                 </div>
+                <div id="pdVariationStockNote" class="pd-stock-variation-note" style="display:none;"></div>
             }
 
-            <!-- Quantity -->
             <div class="pd-qty-row">
                 <span class="pd-qty-label">Qty</span>
                 <div class="pd-qty-control">
-                    <button class="pd-qty-btn" onclick="adjustQty(-1)" type="button">−</button>
-                    <input  id="pdQty" type="number" class="pd-qty-input"
-                            min="1" max="@Model.StockQuantity" value="1" readonly />
-                    <button class="pd-qty-btn" onclick="adjustQty(1)"  type="button">+</button>
+                    <button id="pdQtyMinus" class="pd-qty-btn" type="button">−</button>
+                    <input id="pdQty" type="number" class="pd-qty-input"
+                           min="1" max="@totalVariationStock" value="1" readonly />
+                    <button id="pdQtyPlus" class="pd-qty-btn" type="button">+</button>
                 </div>
-                @if (Model.StockQuantity > 0)
+                @if (!hasVariations && Model.StockQuantity > 0)
                 {
                     <span class="pd-stock-note">@Model.StockQuantity left</span>
                 }
             </div>
 
-            <!-- Actions -->
             <div class="pd-actions">
-                <button class="pd-btn-cart" @(Model.StockQuantity <= 0 ? "disabled" : "")>
-                    <i class="ti ti-shopping-cart-plus"></i> Add to Cart
-                </button>
-                <button class="pd-btn-buy" @(Model.StockQuantity <= 0 ? "disabled" : "")>
-                    <i class="ti ti-bolt"></i> Buy Now
-                </button>
+                <form asp-controller="Customer"
+                      asp-action="AddToCart"
+                      method="post"
+                      onsubmit="return validateVariationsBeforeSubmit();">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId"        value="@Model.ProductId" />
+                    <input type="hidden" id="selectedVariations" name="selectedVariations" value="{}" />
+                    <input type="hidden" id="cartQuantity"       name="quantity" value="1" />
+                    <input type="hidden" name="returnUrl" value="@Url.Action("ProductDetails","Customer", new { id = Model.ProductId })" />
+
+                    <button id="pdBtnCart"
+                            type="submit"
+                            class="pd-btn-cart"
+                            @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
+                        @if (!hasVariations && Model.StockQuantity <= 0)
+                        {
+                            <i class="ti ti-shopping-cart-off"></i> <text>Out of Stock</text>
+                        }
+                        else
+                        {
+                            <i class="ti ti-shopping-cart-plus"></i> <text>Add to Cart</text>
+                        }
+                    </button>
+                </form>
+
+                <form asp-controller="Customer"
+                      asp-action="BuyNow"
+                      method="post"
+                      onsubmit="return prepareBuyNow();">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId"              value="@Model.ProductId" />
+                    <input type="hidden" id="buyNowSelectedVariations" name="selectedVariations" value="{}" />
+                    <input type="hidden" id="buyNowQuantity"           name="quantity" value="1" />
+                    <button id="pdBtnBuy"
+                            type="submit"
+                            class="pd-btn-buy"
+                            @((!hasVariations && Model.StockQuantity <= 0) ? "disabled" : (hasVariations ? "disabled" : ""))>
+                        <i class="ti ti-bolt"></i> Buy Now
+                    </button>
+                </form>
             </div>
 
-            <!-- Wishlist -->
-            <div class="pd-wishlist-row">
-                <i class="ti ti-heart"></i>
-                <span>Save to wishlist</span>
-            </div>
-
-            <!-- Trust badges -->
             <div class="pd-trust">
                 <div class="pd-trust-item">
                     <i class="ti ti-truck-delivery"></i>
@@ -194,29 +263,146 @@
                 </div>
             </div>
 
+        </div><!-- /.pd-info -->
+    </div><!-- /.pd-layout -->
+</div><!-- /.pd-page -->
+
+
+<!-- ════════════════════════════════════════════════════
+     GALLERY IMAGE LIGHTBOX
+     ════════════════════════════════════════════════════ -->
+<div id="pdImgLightbox" class="pd-img-lightbox" hidden>
+    <button class="pd-img-lightbox-close" id="pdImgLightboxClose" aria-label="Close image">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="pdImgLightboxImg" src="" alt="Product image" />
+</div>
+
+
+<!-- ════════════════════════════════════════════════════
+     REVIEWS MODAL
+     ════════════════════════════════════════════════════ -->
+@if (totalReviews > 0)
+{
+    <div class="rv-overlay" id="rvBackdrop" role="dialog" aria-modal="true" aria-label="Customer reviews" hidden>
+        <div class="rv-modal" id="rvPanel">
+
+            <div class="rv-header">
+                <div class="rv-header-top">
+                    <p class="rv-title">Customer reviews</p>
+                    <button class="rv-close" id="rvCloseBtn" aria-label="Close reviews" type="button">
+                        <i class="ti ti-x" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="rv-summary">
+                    <div class="rv-big-score">
+                        <span class="rv-score-num">@Model.AverageRating.ToString("0.0")</span>
+                        <div class="rv-score-stars" aria-label="@fullStars out of 5 stars">
+                            @for (int s = 0; s < fullStars;  s++) { <span>★</span> }
+                            @for (int s = 0; s < emptyStars; s++) { <span class="empty">★</span> }
+                        </div>
+                        <span class="rv-score-label">@totalReviews review@(totalReviews == 1 ? "" : "s")</span>
+                    </div>
+                    <div class="rv-bars" aria-label="Rating breakdown">
+                        @foreach (var kv in breakdown)
+                        {
+                            double pct = totalReviews > 0 ? Math.Round((double)kv.Value / totalReviews * 100) : 0;
+                            <div class="rv-bar-row">
+                                <span class="rv-bar-num">@kv.Key</span>
+                                <div class="rv-bar-track">
+                                    <div class="rv-bar-fill" style="width:@pct%"></div>
+                                </div>
+                                <span class="rv-bar-pct">@((int)pct)%</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="rv-filters" role="group" aria-label="Filter by star rating">
+                <button class="rv-chip active" data-filter="all" type="button">All</button>
+                @foreach (var kv in breakdown.Where(k => k.Value > 0))
+                {
+                    <button class="rv-chip" data-filter="@kv.Key" type="button">
+                        @kv.Key ★ <span class="rv-chip-count">@kv.Value</span>
+                    </button>
+                }
+            </div>
+
+            <div class="rv-body" id="rvBody">
+                @foreach (var r in reviews)
+                {
+                    <div class="rv-card" data-rating="@r.Rating">
+                        <div class="rv-card-author">
+                            <div class="rv-avatar">@(r.OrderItem?.Order?.Customer?.FullName?.Substring(0, 1).ToUpper() ?? "C")</div>
+                            <div class="rv-author-info">
+                                <span class="rv-author-name">@(r.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
+                                <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
+                            </div>
+                        </div>
+
+                        <div class="rv-card-stars" aria-label="@r.Rating out of 5 stars">
+                            @for (int i = 0; i < r.Rating; i++) { <span>★</span> }
+                            @for (int i = 0; i < (5 - r.Rating); i++) { <span class="empty">★</span> }
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(r.ReviewText))
+                        {
+                            <p class="rv-card-text">@r.ReviewText</p>
+                        }
+                        else
+                        {
+                            <p class="rv-card-text muted">No comment left.</p>
+                        }
+
+                        @{
+                            var reviewImgs = ParseReviewImages(r.ReviewImagePathsJson);
+                        }
+                        @if (reviewImgs.Any())
+                        {
+                            <div class="rv-photos">
+                                @foreach (var img in reviewImgs.Take(4))
+                                {
+                                    <div class="rv-photo-thumb"
+                                         onclick="rvOpenLightbox('@img')"
+                                         title="View image">
+                                        <img src="@img" alt="Review photo" onerror="this.style.display='none'" />
+                                        <div class="rv-photo-overlay">
+                                            <i class="ti ti-zoom-in"></i>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="rv-empty" id="rvEmpty" style="display:none;">
+                    <i class="ti ti-message-off" aria-hidden="true"></i>
+                    No reviews for this rating.
+                </div>
+            </div>
+
         </div>
     </div>
+}
+
+
+<!-- ════════════════════════════════════════════════════
+     REVIEW IMAGE LIGHTBOX
+     ════════════════════════════════════════════════════ -->
+<div id="rvLightbox" class="rv-lightbox" onclick="rvCloseLightbox()" hidden>
+    <button class="rv-lightbox-close" onclick="rvCloseLightbox(); event.stopPropagation();">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="rvLightboxImg" src="" alt="Review image" onclick="event.stopPropagation()" />
 </div>
 
 <script>
-    function switchImage(src, el) {
-        document.getElementById('pdMainImg').src = src;
-        document.querySelectorAll('.pd-thumb').forEach(t => t.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    function adjustQty(delta) {
-        const input = document.getElementById('pdQty');
-        const max   = parseInt(input.max) || 999;
-        const val   = Math.min(max, Math.max(1, parseInt(input.value || 1) + delta));
-        input.value = val;
-    }
-
-    function selectVariation(el, groupName, label) {
-        // Deselect siblings in same group
-        const parent = el.closest('.pd-variation-options');
-        parent.querySelectorAll('.pd-variation-btn, .pd-variation-swatch')
-              .forEach(b => b.classList.remove('active'));
-        el.classList.add('active');
-    }
+  window.__PD = {
+    allCombos: @Html.Raw(Model.VariationCombosJson ?? "[]"),
+    groupNames: @Html.Raw(variationGroupNamesJson)
+  };
 </script>
+
+<script src="~/js/customer/product-details.js" asp-append-version="true"></script>

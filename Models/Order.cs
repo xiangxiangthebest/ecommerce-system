@@ -1,75 +1,10 @@
-//namespace EcommerceSystem.Models;
-
-//public class Order
-//{
-    //public int OrderId { get; set; }
-    // public Customer customer { get; set; }
-    // public Seller seller { get; set; }
-    // public DateTime orderTime { get; set; }
-    // public List<CartProduct> products { get; set; }
-    // public decimal totalAmount { get; set; }
-
-    // public string paymentMethod { get; set; }
-
-    // public Order(int orderId, Customer customer, Seller seller, DateTime orderTime, List<CartProduct> products, decimal totalAmount, string paymentMethod)
-    // {
-    //     this.orderId = orderId;
-    //     this.customer = customer;
-    //     this.seller = seller;
-    //     this.orderTime = orderTime;
-    //     this.products = products ?? new List<CartProduct>();
-    //     this.totalAmount = totalAmount;
-    //     this.paymentMethod = paymentMethod;
-
-    // }
-
-    // public OrderStatus GetOrderStatus(){
-    // // Will return the lowest priority status:
-    // // Delivered > Shipped > Pending
-    // // Return Canceled if all items are canceled
-
-    // OrderStatus status = OrderStatus.Delivered;
-    // int cancelled = 0;
-
-    // foreach (CartProduct p in products)
-    // {
-    //     // If at least one item is shipped,
-    //     // and no pending item exists yet
-    //     if (p.GetItemStatus() == OrderStatus.Shipped &&
-    //         status != OrderStatus.Pending)
-    //     {
-    //         status = OrderStatus.Shipped;
-    //     }
-
-    //     // If any item is pending, highest priority
-    //     if (p.GetItemStatus() == OrderStatus.Pending)
-    //     {
-    //         status = OrderStatus.Pending;
-    //     }
-
-    //     if (p.GetItemStatus() == OrderStatus.Canceled)
-    //     {
-    //         cancelled++;
-    //     }
-    // }
-
-    // if (cancelled == products.Count)
-    // {
-    //     return OrderStatus.Canceled;
-    // }
-    // else
-    // {
-    //     return status;
-    // }
-// }
-//}
-
 using System.ComponentModel.DataAnnotations.Schema;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Models;
 
-public class Order : Subject
+public class Order : OrderStatusSubject
 {
     public int OrderId { get; set; }
     public int CustomerUserId { get; set; }
@@ -78,17 +13,58 @@ public class Order : Subject
     public DateTime OrderTime { get; set; }
     public decimal TotalAmount { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
+    public int? AddressId { get; set; }
+    public string? CustomerMessage { get; set; }
+    public List<OrderItem> OrderItems { get; set; } = new();
+    public DeliveryField? Address { get; set; }
+    public string DeliveryRecipientName { get; set; } = string.Empty;
+    public string DeliveryPhoneNumber { get; set; } = string.Empty;
+    public string DeliveryAddressLine1 { get; set; } = string.Empty;
+    public string? DeliveryAddressLine2 { get; set; }
+    public string DeliveryCity { get; set; } = string.Empty;
+    public string DeliveryPostcode { get; set; } = string.Empty;
+    public string DeliveryState { get; set; } = string.Empty;
 
-    // Navigation properties
+    // ── Cancellation ────────────────────────────────────────────────────────
+    public string? CancelReason { get; set; }
+    public DateTime? CanceledAt { get; set; }
+
+    // ── Delivery / Receipt ──────────────────────────────────────────────────
+    /// <summary>Set when status becomes DELIVERED — used by AutoReceiveOrdersJob for 3-day countdown.</summary>
+    public DateTime? DeliveredAt { get; set; }
+    public DateTime? ReceivedAt { get; set; }
+
+    // ── Return / Refund ─────────────────────────────────────────────────────
+    public string? ReturnReason { get; set; }
+
+    /// <summary>The kind of resolution the customer is requesting (ReturnRefund / ReturnReplace / RefundOnly).</summary>
+    public ReturnType? ReturnType { get; set; }
+
+    /// <summary>JSON-serialised list of image paths uploaded by the customer with the return request.</summary>
+    public string? ReturnImagePathsJson { get; set; }
+
+    public DateTime? ReturnInitiatedAt { get; set; }
+    public ReturnInitiatedBy? ReturnInitiatedBy { get; set; }
+    public ReturnStatus ReturnStatus { get; set; } = ReturnStatus.None;
+    public bool ReturnRequested { get; set; } = false;
+
+    /// <summary>Set when seller approves the return/refund request — triggers stock restoration.</summary>
+    public DateTime? ReturnApprovedAt { get; set; }
+
+    // ── Review flag (not persisted) ─────────────────────────────────────────
+    [NotMapped]
+    public bool ReviewSubmitted { get; set; }
+
+    // ── Navigation properties ────────────────────────────────────────────────
     public Customer? Customer { get; set; }
     public Seller? Seller { get; set; }
-    public List<CartProduct> Products { get; set; } = new();
 
+    // ── Observer list (not persisted) ───────────────────────────────────────
     [NotMapped]
-    private List<Observer> _observers = new List<Observer>();
+    private List<OrderStatusObserver> _observers = new List<OrderStatusObserver>();
 
-    public void Attach(Observer observer) => _observers.Add(observer);
-    public void Detach(Observer observer) => _observers.Remove(observer);
+    public void Attach(OrderStatusObserver observer) => _observers.Add(observer);
+    public void Detach(OrderStatusObserver observer) => _observers.Remove(observer);
 
     public void NotifyObservers()
     {
@@ -96,11 +72,102 @@ public class Order : Subject
             o.Update(this);
     }
 
-    public void SetStatus(OrderStatus status)
+    // ─────────────────────────────────────────────────────────────────────────
+    // SELLER TRANSITIONS  (shown in the seller Order page dropdown)
+    //
+    //   PENDING   → PREPARING   Seller accepts and starts preparing the order.
+    //   PREPARING → SHIPPED     Seller hands the parcel to the courier.
+    //   SHIPPED   → DELIVERED   Courier delivers to the customer's address.
+    //
+    // ❌ CANCELED      — customer-only. Seller cannot cancel.
+    // ❌ RECEIVED      — triggered by customer or auto-job.
+    // ❌ RETURN_REFUND — initiated by customer only.
+    // ─────────────────────────────────────────────────────────────────────────
+    public static readonly Dictionary<OrderStatus, List<OrderStatus>> SellerAllowedTransitions = new()
     {
-        CurrentStatus = status;
+        { OrderStatus.PENDING,       new() { OrderStatus.PREPARING } },
+        { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED } },
+        { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
+        { OrderStatus.DELIVERED,     new() { } },
+        { OrderStatus.RECEIVED,      new() { } },
+        { OrderStatus.RETURN_REFUND, new() { } },
+        { OrderStatus.CANCELED,      new() { } },
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CUSTOMER TRANSITIONS
+    //
+    //   PENDING   → CANCELED      Customer cancels before seller starts.
+    //   DELIVERED → RECEIVED      Customer clicks "I received my parcel".
+    //   DELIVERED → RETURN_REFUND Customer raises an issue on delivery.
+    //   RECEIVED  → RETURN_REFUND Customer raises issue after confirming receipt.
+    // ─────────────────────────────────────────────────────────────────────────
+    public static readonly Dictionary<OrderStatus, List<OrderStatus>> CustomerAllowedTransitions = new()
+    {
+        { OrderStatus.PENDING,       new() { OrderStatus.CANCELED } },
+        { OrderStatus.PREPARING,     new() { } },
+        { OrderStatus.SHIPPED,       new() { } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
+        { OrderStatus.RETURN_REFUND, new() { } },
+        { OrderStatus.CANCELED,      new() { } },
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FULL TRANSITION MAP  (union of all actors + background job)
+    // Used internally by CanTransitionTo() — role enforcement is separate.
+    // ─────────────────────────────────────────────────────────────────────────
+    private static readonly Dictionary<OrderStatus, List<OrderStatus>> AllAllowedTransitions = new()
+    {
+        { OrderStatus.PENDING,       new() { OrderStatus.PREPARING, OrderStatus.CANCELED } },
+        { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED } },
+        { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
+        { OrderStatus.RETURN_REFUND, new() { } },
+        { OrderStatus.CANCELED,      new() { } },
+    };
+
+    /// <summary>
+    /// Returns true if transitioning to <paramref name="next"/> is physically
+    /// possible from the current status. Does NOT check who is requesting.
+    /// Use SellerAllowedTransitions / CustomerAllowedTransitions for role-level enforcement.
+    /// </summary>
+    public bool CanTransitionTo(OrderStatus next)
+    {
+        return AllAllowedTransitions.TryGetValue(CurrentStatus, out var allowed)
+               && allowed.Contains(next);
+    }
+
+    /// <summary>
+    /// Validates the transition, updates the status, stamps timestamps,
+    /// then notifies all attached observers.
+    /// Throws InvalidOperationException if the transition is not allowed.
+    /// </summary>
+    public void SetStatus(OrderStatus newStatus)
+    {
+        if (!CanTransitionTo(newStatus))
+            throw new InvalidOperationException(
+                $"Cannot transition order from {CurrentStatus} to {newStatus}.");
+
+        CurrentStatus = newStatus;
+
+        switch (newStatus)
+        {
+            case OrderStatus.DELIVERED:
+                DeliveredAt = DateTime.UtcNow;
+                break;
+            case OrderStatus.RECEIVED:
+                ReceivedAt = DateTime.UtcNow;
+                break;
+            case OrderStatus.CANCELED:
+                CanceledAt = DateTime.UtcNow;
+                break;
+            case OrderStatus.RETURN_REFUND:
+                ReturnInitiatedAt = DateTime.UtcNow;
+                break;
+        }
+
         NotifyObservers();
     }
 }
-
-

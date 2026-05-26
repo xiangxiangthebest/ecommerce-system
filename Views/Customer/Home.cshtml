@@ -23,7 +23,8 @@
             <input type="text"
                    name="search"
                    placeholder="Search products…"
-                   class="filter-input" />
+                   class="filter-input"
+                   value="@ViewBag.Search" />
         </div>
 
         <div class="filter-sep"></div>
@@ -34,7 +35,9 @@
                 <option value="">All Categories</option>
                 @foreach (var category in ViewBag.Category)
                 {
-                    <option value="@category.CategoryId">@category.Name</option>
+                    <option value="@category.CategoryId"
+                            selected="@(ViewBag.CategoryId == category.CategoryId)">
+                        @category.Name</option>
                 }
             </select>
             <i class="ti ti-chevron-down filter-chevron"></i>
@@ -110,7 +113,7 @@
                                 @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
                                 @for (int s = 0; s < emptyStars; s++) { <span class="star empty">★</span> }
                             </div>
-                            <span class="rating-count">@rating.ToString("0.0") (0)</span>
+                            <span class="rating-count">@rating.ToString("0.0") (@item.ReviewCount)</span>
                         </div>
 
                         <!-- Shop -->
@@ -135,16 +138,19 @@
                                 </div>
                             </div>
 
-                            @if (item.StockQuantity > 0) {
-                                <button class="add-btn"
-                                        title="Add to cart"
-                                        onclick="event.preventDefault(); addToCart(@item.ProductId)">
-                                    <i class="ti ti-shopping-cart-plus"></i>
-                                </button>
-                            } else {
-                                <button class="add-btn" disabled title="Out of stock">
-                                    <i class="ti ti-shopping-cart-off"></i>
-                                </button>
+                            @if (item.StockQuantity > 0 || true) 
+                            {
+                                @if (item.StockQuantity > 0) {
+                                    <button class="add-btn"
+                                            title="Add to cart"
+                                            onclick="event.preventDefault(); openQuickAdd(@item.ProductId)">
+                                        <i class="ti ti-shopping-cart-plus"></i>
+                                    </button>
+                                } else {
+                                    <button class="add-btn" disabled title="Out of stock">
+                                        <i class="ti ti-shopping-cart-off"></i>
+                                    </button>
+                                }
                             }
                         </div>
 
@@ -157,3 +163,5 @@
     }
 
 </div>
+
+@await Html.PartialAsync("QuickAddModal")

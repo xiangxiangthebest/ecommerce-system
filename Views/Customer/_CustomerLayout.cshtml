@@ -50,7 +50,9 @@
                 <a class="cart-btn" asp-controller="Customer" asp-action="Cart">
                 <i class="ti ti-shopping-cart"></i>
                 <span>Cart</span>
-                <span class="cart-count">3</span>
+                <span id="navCartCount" class="cart-count">
+                    @ViewBag.CartCount
+                </span>
                 </a>
                 <div class="nav-divider-v"></div>
                 <div class="profile-dropdown">
@@ -73,9 +75,12 @@
                     <i class="ti ti-user"></i> My Profile
                     </a>
                     <hr class="dropdown-sep" />
-                    <a class="dropdown-item danger" asp-controller="Auth" asp-action="Logout">
-                    <i class="ti ti-logout"></i> Sign out
-                    </a>
+                    <form asp-controller="Auth" asp-action="Logout" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="dropdown-item danger">
+                            <i class="ti ti-logout"></i> Sign out
+                        </button>
+                    </form>
                 </div>
                 </div>
             </div>
@@ -96,7 +101,7 @@
             </div>
 
         </nav>
-        </header>
+    </header>
     <div class="container-fluid p-0">
         <main role="main">
             @RenderBody()
@@ -106,42 +111,8 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/customer/layout.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 
-    <script>
-        (function () {
-            // Profile dropdown
-            const profileDropdown = document.querySelector('.profile-dropdown');
-            const profileBtn = profileDropdown?.querySelector('.profile-btn');
-            if (profileBtn) {
-            profileBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                profileDropdown.classList.toggle('open');
-            });
-            }
-
-            // Hamburger / mobile drawer
-            const hamburgerBtn = document.getElementById('hamburgerBtn');
-            const mobileDrawer = document.getElementById('mobileDrawer');
-            if (hamburgerBtn && mobileDrawer) {
-            hamburgerBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                const isOpen = mobileDrawer.classList.toggle('open');
-                hamburgerBtn.querySelector('i').className = isOpen
-                ? 'ti ti-x'
-                : 'ti ti-menu-2';
-            });
-            }
-
-            // Close both on outside click
-            document.addEventListener('click', function () {
-            profileDropdown?.classList.remove('open');
-            mobileDrawer?.classList.remove('open');
-            if (hamburgerBtn) {
-                hamburgerBtn.querySelector('i').className = 'ti ti-menu-2';
-            }
-            });
-        })();
-    </script>
 </body>
 </html>

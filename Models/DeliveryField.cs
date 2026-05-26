@@ -1,20 +1,29 @@
 namespace EcommerceSystem.Models;
 
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 public class DeliveryField
 {
-    public int DeliveryFieldId { get; set; }
-    public string Address { get; set; }
-    public string PhoneNumber { get; set; }
-    public string Name { get; set; }
-    public bool IsDefault { get; set; }
-
+    [Key]
+    public int AddressId { get; set; }
+    [Required]
+    public int UserId { get; set; }
+    [ForeignKey("UserId")]
+    public Customer? Customer { get; set; }
+    [Required]
+    public string RecipientName { get; set; } = string.Empty;
+    [Required]
+    public string PhoneNumber { get; set; } = string.Empty;
+    [Required]
+    public string AddressLine1 { get; set; } = string.Empty;
+    public string? AddressLine2 { get; set; }
+    [Required]
+    public string City { get; set; } = string.Empty;
+    [Required]
+    public string Postcode { get; set; } = string.Empty;
+    [Required]
+    public string State { get; set; } = string.Empty;
+    public bool IsDefault { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 }
-
-// Customer c = new Customer();
-
-// c.DeliveryFields.Add(new DeliveryField
-// {
-//     Address = "KL, Malaysia",
-//     PhoneNumber = "0123456789",
-//     ReceiverName = "Tam Xin Yi"
-// });

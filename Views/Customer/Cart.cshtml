@@ -1,7 +1,7 @@
 @model EcommerceSystem.Models.Cart
 @using System.Text.Json
 
-<link rel="stylesheet" href="~/css/customer/cart.css" />
+<link rel="stylesheet" href="~/css/customer/cart.css" asp-append-version="true" />
 
 @{
     var items        = Model.CartItems ?? new List<EcommerceSystem.Models.CartItem>();
@@ -16,7 +16,7 @@
     <!-- Header -->
     <div class="cart-header">
         <h1 class="cart-title">Your Cart</h1>
-        <span class="cart-count-badge">@itemCount @(itemCount == 1 ? "item" : "items")</span>
+        <span id="cartItemBadge" class="cart-count-badge">@itemCount @(itemCount == 1 ? "item" : "items")</span>
     </div>
 
     @if (!items.Any())
@@ -40,6 +40,9 @@
 
                 <!-- Column headers (desktop) -->
                 <div class="cart-items-header">
+                    <span class="col-check">
+                        <input type="checkbox" id="selectAll" title="Select all" />
+                    </span>
                     <span>Product</span>
                     <span>Unit Price</span>
                     <span>Quantity</span>
@@ -62,7 +65,12 @@
                         } catch { }
                     }
 
-                    <div class="cart-item">
+                    <div class="cart-item" data-item-id="@item.CartItemId" data-price="@item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+
+                        <!-- Checkbox -->
+                        <div class="cart-item-check">
+                            <input type="checkbox" class="item-checkbox" value="@item.CartItemId" />
+                        </div>
 
                         <!-- Product -->
                         <div class="cart-item-product">
@@ -102,41 +110,36 @@
                             RM @item.Price.ToString("0.00")
                         </div>
 
-                        <!-- Quantity stepper -->
+                        <!-- Quantity stepper (AJAX) -->
                         <div class="cart-item-qty">
-                            <form asp-action="UpdateQuantity" method="post" class="qty-form">
-                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
-                                <div class="qty-control">
-                                    <button type="submit"
-                                            name="quantity"
-                                            value="@Math.Max(1, item.Quantity - 1)"
-                                            class="qty-btn">−</button>
-                                    <input type="number"
-                                           class="qty-value"
-                                           value="@item.Quantity"
-                                           min="1"
-                                           readonly />
-                                    <button type="submit"
-                                            name="quantity"
-                                            value="@(item.Quantity + 1)"
-                                            class="qty-btn">+</button>
-                                </div>
-                            </form>
+                            <div class="qty-control">
+                                <button type="button"
+                                        class="qty-btn qty-minus"
+                                        data-item-id="@item.CartItemId">−</button>
+                                <input type="number"
+                                       class="qty-value"
+                                       value="@item.Quantity"
+                                       min="1"
+                                       readonly />
+                                <button type="button"
+                                        class="qty-btn qty-plus"
+                                        data-item-id="@item.CartItemId">+</button>
+                            </div>
                         </div>
 
                         <!-- Subtotal -->
                         <div class="cart-item-subtotal">
-                            RM @((item.Price * item.Quantity).ToString("0.00"))
+                            RM <span class="item-subtotal-value">@((item.Price * item.Quantity).ToString("0.00"))</span>
                         </div>
 
-                        <!-- Remove -->
+                        <!-- Remove (AJAX) -->
                         <div class="cart-item-remove">
-                            <form asp-action="RemoveItem" method="post">
-                                <input type="hidden" name="cartItemId" value="@item.CartItemId" />
-                                <button type="submit" class="remove-btn" title="Remove item">
-                                    <i class="ti ti-trash"></i>
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="remove-btn btn-remove-ajax"
+                                    data-item-id="@item.CartItemId"
+                                    title="Remove item">
+                                <i class="ti ti-trash"></i>
+                            </button>
                         </div>
 
                     </div>
@@ -152,51 +155,36 @@
                 <div class="summary-body">
 
                     <div class="summary-row">
-                        <span class="label">Subtotal (@itemCount @(itemCount == 1 ? "item" : "items"))</span>
-                        <span class="value">RM @subtotal.ToString("0.00")</span>
+                        <span class="label">Subtotal (<span id="summaryItemCount">0</span> <span id="summaryItemWord">items</span>)</span>
+                        <span class="value">RM <span id="summarySubtotal">0.00</span></span>
                     </div>
 
-                    @if (shipping == 0)
-                    {
-                        <div class="summary-row free">
-                            <span class="label">Shipping</span>
-                            <span class="value">Free</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="summary-row">
-                            <span class="label">Shipping</span>
-                            <span class="value">RM @shipping.ToString("0.00")</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="label" style="font-size:11px;color:#bbb;">
-                                Add RM @((100 - subtotal).ToString("0.00")) more for free shipping
-                            </span>
-                        </div>
-                    }
+                    <div class="summary-row" id="shippingRow">
+                        <span class="label">Shipping</span>
+                        <span class="value" id="shippingValue">RM 0.00</span>
+                    </div>
+
+                    <div class="summary-row" id="freeShippingHint" style="display:none;">
+                        <span class="label" style="font-size:11px;color:#bbb;" id="freeShippingHintText"></span>
+                    </div>
 
                     <div class="summary-divider"></div>
 
                     <div class="summary-row total">
                         <span class="label">Total</span>
-                        <span class="value">RM @total.ToString("0.00")</span>
-                    </div>
-
-                    <!-- Promo code -->
-                    <div class="promo-row">
-                        <input type="text"
-                               class="promo-input"
-                               placeholder="Promo code" />
-                        <button class="promo-btn">Apply</button>
+                        <span class="value">RM <span id="summaryTotal">0.00</span></span>
                     </div>
 
                 </div>
 
                 <div class="summary-footer">
-                    <a asp-action="Checkout" class="btn-checkout">
-                        <i class="ti ti-lock"></i> Checkout
-                    </a>
+                    <form id="checkoutForm" method="get" asp-action="Checkout">
+                        <input type="hidden" name="selectedItems" id="selectedItemsInput" />
+                        <input type="hidden" name="source" value="cart" />
+                        <button type="submit" class="btn-checkout" id="checkoutBtn">
+                            <i class="ti ti-lock"></i> Checkout
+                        </button>
+                    </form>
                     <a asp-action="Home" class="btn-continue">
                         <i class="ti ti-arrow-left"></i> Continue shopping
                     </a>
@@ -223,3 +211,9 @@
     }
 
 </div>
+
+<script>
+    window.initialCartItemCount = @itemCount;
+</script>
+
+<script src="~/js/customer/cart.js" asp-append-version="true"></script>

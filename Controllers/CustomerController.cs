@@ -1,134 +1,144 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using EcommerceSystem.Data;
-using EcommerceSystem.Models;
 using System.Security.Claims;
+using EcommerceSystem.Enums;
+using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
-using Microsoft.AspNetCore.Identity;
-using BCrypt.Net;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
     [Authorize(Roles = "Customer")]
     public class CustomerController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly ICustomerContext _customerContext;
+        private readonly IProductService _productService;
+        private readonly ICartService _cartService;
+        private readonly IOrderService _orderService;
+        private readonly IReviewService _reviewService;
+        private readonly IProfileService _profileService;
+        private readonly IReturnImageStorage _returnImageStorage;
 
-        public CustomerController(AppDbContext context)
+        public CustomerController(
+            ICustomerContext customerContext,
+            IProductService productService,
+            ICartService cartService,
+            IOrderService orderService,
+            IReviewService reviewService,
+            IProfileService profileService,
+            IReturnImageStorage returnImageStorage)
         {
-            _context = context;
+            _customerContext = customerContext;
+            _productService = productService;
+            _cartService = cartService;
+            _orderService = orderService;
+            _reviewService = reviewService;
+            _profileService = profileService;
+            _returnImageStorage = returnImageStorage;
+        }
+
+        // =========================
+        // NAVBAR CART COUNT
+        // =========================
+        private async Task LoadCartCountAsync()
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
         }
 
         // =========================
         // HOME PAGE (BROWSING PRODUCTS)
         // =========================
-        public IActionResult Home(string? search, int? categoryId)
+        public async Task<IActionResult> Home(string? search, int? categoryId)
         {
-            ViewBag.Category = _context.Category.ToList();
+            await LoadCartCountAsync();
 
-            var query = _context.Products
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .Where(p =>
-                    !p.IsDraft &&
-                    p.Seller != null &&
-                    p.Seller.IsApproved);
+            var categories = await _productService.GetCategoriesAsync();
+            var products = await _productService.GetBrowseProductsAsync(search, categoryId);
 
-            // Search
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                query = query.Where(p =>
-                    p.Name.Contains(search) ||
-                    p.Description.Contains(search));
-            }
-
-            // Category filter
-            if (categoryId.HasValue)
-            {
-                query = query.Where(p => p.CategoryId == categoryId.Value);
-            }
-
-            var products = query.ToList();
+            ViewBag.Category = categories;
+            ViewBag.Search = search;
+            ViewBag.CategoryId = categoryId;
 
             return View(products);
         }
 
         // =========================
-        // PRODUCT DETAILS
+        // QUICK ADD DATA (HOME PAGE)
         // =========================
-        public IActionResult ProductDetails(int id)
+        [HttpGet]
+        public async Task<IActionResult> QuickAddData(int id)
         {
-            var product = _context.Products
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .FirstOrDefault(p =>
-                    p.ProductId == id &&
-                    !p.IsDraft);
-
-            if (product == null)
-                return NotFound();
-
-            // Deserialize image list
-            ViewBag.Images = string.IsNullOrEmpty(product.ImagePathsJson)
-                ? new List<string>()
-                : JsonSerializer.Deserialize<List<string>>(product.ImagePathsJson);
-
-            // Deserialize variations
-            ViewBag.Variations = string.IsNullOrEmpty(product.VariationsJson)
-                ? new List<object>()
-                : JsonSerializer.Deserialize<List<object>>(product.VariationsJson);
-
-            return View(product);
+            var dto = await _productService.GetQuickAddProductAsync(id);
+            return dto == null ? NotFound() : Json(dto);
         }
 
         // =========================
-        // ADD TO CART
+        // PRODUCT DETAILS
+        // =========================
+        public async Task<IActionResult> ProductDetails(int id)
+        {
+            await LoadCartCountAsync();
+
+            var vm = await _productService.GetProductDetailsAsync(id);
+            if (vm == null) return NotFound();
+
+            ViewBag.Reviews = vm.Reviews;
+            ViewBag.Images = vm.Images;
+            ViewBag.Variations = vm.Variations;
+
+            return View(vm.Product);
+        }
+
+        // =========================
+        // ADD TO CART (PRODUCT DETAILS PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}")
+        public async Task<IActionResult> AddToCart(int productId, int quantity, string selectedVariations = "{}", string? returnUrl = null)
         {
-            var customer = await GetCurrentCustomerAsync();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            var cart = await _context.Cart
-                .Include(c => c.CartItems)
-                .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
+            var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
-            if (cart == null)
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
             {
-                cart = new Cart { UserId = customer.UserId };
-                _context.Cart.Add(cart);
-                await _context.SaveChangesAsync();
+                returnUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
             }
 
-            var product = await _context.Products.FindAsync(productId);
-
-            // Match existing item by product AND same variation combo
-            var existingItem = cart.CartItems
-                .FirstOrDefault(x => x.ProductId == productId
-                                && x.SelectedVariations == selectedVariations);
-
-            if (existingItem != null)
+            if (!result.Success)
             {
-                existingItem.Quantity += quantity;
-            }
-            else
-            {
-                cart.CartItems.Add(new CartItem
-                {
-                    ProductId          = productId,
-                    Quantity           = quantity,
-                    Price              = product.Price,
-                    SelectedVariations = selectedVariations
-                });
+                TempData["CartError"] = result.Error;
+                return Redirect(returnUrl);
             }
 
-            await _context.SaveChangesAsync();
-            TempData["Success"] = "Product added to cart";
-            return RedirectToAction("Cart");
+            TempData["CartSuccess"] = "Product added to cart";
+            return Redirect(returnUrl);
+        }
+
+        // =========================
+        // BUY NOW (PRODUCT DETAILS PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BuyNow(int productId, int quantity, string selectedVariations)
+        {
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var checkout = await _cartService.BuildBuyNowCheckoutAsync(customer.UserId, productId, quantity, selectedVariations);
+
+            if (!checkout.Success)
+                return RedirectToAction("Home");
+
+            ViewBag.Source = "product";
+            ViewBag.ProductId = productId;
+
+            return View("Checkout", checkout.Value);
         }
 
         // =========================
@@ -136,57 +146,212 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Cart()
         {
-            var customer = await GetCurrentCustomerAsync();
+            await LoadCartCountAsync();
 
-            var cart = await _context.Cart
-                .Include(c => c.CartItems)
-                .ThenInclude(ci => ci.Product)
-                .FirstOrDefaultAsync(c => c.UserId == customer.UserId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (cart == null)
-            {
-                cart = new Cart
-                {
-                    CartItems = new List<CartItem>()
-                };
-            }
-
+            var cart = await _cartService.GetCartAsync(customer.UserId);
             return View(cart);
         }
 
         // =========================
-        // GET CURRENT CUSTOMER
+        // UPDATE QUANTITY (CART PAGE)
         // =========================
-        private async Task<Customer?> GetCurrentCustomerAsync()
+        [HttpPost]
+        public async Task<IActionResult> UpdateQuantity(int cartItemId, int quantity)
         {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            return await _context.Customers
-                .FirstOrDefaultAsync(x => x.Email == email);
+            var result = await _cartService.UpdateQuantityAsync(customer.UserId, cartItemId, quantity);
+            return result.Success ? Ok() : BadRequest(result.Error);
+        }
+
+        // =========================
+        // REMOVE ITEM (CART PAGE)
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> RemoveItem(int cartItemId)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _cartService.RemoveItemAsync(customer.UserId, cartItemId);
+            return result.Success ? Ok() : BadRequest(result.Error);
+        }
+
+        // =========================
+        // CHECKOUT (CART PAGE)
+        // =========================
+        public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
+        {
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            ViewBag.Source = source;
+            ViewBag.ProductId = productId;
+
+            if (string.IsNullOrWhiteSpace(selectedItems))
+                return RedirectToAction("Cart");
+
+            var ids = selectedItems
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(int.Parse)
+                .ToList();
+
+            var result = await _cartService.BuildCartCheckoutAsync(customer.UserId, ids);
+
+            if (!result.Success)
+                return RedirectToAction("Cart");
+
+            ViewBag.Source = "cart";
+            ViewBag.ProductId = null;
+
+            return View("Checkout", result.Value);
+        }
+
+        // =========================
+        // PLACE ORDER
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PlaceOrder(
+            int selectedAddressId,
+            string paymentMethod,
+            List<int> selectedItemIds,
+            string source,
+            int? productId,
+            int? buyNowQuantity,
+            string? buyNowSelectedVariations)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var req = new PlaceOrderRequest
+            {
+                CustomerId = customer.UserId,
+                SelectedAddressId = selectedAddressId,
+                PaymentMethod = paymentMethod,
+                SelectedItemIds = selectedItemIds ?? new List<int>(),
+                Source = source ?? "cart",
+                ProductId = productId,
+                BuyNowQuantity = buyNowQuantity,
+                BuyNowSelectedVariations = buyNowSelectedVariations ?? "{}",
+                SellerMessages = ExtractSellerMessagesFromForm(Request.Form)
+            };
+
+            var result = await _orderService.PlaceOrderAsync(req);
+
+            if (!result.Success)
+            {
+                TempData["OrderError"] = result.Error;
+                return RedirectToAction(source == "product" ? "ProductDetails" : "Cart", new { id = productId });
+            }
+
+            return RedirectToAction("PurchaseHistory");
+        }
+
+        private Dictionary<string, string> ExtractSellerMessagesFromForm(IFormCollection form)
+        {
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var key in form.Keys)
+            {
+                if (key.StartsWith("SellerMessage_", StringComparison.OrdinalIgnoreCase))
+                {
+                    dict[key] = form[key].ToString();
+                }
+            }
+
+            return dict;
         }
 
         // =========================
         // PURCHASE HISTORY
         // =========================
-        public IActionResult PurchaseHistory()
+        public async Task<IActionResult> PurchaseHistory()
         {
-            return View();
+            await LoadCartCountAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
+            return View(orders);
         }
 
         // =========================
-        // CHAT
+        // CANCEL ORDER (PURCHASE HISTORY PAGE)
         // =========================
-        public IActionResult Chat()
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason)
         {
-            return View();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
-        // NOTIFICATIONS
+        // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
         // =========================
-        public IActionResult Notifications()
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
         {
-            return View();
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            List<string> imagePaths = new();
+
+            if (images != null && images.Count > 4)
+                return Json(new { success = false, message = "Maximum 4 images allowed." });
+
+            if (images != null && images.Any())
+                imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
+
+            var result = await _orderService.RequestReturnRefundAsync(
+                customer.UserId,
+                orderId,
+                reason,
+                imagePaths,
+                ReturnInitiatedBy.Customer
+            );
+
+            return Json(new { success = result.Success, message = result.Error });
+        }
+
+        // =========================
+        // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmReceived(int orderId)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _orderService.ConfirmReceivedAsync(customer.UserId, orderId);
+            return Json(new { success = result.Success, message = result.Error });
+        }
+
+        // =========================
+        // SUBMIT RATING (PURCHASE HISTORY PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SubmitRating(int orderItemId, int rating, string reviewText, List<IFormFile> images)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _reviewService.SubmitRatingAsync(customer.UserId, orderItemId, rating, reviewText, images);
+            return Json(new { success = result.Success, message = result.Error });
         }
 
         // =========================
@@ -194,144 +359,143 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Profile()
         {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            await LoadCartCountAsync();
 
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.Email == email);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return NotFound();
-
-            return View(customer);
+            var profile = await _profileService.GetProfileAsync(customer.UserId);
+            return profile == null ? NotFound() : View(profile);
         }
 
         // =========================
-        // UPDATE PROFILE
+        // UPDATE PROFILE (PROFILE PAGE)
         // =========================
         [HttpPost]
-        public async Task<IActionResult> UpdateProfile(Customer model, IFormFile profileImage)
+        public async Task<IActionResult> UpdateProfile(Customer model, IFormFile? profileImage)
         {
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.UserId == model.UserId);
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            if (customer == null)
-                return NotFound();
+            var result = await _profileService.UpdateProfileAsync(customer.UserId, model, profileImage);
 
-            customer.FullName = model.FullName;
-            customer.Email = model.Email;
-            customer.Phone = model.Phone;
-            customer.Address = model.Address;
-            customer.Gender = model.Gender;
-            customer.Birthday = model.Birthday;
-
-            if (profileImage != null && profileImage.Length > 0)
+            if (!result.Success)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images/profile");
-
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
-
-                var fileName = Guid.NewGuid() + Path.GetExtension(profileImage.FileName);
-                var filePath = Path.Combine(uploadsFolder, fileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await profileImage.CopyToAsync(stream);
-                }
-
-                customer.ProfilePicture = "/images/profile/" + fileName;
+                TempData["ProfileError"] = result.Error;
+                return RedirectToAction("Profile");
             }
 
-            await _context.SaveChangesAsync();
+            var updated = result.Value!;
+            await RefreshSignInAsync(updated);
 
+            TempData["ProfileSuccess"] = "Profile updated successfully.";
+            return RedirectToAction("Profile");
+        }
+
+        private async Task RefreshSignInAsync(User user)
+        {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, customer.FullName),
-                new Claim(ClaimTypes.Email, customer.Email),
-                new Claim(ClaimTypes.Role, customer.Role)
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
             };
 
-            var identity = new ClaimsIdentity(
-                claims,
-                CookieAuthenticationDefaults.AuthenticationScheme);
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+        }
 
-            var principal = new ClaimsPrincipal(identity);
+        // =========================
+        // ADD ADDRESS (PROFILE PAGE)
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> AddAddress(DeliveryField model)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
 
-            await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme,
-                principal);
-
+            var result = await _profileService.AddAddressAsync(customer.UserId, model);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address added successfully." : result.Error;
             return RedirectToAction("Profile");
         }
 
         // =========================
-        // CHANGE PASSWORD PAGE
+        // EDIT ADDRESS (PROFILE PAGE)
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> EditAddress(DeliveryField model)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _profileService.EditAddressAsync(customer.UserId, model);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address updated successfully." : result.Error;
+            return RedirectToAction("Profile");
+        }
+
+        // =========================
+        // REMOVE ADDRESS (PROFILE PAGE)
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> RemoveAddress(int addressId)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _profileService.RemoveAddressAsync(customer.UserId, addressId);
+            TempData[result.Success ? "AddressSuccess" : "AddressError"] = result.Success ? "Address removed successfully." : result.Error;
+            return RedirectToAction("Profile");
+        }
+
+        // =========================
+        // CHANGE PASSWORD (PROFILE PAGE)
         // =========================
         [HttpGet]
-        public IActionResult ChangePassword()
+        public async Task<IActionResult> ChangePassword()
         {
+            await LoadCartCountAsync();
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        {
+            if (!ModelState.IsValid) return View(model);
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var result = await _profileService.ChangePasswordAsync(customer.UserId, model.OldPassword, model.NewPassword);
+
+            if (!result.Success)
+            {
+                ModelState.AddModelError("OldPassword", result.Error ?? "Failed to change password.");
+                return View(model);
+            }
+
+            TempData["PasswordSuccess"] = "Password changed successfully.";
+            return RedirectToAction("Profile");
+        }
+
+        // =========================
+        // CHAT
+        // =========================
+        public async Task<IActionResult> Chat()
+        {
+            await LoadCartCountAsync();
+
             return View();
         }
 
         // =========================
-        // CHANGE PASSWORD
+        // NOTIFICATIONS
         // =========================
-        [HttpPost]
-        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        public async Task<IActionResult> Notifications()
         {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
-
-            var customer = await _context.Users
-                .OfType<Customer>()
-                .FirstOrDefaultAsync(x => x.Email == email);
-
-            if (customer == null)
-                return NotFound();
-
-            // Verify current password
-            bool passwordCorrect = BCrypt.Net.BCrypt.Verify(
-                model.OldPassword,
-                customer.PasswordHash
-            );
-
-            if (!passwordCorrect)
-            {
-                ModelState.AddModelError(
-                    "OldPassword",
-                    "Current password is incorrect."
-                );
-
-                return View(model);
-            }
-
-            // Prevent same password
-            if (model.OldPassword == model.NewPassword)
-            {
-                ModelState.AddModelError(
-                    "NewPassword",
-                    "New password cannot be same as current password."
-                );
-
-                return View(model);
-            }
-
-            // Hash new password
-            customer.PasswordHash = BCrypt.Net.BCrypt.HashPassword(
-                model.NewPassword
-            );
-
-            await _context.SaveChangesAsync();
-
-            TempData["Success"] = "Password changed successfully.";
-
-            return RedirectToAction("Profile");
+            await LoadCartCountAsync();
+            
+            return View();
         }
     }
 }
