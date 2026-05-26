@@ -22,7 +22,6 @@ namespace EcommerceSystem.Controllers
         // Main Dashboard View
         public IActionResult Index()
         {
-            // In a real app, you'd fetch stats here (e.g., total users, pending sellers)
             ViewBag.TotalOrders = 150; 
             return View();
         }
@@ -30,7 +29,6 @@ namespace EcommerceSystem.Controllers
         // User Management
         public IActionResult ManageUsers()
         {
-            // Logic to fetch all users from the database
             return RedirectToAction("ManageSellers");
         }
 
@@ -67,7 +65,7 @@ namespace EcommerceSystem.Controllers
 
         public IActionResult ManageCustomerService()
         {
-            var staffList = _context.CustomerServices.ToList(); // Or your logic
+            var staffList = _context.CustomerServices.ToList(); 
             return View(staffList);
         }
 
@@ -98,7 +96,6 @@ namespace EcommerceSystem.Controllers
 
             // Permanently deactivate the account
             seller.IsActive = false; 
-
             seller.IsApproved = false; 
 
             await _context.SaveChangesAsync();
@@ -111,7 +108,6 @@ namespace EcommerceSystem.Controllers
         [HttpPost]
         public IActionResult ApproveProduct(int productID)
         {
-            // Logic to set product status to 'Approved'
             return RedirectToAction("ManageProducts");
         }
 
@@ -131,7 +127,6 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // 1. Check if the email already exists
             var existingUser = await _context.Users.AnyAsync(u => u.Email == model.Email);
             if (existingUser)
             {
@@ -139,12 +134,9 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // 2. Use your new CustomerServiceCreator
-            // This utilizes the logic in your uploaded CustomerServiceCreator.cs
             UserCreator creator = new CustomerServiceCreator(model); 
             User customerServiceAccount = creator.CreateUser();
 
-            // 3. Save to database via DbContext
             try 
             {
                 _context.Users.Add(customerServiceAccount);
@@ -187,7 +179,6 @@ namespace EcommerceSystem.Controllers
             var user = await _context.Users.FindAsync(model.UserId);
             if (user == null) return NotFound();
 
-            // Fix: Use UserId to verify email isn't taken by a different user
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == model.Email && u.UserId != model.UserId);
             
@@ -222,16 +213,12 @@ namespace EcommerceSystem.Controllers
 
             try
             {
-                // Instead of _context.Users.Remove(user);
-                // We update the status. For example:
                 user.IsActive = false; 
                 
                 _context.Update(user);
                 await _context.SaveChangesAsync();
 
                 TempData["AdminSuccess"] = "Staff member deactivated successfully.";
-                
-                // Redirect back to the list so you stay on the same page
                 return RedirectToAction("ManageCustomerService");
             }
             catch (Exception ex)
@@ -240,6 +227,23 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("ManageCustomerService");
             }
         }
+
+        // AJAX Action Name aligned to the pattern called by ManageSellers JavaScript:
+        [HttpGet]
+        public async Task<IActionResult> GetSellerDetails(int id)
+        {
+            // Kept singular database reference context as required
+            var seller = await _context.Seller
+                .FirstOrDefaultAsync(s => s.UserId == id);
+
+            if (seller == null)
+            {
+                return NotFound();
+            }
+
+            return PartialView("SellerDetails", seller);
+        }
+
         // System Settings
         public IActionResult Home()
         {
