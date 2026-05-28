@@ -5,6 +5,7 @@ using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
 using EcommerceSystem.Observers;
+using EcommerceSystem.Interfaces;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -13,10 +14,12 @@ namespace EcommerceSystem.Controllers
     public class SellerController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public SellerController(AppDbContext context)
+        public SellerController(AppDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         private async Task<Seller?> GetCurrentSellerAsync()
@@ -576,9 +579,9 @@ namespace EcommerceSystem.Controllers
             }
 
             // Attach observers — they are called inside SetStatus()
-            order.Attach(new CustomerDashboardObserver());
-            order.Attach(new SellerDashboardObserver());
-            order.Attach(new AdminPanelObserver());
+            order.Attach(new CustomerDashboardObserver(_notificationService));
+            order.Attach(new SellerDashboardObserver(_notificationService));
+            order.Attach(new AdminPanelObserver(_notificationService, _context));
 
             // SetStatus does the final validation, stamps timestamps, notifies observers
             order.SetStatus(newStatus);
