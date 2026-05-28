@@ -10,7 +10,7 @@ namespace EcommerceSystem.Models
         public string TIN { get; set; } = string.Empty;
         public string ShopName { get; set; } = string.Empty;
         public string PickupAddress { get; set; } = string.Empty;
-        public string PhoneNumber { get; set; } = string.Empty;
+        //public string PhoneNumber { get; set; } = string.Empty;
         public int SoldItemCount { get; set; }
 
         public bool IsApproved { get; set; } = false;

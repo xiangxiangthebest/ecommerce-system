@@ -10,6 +10,5 @@ namespace EcommerceSystem.Interfaces
         Task<OperationResult> CancelOrderAsync(int customerId, int orderId, string reason);
         Task<OperationResult> ConfirmReceivedAsync(int customerId, int orderId);
         Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths,ReturnInitiatedBy initiatedBy);
-        Task<OperationResult> UpdateOrderStatusAsync(int orderId, OrderStatus status);
     }
 }
