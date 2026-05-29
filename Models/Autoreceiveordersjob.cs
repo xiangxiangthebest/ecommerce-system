@@ -15,10 +15,13 @@ public class AutoReceiveOrdersJob : BackgroundService
     private readonly ILogger<AutoReceiveOrdersJob> _logger;
 
     // How often to check (every 1 hour is fine; reduce to minutes for testing)
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
+    //private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
     // How many days after DELIVERED before auto-confirming
-    private const int AutoReceiveDays = 3;
+    //private const int AutoReceiveDays = 3;
+
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(1); // check every 1 min
+    private const int AutoReceiveDays = 0;
 
     public AutoReceiveOrdersJob(
         IServiceScopeFactory scopeFactory,
@@ -55,7 +58,8 @@ public class AutoReceiveOrdersJob : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
+        //var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
+        var cutoff = DateTime.UtcNow.AddMinutes(-2);
 
         // Find all orders that are still DELIVERED but were delivered over 3 days ago
         var overdueOrders = await db.Order

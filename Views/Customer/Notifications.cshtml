@@ -1,0 +1,108 @@
+@model List<EcommerceSystem.Models.Notification>
+@{
+    ViewData["Title"] = "Notifications";
+    var notificationCount = Model?.Count ?? 0;
+}
+
+<link rel="stylesheet" href="~/css/customer/notification.css" asp-append-version="true" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@@tabler/icons-webfont@@latest/tabler-icons.min.css" />
+
+<div class="notif-page">
+    <div class="notif-page-header">
+        <div class="notif-page-title-group">
+            <i class="ti ti-bell"></i>
+            <h2>Notifications (@notificationCount)</h2>
+        </div>
+
+    <div class="notif-page-header">
+        <div class="notif-page-title-group">
+            <i class="ti ti-bell"></i>
+            <h2>Notifications</h2>
+        </div>
+        @if (Model?.Any(n => !n.IsRead) == true)
+        {
+            <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" id="markAllForm">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="notif-markall-btn">
+                    <i class="ti ti-checks"></i> Mark all as read
+                </button>
+            </form>
+        }
+    </div>
+
+    @if (!(Model?.Any() ?? false))
+    {
+        <div class="notif-empty-state">
+            <i class="ti ti-bell-off"></i>
+            <p>You have no notifications yet.</p>
+            <span>We'll let you know when something happens with your orders.</span>
+        </div>
+    }
+    else
+    {
+        <div class="notif-list-page">
+            @foreach (var n in Model ?? new List<EcommerceSystem.Models.Notification>())
+            {
+                <div class="notif-row @(n.IsRead ? "read" : "unread")" id="notif-@n.NotificationId">
+                    <div class="notif-dot-col">
+                        @if (!n.IsRead)
+                        {
+                            <span class="notif-dot"></span>
+                        }
+                    </div>
+                    <div class="notif-content-col">
+                        <div class="notif-row-top">
+                            <span class="notif-row-title">@n.Title</span>
+                            <span class="notif-row-time">@n.CreatedAt.ToLocalTime().ToString("dd MMM, h:mm tt")</span>
+                        </div>
+                        <p class="notif-row-msg">@n.Message</p>
+                    </div>
+                    @if (!n.IsRead)
+                    {
+                        <div class="notif-action-col">
+                            <form asp-controller="Notifications" asp-action="MarkRead"
+                                  asp-route-id="@n.NotificationId" method="post"
+                                  onsubmit="markSingleRead(event, @n.NotificationId)">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="notif-read-btn" title="Mark as read">
+                                    <i class="ti ti-check"></i>
+                                </button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+    // Mark single as read without full page reload
+    function markSingleRead(e, id) {
+        e.preventDefault();
+        const row = document.getElementById('notif-' + id);
+        fetch(`/Notifications/MarkRead?id=${id}`, {
+            method: 'POST',
+            headers: {
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? ''
+            }
+        }).then(() => {
+            row.classList.remove('unread');
+            row.classList.add('read');
+            row.querySelector('.notif-dot')?.remove();
+            row.querySelector('.notif-action-col')?.remove();
+
+            // Hide "Mark all" button if none left
+            if (!document.querySelector('.notif-row.unread')) {
+                document.getElementById('markAllForm')?.remove();
+            }
+        });
+    }
+
+    // After mark-all, reload to reflect changes
+    document.getElementById('markAllForm')?.addEventListener('submit', function() {
+        setTimeout(() => location.reload(), 300);
+    });
+</script>
+}

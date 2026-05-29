@@ -16,5 +16,92 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+        function toggleNotifDropdown() {
+            const dd = document.getElementById('notifDropdown');
+            dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+            if (dd.style.display === 'block') loadNotifications();
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('notifWrapper');
+            if (wrapper && !wrapper.contains(e.target))
+                document.getElementById('notifDropdown').style.display = 'none';
+        });
+
+        async function loadNotifications() {
+            try {
+                const res = await fetch('/Notifications/GetDropdown');
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const badge = document.getElementById('notifBadge');
+                if (badge) {
+                    badge.textContent = data.unreadCount;
+                    badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+                }
+
+                const list = document.getElementById('notifList');
+                if (!list) return;
+
+                if (data.items.length === 0) {
+                    list.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+                    return;
+                }
+
+                list.innerHTML = data.items.map(n => `
+                    <div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markRead(${n.notificationId}, this)">
+                        <div class="notif-item-title">${n.title}</div>
+                        <div class="notif-item-msg">${n.message}</div>
+                        <div class="notif-item-time">${n.createdAt}</div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Notification load failed:', err);
+            }
+        }
+
+        async function markRead(id, el) {
+            await fetch(`/Notifications/MarkRead?id=${id}`, {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+            });
+            el.classList.remove('unread');
+            refreshBadge();
+        }
+
+        async function markAllRead() {
+            await fetch('/Notifications/MarkAllRead', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+            });
+            document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+            const badge = document.getElementById('notifBadge');
+            if (badge) badge.style.display = 'none';
+        }
+
+        async function refreshBadge() {
+            try {
+                const res = await fetch('/Notifications/GetDropdown');
+                if (!res.ok) return;
+                const data = await res.json();
+                const badge = document.getElementById('notifBadge');
+                if (badge) {
+                    badge.textContent = data.unreadCount;
+                    badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+                }
+            } catch {}
+        }
+
+        function getAntiForgeryToken() {
+            return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        }
+
+        // Auto-refresh badge every 30 seconds
+        setInterval(refreshBadge, 30000);
+        window.addEventListener('load', refreshBadge);
+    </script>
 </body>
 </html>

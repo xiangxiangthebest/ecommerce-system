@@ -240,6 +240,8 @@
                 <h2 class="section-title">Your Orders</h2>
             </div>
 
+            <!-- Bell Icon (moved to fixed overlay so it is never occluded) -->
+
             <!-- ── Status tabs ── -->
             <div class="order-tabs" id="orderTabs">
                 <button class="order-tab active" data-status="ALL">
@@ -439,6 +441,41 @@
             </div>
         }
     </main>
+</div>
+
+{{!-- ── Fixed notification bell (always on top, never occluded) ── --}}
+<div id="notifWrapper" style="position:fixed;top:18px;right:24px;z-index:2000;">
+    <button class="notif-bell" id="notifBell" onclick="toggleNotifDropdown()"
+            style="background:#1e1b4b;border:none;border-radius:50%;width:44px;height:44px;
+                   display:flex;align-items:center;justify-content:center;cursor:pointer;
+                   box-shadow:0 2px 12px rgba(30,27,75,0.25);position:relative;">
+        <i class="fas fa-bell" style="color:#fff;font-size:17px;"></i>
+        <span class="notif-badge" id="notifBadge"
+              style="display:none;position:absolute;top:-4px;right:-4px;
+                     background:#ef4444;color:#fff;font-size:11px;font-weight:700;
+                     min-width:18px;height:18px;border-radius:9px;
+                     display:none;align-items:center;justify-content:center;
+                     padding:0 4px;border:2px solid #fff;">0</span>
+    </button>
+
+    <div class="notif-dropdown" id="notifDropdown"
+         style="display:none;position:absolute;top:52px;right:0;
+                width:320px;max-height:400px;background:#fff;
+                border-radius:14px;box-shadow:0 8px 32px rgba(30,27,75,0.18);
+                overflow:hidden;z-index:2001;border:1px solid #e8eaf6;">
+        <div class="notif-header"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:12px 16px 10px;border-bottom:1px solid #f0f0f8;">
+            <span style="font-weight:700;font-size:14px;color:#1e1b4b;">Notifications</span>
+            <button onclick="markAllRead()" class="notif-mark-all"
+                    style="background:none;border:none;color:#6366f1;font-size:12px;
+                           font-weight:600;cursor:pointer;padding:0;">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notifList"
+             style="overflow-y:auto;max-height:340px;padding:4px 0;">
+            <p class="notif-empty" style="color:#9a98b6;font-size:13px;text-align:center;padding:24px;">Loading...</p>
+        </div>
+    </div>
 </div>
 
 @* ── Seller: inject order data for the Approve Return modal ── *@
@@ -1384,3 +1421,75 @@
         font-weight: 500;
     }
 </style>
+<script>
+    function toggleNotifDropdown() {
+        const dd = document.getElementById('notifDropdown');
+        dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+        if (dd.style.display === 'block') loadNotifications();
+    }
+
+    document.addEventListener('click', function(e) {
+        const wrapper = document.getElementById('notifWrapper');
+        if (wrapper && !wrapper.contains(e.target))
+            document.getElementById('notifDropdown').style.display = 'none';
+    });
+
+    async function loadNotifications() {
+        const res = await fetch('/Notifications/GetDropdown');
+        const data = await res.json();
+        const badge = document.getElementById('notifBadge');
+        badge.textContent = data.unreadCount;
+        badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+        const list = document.getElementById('notifList');
+        if (data.items.length === 0) {
+            list.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+            return;
+        }
+        list.innerHTML = data.items.map(n => `
+            <div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markRead(${n.notificationId}, this)">
+                <div class="notif-item-title">${n.title}</div>
+                <div class="notif-item-msg">${n.message}</div>
+                <div class="notif-item-time">${n.createdAt}</div>
+            </div>
+        `).join('');
+    }
+
+    async function markRead(id, el) {
+        await fetch(`/Notifications/MarkRead?id=${id}`, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+        });
+        el.classList.remove('unread');
+        refreshBadge();
+    }
+
+    async function markAllRead() {
+        await fetch('/Notifications/MarkAllRead', {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+        });
+        document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+        const badge = document.getElementById('notifBadge');
+        if (badge) badge.style.display = 'none';
+    }
+
+    async function refreshBadge() {
+        try {
+            const res = await fetch('/Notifications/GetDropdown');
+            if (!res.ok) return;
+            const data = await res.json();
+            const badge = document.getElementById('notifBadge');
+            if (badge) {
+                badge.textContent = data.unreadCount;
+                badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+            }
+        } catch {}
+    }
+
+    function getAntiForgeryToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    }
+
+    setInterval(refreshBadge, 30000);
+    window.addEventListener('load', refreshBadge);
+</script>
