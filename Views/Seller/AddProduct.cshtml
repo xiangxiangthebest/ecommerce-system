@@ -35,6 +35,19 @@
                 </button>
             </div>
 
+            @* ══ SERVER-SIDE PUBLISH ERROR BANNER (only shown on postback) ══ *@
+            @if (ViewBag.PublishErrors != null)
+            {
+                <div class="val-banner" style="display:block;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    @foreach (var err in (List<string>)ViewBag.PublishErrors)
+                    {
+                        <div>@err</div>
+                    }
+                </div>
+            }
+
+            @* Client-side validation banner *@
             <div id="val-banner" class="val-banner" style="display:none;"></div>
 
             <form id="productForm" asp-controller="Seller" asp-action="AddProduct"
@@ -46,7 +59,8 @@
 
                     <div class="form-row">
                         <label>Product Name</label>
-                        <input type="text" id="field-name" name="Name" placeholder="Enter product name" />
+                        <input type="text" id="field-name" name="Name" placeholder="Enter product name"
+                               value="@Model?.Name" />
                     </div>
 
                     <div class="form-row">
@@ -54,8 +68,8 @@
                         <textarea name="Description" id="desc-field" rows="4"
                                   placeholder="Describe your product..."
                                   maxlength="3000" class="form-textarea"
-                                  oninput="document.getElementById('desc-count').textContent=this.value.length+' / 3000'"></textarea>
-                        <div class="char-count" id="desc-count">0 / 3000</div>
+                                  oninput="document.getElementById('desc-count').textContent=this.value.length+' / 3000'">@Model?.Description</textarea>
+                        <div class="char-count" id="desc-count">@(Model?.Description?.Length ?? 0) / 3000</div>
                     </div>
 
                     <!-- IMAGES -->
@@ -131,15 +145,18 @@
                     <div class="form-row-inline">
                         <div class="form-row" style="flex:1;">
                             <label>Price (RM)</label>
-                            <input type="number" id="field-price" name="Price" step="0.01" min="0" placeholder="0.00" />
+                            <input type="number" id="field-price" name="Price" step="0.01" min="0" placeholder="0.00"
+                                   value="@Model?.Price" />
                         </div>
                         <div class="form-row" style="flex:1;" id="global-stock-wrap">
                             <label>Stock Quantity <span class="desc-hint">set per variation if using variations</span></label>
-                            <input type="number" id="field-stock" name="StockQuantity" min="0" placeholder="0" />
+                            <input type="number" id="field-stock" name="StockQuantity" min="0" placeholder="0"
+                                   value="@Model?.StockQuantity" />
                         </div>
                         <div class="form-row" style="flex:1;">
                             <label>SKU</label>
-                            <input type="text" name="SKU" placeholder="e.g. SKU-001" />
+                            <input type="text" name="SKU" placeholder="e.g. SKU-001"
+                                   value="@Model?.SKU" />
                         </div>
                     </div>
 
@@ -682,7 +699,7 @@ function rebuildComboTable() {
             const g1opt = allGroupsArr[1].options.find(o => o.label === labels[1]);
             const imgHtml1 = g1opt?.imagePath
                 ? `<img class="combo-img" src="${g1opt.imagePath}" />`
-                : '';
+                : ''
             html += `<td>${imgHtml1}${escHtml(labels[1])}</td>`;
         } else {
             const g0opt = allGroupsArr[0].options.find(o => o.label === labels[0]);
@@ -755,9 +772,9 @@ function submitForm(type) {
     const banner = document.getElementById('val-banner');
     banner.style.display = 'none';
 
-    const name     = document.getElementById('field-name').value.trim();
-    const price    = parseFloat(document.getElementById('field-price').value) || 0;
-    const category = document.getElementById('field-category').value;
+    const name      = document.getElementById('field-name').value.trim();
+    const price     = parseFloat(document.getElementById('field-price').value) || 0;
+    const category  = document.getElementById('field-category').value;
     const imgPresent = hasImage();
     const errors = [];
 
@@ -777,6 +794,8 @@ function submitForm(type) {
         banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
+
+    // ── FIX: stamp actionType BEFORE submit so the server receives it ──
     document.getElementById('actionType-input').value = type;
     document.getElementById('productForm').submit();
 }

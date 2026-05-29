@@ -3,6 +3,7 @@ using System;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ecommerce_system.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528131620_AddNotifications")]
+    partial class AddNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -79,63 +82,6 @@ namespace ecommerce_system.Migrations
                     b.HasKey("CategoryId");
 
                     b.ToTable("Category", (string)null);
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.ChatMessage", b =>
-                {
-                    b.Property<int>("ChatMessageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ChatRoomId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("MessageText")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("ProductsProductId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SenderId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ChatMessageId");
-
-                    b.HasIndex("ChatRoomId");
-
-                    b.HasIndex("ProductsProductId");
-
-                    b.ToTable("ChatMessages");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.ChatRoom", b =>
-                {
-                    b.Property<int>("ChatRoomId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SellerId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("ChatRoomId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("SellerId");
-
-                    b.ToTable("ChatRoom");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
@@ -601,42 +547,6 @@ namespace ecommerce_system.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("EcommerceSystem.Models.ChatMessage", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.ChatRoom", "ChatRoom")
-                        .WithMany("Messages")
-                        .HasForeignKey("ChatRoomId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EcommerceSystem.Models.Product", "Products")
-                        .WithMany()
-                        .HasForeignKey("ProductsProductId");
-
-                    b.Navigation("ChatRoom");
-
-                    b.Navigation("Products");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.ChatRoom", b =>
-                {
-                    b.HasOne("EcommerceSystem.Models.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("EcommerceSystem.Models.Seller", "Seller")
-                        .WithMany()
-                        .HasForeignKey("SellerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("Seller");
-                });
-
             modelBuilder.Entity("EcommerceSystem.Models.DeliveryField", b =>
                 {
                     b.HasOne("EcommerceSystem.Models.Customer", "Customer")
@@ -786,11 +696,6 @@ namespace ecommerce_system.Migrations
             modelBuilder.Entity("EcommerceSystem.Models.Category", b =>
                 {
                     b.Navigation("Products");
-                });
-
-            modelBuilder.Entity("EcommerceSystem.Models.ChatRoom", b =>
-                {
-                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("EcommerceSystem.Models.Order", b =>

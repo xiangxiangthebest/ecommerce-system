@@ -9,13 +9,11 @@ public class AppDbContext : DbContext
         : base(options)
     {
     }
-    
-    public DbSet<ChatRoom> ChatRoom { get; set; }
-    public DbSet<ChatMessage> ChatMessages { get; set; }
+
     public DbSet<User> Users { get; set; }
     public DbSet<Customer> Customers { get; set; }
     public DbSet<CustomerService> CustomerServices { get; set; }
-    public DbSet<Seller> Seller { get; set; }
+    public DbSet<Seller> Seller { get; set; } 
     public DbSet<Admin> Admin { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Category { get; set; }
@@ -25,6 +23,10 @@ public class AppDbContext : DbContext
     public DbSet<Order> Order { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<Review> Reviews { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
+    public DbSet<ChatRoom> ChatRoom { get; set; }
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
