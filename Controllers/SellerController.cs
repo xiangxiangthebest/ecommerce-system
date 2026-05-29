@@ -16,6 +16,7 @@ namespace EcommerceSystem.Controllers
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
 
+
         public SellerController(AppDbContext context, INotificationService notificationService)
         {
             _context = context;
@@ -174,13 +175,16 @@ namespace EcommerceSystem.Controllers
 
             if (!isDraft)
             {
+                var publishErrors = new List<string>();
                 if (string.IsNullOrWhiteSpace(model.Name))
-                    ModelState.AddModelError("Name", "Product name is required to publish.");
+                    publishErrors.Add("Product name is required to publish.");
                 if (model.Price <= 0)
-                    ModelState.AddModelError("Price", "Price must be greater than 0 to publish.");
-                if (!ModelState.IsValid)
+                    publishErrors.Add("Price must be greater than 0 to publish.");
+
+                if (publishErrors.Any())
                 {
                     ViewBag.ShopName = seller.ShopName;
+                    ViewBag.PublishErrors = publishErrors;
                     return View(model);
                 }
             }
@@ -550,8 +554,9 @@ namespace EcommerceSystem.Controllers
             var order = await _context.Order
                 .Include(o => o.Customer)
                 .Include(o => o.Seller)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId && o.SellerUserId == seller.UserId);
-
+                .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId && o.SellerUserId == seller.UserId);
             if (order == null)
             {
                 TempData["OrderError"] = "Order not found.";

@@ -23,6 +23,8 @@ public class AppDbContext : DbContext
     public DbSet<Order> Order { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<Review> Reviews { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
