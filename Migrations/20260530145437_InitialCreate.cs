@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ecommerce_system.Migrations
 {
     /// <inheritdoc />
-    public partial class AddNotificationTable : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -242,7 +242,9 @@ namespace ecommerce_system.Migrations
                     VariationCombosJson = table.Column<string>(type: "TEXT", nullable: false),
                     OriginalPrice = table.Column<double>(type: "REAL", nullable: false),
                     AverageRating = table.Column<double>(type: "REAL", nullable: false),
-                    ReviewCount = table.Column<double>(type: "REAL", nullable: false)
+                    ReviewCount = table.Column<double>(type: "REAL", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {

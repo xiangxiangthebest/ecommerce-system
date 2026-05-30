@@ -1,172 +1,414 @@
+/* ── Page wrapper ────────────────────────────────────────── */
 .notif-page {
-    max-width: 720px;
-    margin: 40px auto;
-    padding: 0 16px 60px;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 36px 20px 80px;
 }
 
-.notif-page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
+/* ── Two-column layout ───────────────────────────────────── */
+.notif-container {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+    align-items: start;
 }
 
-.notif-page-title-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+@media (max-width: 680px) {
+    .notif-container {
+        grid-template-columns: 1fr;
+    }
+    .notif-sidebar {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        border-radius: 12px;
+        padding: 10px 14px;
+    }
+    .notif-sidebar-header {
+        display: none;
+    }
+    .notif-filter-nav {
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+    }
 }
 
-.notif-page-title-group i {
-    font-size: 22px;
-    color: #333;
-}
-
-.notif-page-title-group h2 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 0;
-    color: #111;
-}
-
-.notif-markall-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    padding: 7px 14px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+/* ── Sidebar ─────────────────────────────────────────────── */
+.notif-sidebar {
     background: #fff;
-    color: #555;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 18px 14px;
+    position: sticky;
+    top: 90px;
 }
 
-.notif-markall-btn:hover {
-    background: #f4f4f4;
-    color: #111;
+.notif-sidebar-header {
+    margin-bottom: 10px;
+    padding: 0 6px;
 }
 
-/* Empty state */
-.notif-empty-state {
-    text-align: center;
-    padding: 80px 20px;
+.notif-sidebar-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: #aaa;
 }
 
-.notif-empty-state i {
-    font-size: 48px;
-    display: block;
-    margin-bottom: 16px;
-}
-
-.notif-empty-state p {
-    font-size: 16px;
-    font-weight: 600;
-    color: #666;
-    margin-bottom: 6px;
-}
-
-.notif-empty-state span {
-    font-size: 13px;
-    color: #aaa;
-}
-
-/* Notification rows */
-.notif-list-page {
+.notif-filter-nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.notif-row {
+.notif-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: #555;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, color 0.15s;
+}
+
+.notif-filter-btn i {
+    font-size: 17px;
+    flex-shrink: 0;
+    color: #aaa;
+    transition: color 0.15s;
+}
+
+.notif-filter-btn span:not(.notif-filter-count) {
+    flex: 1;
+}
+
+.notif-filter-btn:hover {
+    background: #f4f6fb;
+    color: #111;
+}
+
+.notif-filter-btn:hover i {
+    color: #555;
+}
+
+.notif-filter-btn.active {
+    background: #eff4ff;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.notif-filter-btn.active i {
+    color: #2563eb;
+}
+
+.notif-filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 20px;
+    background: #f0f0f0;
+    color: #666;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: auto;
+}
+
+.notif-filter-count--blue {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* ── Main panel ──────────────────────────────────────────── */
+.notif-main {
+    background: #fff;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* ── Main header ─────────────────────────────────────────── */
+.notif-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.notif-main-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.notif-main-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+}
+
+.notif-unread-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+}
+
+.notif-markall-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 9px;
+    background: #fff;
+    color: #555;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.notif-markall-btn i {
+    font-size: 16px;
+    color: #3b82f6;
+}
+
+.notif-markall-btn:hover {
+    background: #f4f6fb;
+    border-color: #c7d7f8;
+    color: #1d4ed8;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+.notif-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 80px 24px;
+    text-align: center;
+}
+
+.notif-empty-icon-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #f4f6fb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.notif-empty-icon-wrap i {
+    font-size: 32px;
+    color: #bbb;
+}
+
+.notif-empty-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 8px;
+}
+
+.notif-empty-sub {
+    font-size: 13px;
+    color: #999;
+    max-width: 300px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ── Notification list ───────────────────────────────────── */
+.notif-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Notification item ───────────────────────────────────── */
+.notif-item {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 16px 14px;
-    border-radius: 10px;
+    gap: 14px;
+    padding: 18px 24px;
+    border-bottom: 1px solid #f5f5f5;
     transition: background 0.15s;
+    position: relative;
 }
 
-.notif-row.unread {
-    background: #f0f6ff;
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: #fafbff;
+}
+
+.notif-item.is-unread {
+    background: #f8faff;
     border-left: 3px solid #3b82f6;
+    padding-left: 21px;
 }
 
-.notif-row.read {
-    background: #fafafa;
+.notif-item.is-unread:hover {
+    background: #f0f5ff;
+}
+
+.notif-item.is-read {
     border-left: 3px solid transparent;
+    padding-left: 21px;
 }
 
-.notif-row:hover {
-    background: #eef2ff;
-}
-
-.notif-dot-col {
-    width: 10px;
-    padding-top: 5px;
+/* ── Item icon ───────────────────────────────────────────── */
+.notif-item-icon-wrap {
     flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #f2f4f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
 }
 
-.notif-dot {
-    display: block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #3b82f6;
+.notif-item-icon-wrap i {
+    font-size: 18px;
+    color: #aaa;
 }
 
-.notif-content-col {
+.notif-item-icon-wrap--active {
+    background: #eff4ff;
+}
+
+.notif-item-icon-wrap--active i {
+    color: #3b82f6;
+}
+
+/* ── Item body ───────────────────────────────────────────── */
+.notif-item-body {
     flex: 1;
     min-width: 0;
 }
 
-.notif-row-top {
+.notif-item-top {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 12px;
     margin-bottom: 4px;
 }
 
-.notif-row-title {
-    font-weight: 600;
+.notif-item-title {
     font-size: 14px;
+    font-weight: 600;
     color: #111;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.notif-row-time {
+.notif-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #3b82f6;
+    flex-shrink: 0;
+}
+
+.notif-item-time {
     font-size: 11px;
-    color: #aaa;
+    color: #bbb;
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-.notif-row-msg {
+.notif-item-msg {
     font-size: 13px;
-    color: #555;
+    color: #666;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.55;
 }
 
-.notif-action-col {
+/* ── Read button ─────────────────────────────────────────── */
+.notif-item-action {
     flex-shrink: 0;
+    padding-top: 2px;
 }
 
 .notif-read-btn {
-    background: none;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 4px 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+    color: #aaa;
+    font-size: 15px;
     cursor: pointer;
-    color: #6b7280;
-    font-size: 13px;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .notif-read-btn:hover {
     background: #3b82f6;
     border-color: #3b82f6;
     color: #fff;
+}
+
+/* ── Responsive: tablet ──────────────────────────────────── */
+@media (max-width: 860px) {
+    .notif-container {
+        grid-template-columns: 170px 1fr;
+    }
+}
+
+@media (max-width: 680px) {
+    .notif-page {
+        padding: 20px 12px 60px;
+    }
+    .notif-main-header {
+        padding: 16px 16px;
+    }
+    .notif-item {
+        padding: 14px 16px 14px 13px;
+    }
+    .notif-item.is-unread,
+    .notif-item.is-read {
+        padding-left: 13px;
+    }
+    .notif-item-icon-wrap {
+        width: 36px;
+        height: 36px;
+    }
+    .notif-item-icon-wrap i {
+        font-size: 16px;
+    }
 }

@@ -9,14 +9,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Floating alerts (supports multiple alerts)
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll(".js-floating-alert").forEach(alertBox => {
-            setTimeout(() => {
-                alertBox.classList.add("hide");
-                setTimeout(() => alertBox.remove(), 500);
-            }, 3000);
-        });
+    // Floating alerts
+    document.querySelectorAll(".js-floating-alert").forEach(alertBox => {
+        setTimeout(() => {
+            alertBox.classList.add("hide");
+            setTimeout(() => alertBox.remove(), 500);
+        }, 3000);
     });
 
     // Address UI
@@ -93,4 +91,75 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cancelEditBtn) {
         cancelEditBtn.addEventListener("click", () => closeEditForm());
     }
+
+    // Restore unsaved profile values
+    if (sessionStorage.getItem("profileDraftRestore") === "true") {
+        
+        document.querySelector('[name="FullName"]').value =
+            sessionStorage.getItem("profileFullName") || "";
+
+        document.querySelector('[name="Gender"]').value =
+            sessionStorage.getItem("profileGender") || "";
+
+        document.querySelector('[name="Birthday"]').value =
+            sessionStorage.getItem("profileBirthday") || "";
+
+        document.querySelector('[name="Phone"]').value =
+            sessionStorage.getItem("profilePhone") || "";
+
+        // One-time restore only
+        sessionStorage.removeItem("profileDraftRestore");
+    }
+
+    if (fullName)
+        document.querySelector('[name="FullName"]').value = fullName;
+
+    if (gender)
+        document.querySelector('[name="Gender"]').value = gender;
+
+    if (birthday)
+        document.querySelector('[name="Birthday"]').value = birthday;
+
+    if (phone)
+        document.querySelector('[name="Phone"]').value = phone;
+
+    document.getElementById("profileForm")?.addEventListener("submit", () => {
+        sessionStorage.removeItem("profileFullName");
+        sessionStorage.removeItem("profileGender");
+        sessionStorage.removeItem("profileBirthday");
+        sessionStorage.removeItem("profilePhone");
+    });
+});
+
+function saveProfileDraft() {
+    sessionStorage.setItem("profileDraftRestore", "true");
+
+    sessionStorage.setItem("profileFullName",
+        document.querySelector('[name="FullName"]')?.value || "");
+
+    sessionStorage.setItem("profileGender",
+        document.querySelector('[name="Gender"]')?.value || "");
+
+    sessionStorage.setItem("profileBirthday",
+        document.querySelector('[name="Birthday"]')?.value || "");
+
+    sessionStorage.setItem("profilePhone",
+        document.querySelector('[name="Phone"]')?.value || "");
+}
+
+// Add Address submit
+document.getElementById("addAddressForm")?.addEventListener("submit", () => {
+    saveProfileDraft();
+});
+
+// Edit Address submit
+document.getElementById("editAddressForm")?.addEventListener("submit", () => {
+    saveProfileDraft();
+});
+
+// Remove Address submit
+document.querySelectorAll('form[asp-action="RemoveAddress"]').forEach(form => {
+    form.addEventListener("submit", () => {
+        saveProfileDraft();
+    });
 });
