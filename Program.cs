@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllersWithViews().AddRazorRuntimeCompilation();
+builder.Services.AddControllersWithViews();
+// builder.Services.AddControllersWithViews().AddRazorRuntimeCompilation();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=database.db"));
@@ -44,7 +44,8 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    context.Database.Migrate();
+    context.Database.EnsureCreated();
+    // context.Database.Migrate();
 
     if (!context.Users.Any(x => x.Email == "admin@gmail.com"))
     {

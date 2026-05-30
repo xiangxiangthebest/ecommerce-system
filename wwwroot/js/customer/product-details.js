@@ -43,6 +43,20 @@
     var pdLightboxClose = qs("#pdImgLightboxClose");
     var pdMainImgWrap = qs("#pdMainImgWrap");
 
+    function updateChatVariationJson() {
+    var obj = {};
+    for (var i = 0; i < totalGroups; i++) {
+        if (selectedKeys[i] !== null) {
+            obj[groupNames[i]] = selectedKeys[i];
+        }
+    }
+    
+    var chatInput = document.getElementById("chatVariationJson");
+    if (chatInput) {
+        chatInput.value = JSON.stringify(obj);
+    }
+    }
+    
     function openGalleryLightbox() {
         pdLightboxImg.src = qs("#pdMainImg").src;
         pdLightbox.hidden = false;
@@ -178,6 +192,7 @@
     }
 
     function updateVariationUI() {
+        updateChatVariationJson();
         var allSelected = selectedKeys.every(function (v) { return v !== null; });
 
         updateHiddenSelected();

@@ -20,6 +20,59 @@ let _ratingFilesByOrderItem = {};   // { [orderItemId]: File[] }
    INIT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
+const searchInput = document.getElementById("phSearchInput"); // 确保 I 大写
+    const tabs = document.querySelectorAll(".ph-tab");
+    const cards = document.querySelectorAll(".ph-card"); // 确认为 .ph-card
+    const noResults = document.getElementById("phNoResults");
+
+    let currentStatus = "ALL";
+
+    // 将过滤逻辑抽离成一个独立函数，方便重复调用
+    function filterOrders() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        let hasVisible = false;
+
+        cards.forEach(card => {
+            const searchData = card.getAttribute("data-search") || "";
+            const cardStatus = card.getAttribute("data-status") || "";
+
+            const matchesStatus = (currentStatus === "ALL" || cardStatus === currentStatus);
+            const matchesSearch = searchData.includes(query);
+
+            if (matchesStatus && matchesSearch) {
+                card.style.display = "";
+                hasVisible = true;
+            } else {
+                card.style.display = "none";
+            }
+        });
+
+        if (noResults) {
+            noResults.style.display = hasVisible ? "none" : "block";
+        }
+    }
+
+    // 1. 监听用户手动的输入事件
+    if (searchInput) {
+        searchInput.addEventListener("input", filterOrders);
+    }
+
+    // 2. 监听选项卡点击事件
+    tabs.forEach(tab => {
+        tab.addEventListener("click", function () {
+            tabs.forEach(t => t.classList.remove("active"));
+            this.classList.add("active");
+
+            currentStatus = this.getAttribute("data-status");
+            filterOrders(); // 切换标签时执行过滤
+        });
+    });
+
+    // ✨ 核心修复：页面加载完成后，如果输入框里已经有传过来的 searchString，直接执行一次过滤
+    if (searchInput && searchInput.value.trim() !== "") {
+        filterOrders();
+    }
+
     initToast();
     initTabs();
     initSearch();
@@ -32,13 +85,44 @@ function initToast() {
 }
 
 function initTabs() {
-    document.querySelectorAll('.ph-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
+    // document.querySelectorAll('.ph-tab').forEach(tab => {
+    //     tab.addEventListener('click', () => {
+    //         document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
+    //         tab.classList.add('active');
+    //         applyFilters();
+
+
+    //     });
+    // });
+
+    const tabs = document.querySelectorAll('#phTabs .ph-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentTab = this.getAttribute('data-status');
             applyFilters();
         });
     });
+
+    const searchInput = document.getElementById('phSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase().trim();
+            applyFilters();
+        });
+
+        if (searchInput.value) {
+            currentSearch = searchInput.value.toLowerCase().trim();
+            currentTab = 'ALL';
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            const allTabBtn = document.querySelector('#phTabs .ph-tab[data-status="ALL"]');
+            if (allTabBtn) allTabBtn.classList.add('active');
+            
+            applyFilters();
+        }
+    }
 }
 
 function initSearch() {
@@ -60,18 +144,33 @@ function initKeyboardClose() {
    FILTERS  (tab + search)
    ============================================================ */
 function applyFilters() {
-    const status  = document.querySelector('.ph-tab.active')?.dataset.status ?? 'ALL';
-    const query   = document.getElementById('phSearch').value.toLowerCase().trim();
-    let   visible = 0;
+    const cards = document.querySelectorAll('#phOrderList .ph-card');
+    let visibleCount = 0;
 
-    document.querySelectorAll('.ph-card').forEach(card => {
-        const show = (status === 'ALL' || card.dataset.status === status)
-                  && (!query || card.dataset.search.includes(query));
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
+    cards.forEach(card => {
+        const cardStatus = card.getAttribute('data-status');
+        const cardSearchInfo = card.getAttribute('data-search') || '';
+
+        // A. 分类标签状态校验
+        const matchesTab = (currentTab === 'ALL' || cardStatus === currentTab);
+        
+        // B. 搜索内容校验 (单号数字或商品名称)
+        const matchesSearch = (!currentSearch || cardSearchInfo.includes(currentSearch));
+
+        // 如果同时满足标签和检索词，则显示，否则彻底在视图中隐藏
+        if (matchesTab && matchesSearch) {
+            card.style.display = '';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
     });
 
-    document.getElementById('phNoResults').style.display = visible === 0 ? 'flex' : 'none';
+    // C. 如果过滤完了发现一笔都没有，展示原本的 phNoResults 空白提示块
+    const noResults = document.getElementById('phNoResults');
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0) ? 'block' : 'none';
+    }
 }
 
 /* ============================================================
@@ -861,3 +960,4 @@ function showToast(msg, type = 'success') {
     setTimeout(() => t.classList.add('ph-toast-hide'), 3500);
     setTimeout(() => t.remove(), 4200);
 }
+
