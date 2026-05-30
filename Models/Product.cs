@@ -77,6 +77,10 @@ namespace EcommerceSystem.Models
         public double AverageRating { get; set; } = 0;
         public double ReviewCount   { get; set; } = 0;
 
+        // Soft delete fields
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
         // ── Nested types ─────────────────────────────────────────────────────
 
         /// <summary>Stock entry for one combination, e.g. { keys:["Black","M"], stock:10 }</summary>
