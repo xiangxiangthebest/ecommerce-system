@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using EcommerceSystem.Enums;
 using EcommerceSystem.Models;
+
 using EcommerceSystem.Models.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -20,6 +21,8 @@ namespace EcommerceSystem.Controllers
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
         private readonly IReturnImageStorage _returnImageStorage;
+        private readonly INotificationService _notificationService;
+
 
         public CustomerController(
             ICustomerContext customerContext,
@@ -28,7 +31,8 @@ namespace EcommerceSystem.Controllers
             IOrderService orderService,
             IReviewService reviewService,
             IProfileService profileService,
-            IReturnImageStorage returnImageStorage)
+            IReturnImageStorage returnImageStorage,
+            INotificationService notificationService)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -37,6 +41,7 @@ namespace EcommerceSystem.Controllers
             _reviewService = reviewService;
             _profileService = profileService;
             _returnImageStorage = returnImageStorage;
+            _notificationService = notificationService; 
         }
 
         // =========================
@@ -481,11 +486,10 @@ namespace EcommerceSystem.Controllers
         // =========================
         // CHAT
         // =========================
-        public async Task<IActionResult> Chat()
+        public IActionResult Chat()
         {
-            await LoadCartCountAsync();
-
-            return View();
+            // 顾客点击导航栏的“聊天”或者进入 /Customer/Chat 时，后端自动重定向到 Chat 控制器的 CustomerInbox 方法
+            return RedirectToAction("CustomerInbox", "Chat");
         }
 
         // =========================
@@ -494,8 +498,16 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> Notifications()
         {
             await LoadCartCountAsync();
-            
-            return View();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            // Pass the full list to the view so it can render server-side,
+            // AND the JS dropdown still works via /Notifications/GetDropdown
+            var notifications = await _notificationService.GetForUserAsync(customer.UserId)
+                                ?? new List<EcommerceSystem.Models.Notification>();
+            return View(notifications);
         }
+
     }
 }

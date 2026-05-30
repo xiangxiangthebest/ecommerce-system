@@ -85,6 +85,7 @@
     }).ToList();
 
     var orderDataJson = JsonSerializer.Serialize(orderData, new JsonSerializerOptions { WriteIndented = false });
+    var urlSearchString = Context.Request.Query["searchString"].ToString();
 }
 
 @functions {
@@ -211,7 +212,7 @@
         </div>
         <div class="ph-search-wrap">
             <i class="ti ti-search"></i>
-            <input type="text" id="phSearch" placeholder="Search by order ID or product…" />
+            <input type="text" id="phSearchInput" class="ph-search-input" value="@urlSearchString" placeholder="Search by Order ID or Product Name...">
         </div>
     </div>
 

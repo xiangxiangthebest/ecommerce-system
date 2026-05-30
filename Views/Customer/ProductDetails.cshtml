@@ -248,6 +248,21 @@
                 </form>
             </div>
 
+
+       <form asp-controller="Chat" asp-action="StartConversation" method="post">
+    @Html.AntiForgeryToken()
+
+    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+
+    <input type="hidden" name="productId" value="@Model.ProductId" />
+
+    <input type="hidden" id="chatVariationJson" name="variationJson" value="{}" />
+
+    <button class="pd-chat-seller-btn" type="submit">
+        <i class="ti ti-message"></i> Chat with Seller
+    </button>
+</form>
+
             <div class="pd-trust">
                 <div class="pd-trust-item">
                     <i class="ti ti-truck-delivery"></i>
