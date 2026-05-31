@@ -7,105 +7,97 @@
 
 <div class="auth-container">
 
+    <div class="auth-brand">
+        <div class="auth-brand-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 01-8 0"/>
+            </svg>
+        </div>
+        <span class="auth-brand-name">MMU Shop</span>
+    </div>
+
     <div class="auth-card">
 
         <div class="auth-top">
-            <div class="auth-badge">@role Portal</div>
-
-            <h1>Login</h1>
-
-            <p>
-                Sign in to continue accessing your dashboard and services.
-            </p>
+            <div class="auth-badge">
+                <span class="auth-badge-dot"></span>
+                @role Portal
+            </div>
+            <h1>Sign in</h1>
+            <p>Enter your credentials to access your workspace.</p>
         </div>
 
         @if (ViewBag.Error != null)
         {
             <div class="error-message">
+                <i class="ti ti-alert-circle"></i>
                 @ViewBag.Error
             </div>
         }
 
         <form asp-controller="Auth" asp-action="Login" method="post" class="auth-form">
             @Html.AntiForgeryToken()
-
             <input type="hidden" name="role" value="@role" />
 
             <div class="form-group">
-                <label>Email Address</label>
+                <label>Email address</label>
                 <input type="email"
                        name="email"
-                       placeholder="Enter your email"
+                       placeholder="you@example.com"
                        required />
             </div>
 
             <div class="form-group">
                 <label>Password</label>
-
                 <div class="password-wrapper">
-
                     <input type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Enter your password"
-                        required />
-
-                    <span class="toggle-password"
-                        onclick="togglePassword('password', this)">
-                        <i class="fa-solid fa-eye"></i>
+                           id="password"
+                           name="password"
+                           placeholder="Enter your password"
+                           required />
+                    <span class="toggle-password" onclick="togglePassword('password', this)">
+                        <i class="ti ti-eye"></i>
                     </span>
-
                 </div>
             </div>
 
-            <button type="submit" class="auth-btn">
-                Login
-            </button>
-
+            <button type="submit" class="auth-btn">Sign in</button>
         </form>
-
-        <script>
-            function togglePassword(inputId, element) {
-
-                const input = document.getElementById(inputId);
-                const icon = element.querySelector("i");
-
-                if (input.type === "password") {
-                    input.type = "text";
-
-                    icon.classList.remove("fa-eye");
-                    icon.classList.add("fa-eye-slash");
-                }
-                else {
-                    input.type = "password";
-
-                    icon.classList.remove("fa-eye-slash");
-                    icon.classList.add("fa-eye");
-                }
-            }
-        </script>
 
         @if (role == "Customer" || role == "Seller")
         {
+            <div class="auth-divider"></div>
             <div class="auth-bottom">
-                <span>Don't have an account?</span>
-
+                Don't have an account?
                 @if (role == "Customer")
                 {
-                    <a href="/Auth/RegisterCustomer">
-                        Sign Up
-                    </a>
+                    <a href="/Auth/RegisterCustomer">Create account</a>
                 }
-
                 @if (role == "Seller")
                 {
-                    <a href="/Auth/RegisterSeller">
-                        Sign Up
-                    </a>
+                    <a href="/Auth/RegisterSeller">Create account</a>
                 }
             </div>
         }
 
     </div>
-    
+
+    <p class="auth-footer">© 2026 CSE6234 TT5L Group 4. All rights reserved.</p>
+
 </div>
+
+<script>
+    function togglePassword(inputId, el) {
+        const input = document.getElementById(inputId);
+        const icon  = el.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('ti-eye', 'ti-eye-off');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('ti-eye-off', 'ti-eye');
+        }
+    }
+</script>

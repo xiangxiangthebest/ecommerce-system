@@ -5,70 +5,78 @@
 <link rel="stylesheet" href="~/css/home.css" />
 
 <div class="home-wrapper">
-    
-    <main class="home-main">
 
-        <div class="home-hero">
-            <div class="hero-tag">
-                <span class="hero-tag-line"></span>
-                Commerce Platform
-            </div>
-            <h1>Welcome.<br />Who are <span>you today?</span></h1>
-            <p>Pick your role below to sign in and access your tailored workspace.</p>
+    <div class="home-brand">
+        <div class="brand-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 01-8 0"/>
+            </svg>
+        </div>
+        <span class="brand-name">MMU Shop</span>
+    </div>
+
+    <div class="home-card">
+
+        <div class="home-card-header">
+            <h1>Sign in</h1>
+            <p>Choose your role to continue</p>
         </div>
 
-        <nav class="role-grid" aria-label="Role selection">
+        <nav class="role-list" aria-label="Role selection">
 
             <a class="role-card" href="/Auth/Login?role=Customer">
-                <div class="role-num">01</div>
-                <div>
-                    <div class="role-label">Customer</div>
-                    <div class="role-desc">Shop, place orders &amp; track your deliveries</div>
+                <div class="role-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
                 </div>
-                <div class="card-footer">
-                    <span class="card-cta">Sign In</span>
-                    <span class="card-arrow">↗</span>
-                </div>
+                <span class="role-label">Customer</span>
+                <span class="role-arrow">›</span>
             </a>
 
             <a class="role-card" href="/Auth/Login?role=Seller">
-                <div class="role-num">02</div>
-                <div>
-                    <div class="role-label">Seller</div>
-                    <div class="role-desc">Manage listings, inventory &amp; fulfilment</div>
+                <div class="role-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M20 12V22H4V12"/>
+                        <path d="M22 7H2v5h20V7z"/>
+                        <path d="M12 22V7"/>
+                        <path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/>
+                        <path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>
+                    </svg>
                 </div>
-                <div class="card-footer">
-                    <span class="card-cta">Sign In</span>
-                    <span class="card-arrow">↗</span>
-                </div>
+                <span class="role-label">Seller</span>
+                <span class="role-arrow">›</span>
             </a>
 
+            <div class="role-divider"></div>
+
             <a class="role-card" href="/Auth/Login?role=CustomerService">
-                <div class="role-num">03</div>
-                <div>
-                    <div class="role-label">Customer Service</div>
-                    <div class="role-desc">Handle inquiries, disputes &amp; support tickets</div>
+                <div class="role-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
                 </div>
-                <div class="card-footer">
-                    <span class="card-cta">Sign In</span>
-                    <span class="card-arrow">↗</span>
-                </div>
+                <span class="role-label">Customer Service</span>
+                <span class="role-arrow">›</span>
             </a>
 
             <a class="role-card" href="/Auth/Login?role=Admin">
-                <div class="role-num">04</div>
-                <div>
-                    <div class="role-label">Admin</div>
-                    <div class="role-desc">Platform oversight, users &amp; configuration</div>
+                <div class="role-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
                 </div>
-                <div class="card-footer">
-                    <span class="card-cta">Sign In</span>
-                    <span class="card-arrow">↗</span>
-                </div>
+                <span class="role-label">Admin</span>
+                <span class="role-arrow">›</span>
             </a>
 
         </nav>
 
-    </main>
+    </div>
+
+    <p class="home-footer">© 2026 CSE6234 TT5L Group 4. All rights reserved.</p>
 
 </div>
