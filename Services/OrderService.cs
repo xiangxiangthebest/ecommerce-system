@@ -181,6 +181,9 @@ namespace EcommerceSystem.Services
 
             var groupedBySeller = itemsToPurchase.GroupBy(i => new { i.Product!.SellerId, i.Product.Seller!.ShopName });
 
+            // Collect placed order IDs so we can notify after the transaction commits.
+            var placedOrderIds = new List<int>();
+
             await using var tx = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -254,29 +257,126 @@ namespace EcommerceSystem.Services
 
                     await _context.SaveChangesAsync();
 
-                    // ── Reload order with navigation properties so observers can build messages ──
-                    var orderWithDetails = await _context.Order
-                        .Include(o => o.Customer)
-                        .Include(o => o.Seller)
-                        .Include(o => o.OrderItems)
-                            .ThenInclude(oi => oi.Product)
-                        .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
-
-                    if (orderWithDetails != null)
-                    {
-                        AttachObservers(orderWithDetails);
-                        orderWithDetails.SetStatus(OrderStatus.PENDING);
-                    }
+                    placedOrderIds.Add(order.OrderId);
                 }
 
                 await tx.CommitAsync();
-                return OperationResult.Ok();
             }
             catch
             {
                 await tx.RollbackAsync();
                 return OperationResult.Fail("Failed to place order. Please try again.");
             }
+
+            // ── Send PENDING notifications AFTER the transaction has committed ──
+            // Failures here never roll back the order — the purchase is already saved.
+            //
+            // WHY we call _notificationService.CreateAsync() directly instead of
+            // going through the observer Update() methods:
+            //
+            //   1. SetStatus(PENDING) is a no-op because the order is already saved
+            //      as PENDING — SetStatus() guards against same-status transitions.
+            //
+            //   2. The observer Update() methods are declared as `async void`, which
+            //      means they cannot be awaited. Calling them fires-and-forgets on a
+            //      background thread, so the DB write may never complete before the
+            //      HTTP response returns, and any exception is silently swallowed.
+            //
+            // Calling CreateAsync() directly here ensures every notification is
+            // properly awaited and any failure is caught and logged.
+            foreach (var orderId in placedOrderIds)
+            {
+                try
+                {
+                    var o = await _context.Order
+                        .Include(o => o.Customer)
+                        .Include(o => o.Seller)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Product)
+                        .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+                    if (o == null) continue;
+
+                    var shopName    = o.Seller?.ShopName                  ?? "the seller";
+                    var sellerId    = o.Seller?.UserId;
+                    var sellerIdStr = o.Seller?.UserId.ToString()          ?? "N/A";
+                    var customerId  = o.Customer?.UserId;
+                    var customerName= o.Customer?.FullName                 ?? "Unknown Customer";
+                    var customerIdStr = o.Customer?.UserId.ToString()      ?? "N/A";
+                    var total       = o.TotalAmount;
+
+                    // Build product list with variation details
+                    // e.g. "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
+                    var productList = "N/A";
+                    if (o.OrderItems != null && o.OrderItems.Any())
+                    {
+                        var entries = o.OrderItems
+                            .Where(oi => oi.Product != null)
+                            .Select(oi =>
+                            {
+                                var name = oi.Product.Name;
+                                var varSuffix = BuildVariationSuffix(oi.SelectedVariation);
+                                return string.IsNullOrEmpty(varSuffix)
+                                    ? name
+                                    : $"{name} ({varSuffix})";
+                            })
+                            .ToList();
+                        if (entries.Any())
+                            productList = string.Join(", ", entries);
+                    }
+
+                    // ── Customer: "Order Placed" ───────────────────────────────
+                    if (customerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  customerId.Value,
+                            title:   "Order Placed",
+                            message: $"Order #{orderId}\n" +
+                                     $"Shop: {shopName}\n" +
+                                     $"Product(s): {productList}\n" +
+                                     $"Total: RM{total:F2}\n" +
+                                     $"Status: Pending"
+                        );
+                    }
+
+                    // ── Seller: "New Order Alert" ──────────────────────────────
+                    if (sellerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  sellerId.Value,
+                            title:   "🛒 New Order Alert",
+                            message: $"Order #{orderId}\n" +
+                                     $"Customer ID: {customerIdStr}\n" +
+                                     $"Customer Name: {customerName}\n" +
+                                     $"Product(s) Ordered: {productList}\n" +
+                                     $"Total: RM{total:F2}"
+                        );
+                    }
+
+                    // ── All Admins: "New Order Placed" ─────────────────────────
+                    var adminIds = await _context.Users
+                        .Where(u => u.Role == "Admin" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+
+                    foreach (var adminId in adminIds)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  adminId,
+                            title:   "New Order Placed",
+                            message: $"Customer #{customerIdStr} ({customerName}) has placed an order " +
+                                     $"at {shopName} (Seller #{sellerIdStr}). " +
+                                     $"Product(s): {productList}. Total: RM{total:F2}"
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[OrderService] PENDING notification failed for order #{orderId}: {ex.Message}");
+                }
+            }
+
+            return OperationResult.Ok();
         }
 
         public async Task<List<Order>> GetPurchaseHistoryAsync(int customerId)
@@ -424,6 +524,33 @@ namespace EcommerceSystem.Services
             await _context.SaveChangesAsync();
 
             return OperationResult.Ok();
+        }
+
+        // Parses SelectedVariation JSON like {"Flavour":"Honey","Size":"Large"}
+        // Returns "Flavour: Honey, Size: Large" or empty string if no variations.
+        private static string BuildVariationSuffix(string? selectedVariationJson)
+        {
+            if (string.IsNullOrWhiteSpace(selectedVariationJson)
+                || selectedVariationJson == "{}"
+                || selectedVariationJson == "null")
+                return string.Empty;
+
+            try
+            {
+                var dict = System.Text.Json.JsonSerializer
+                    .Deserialize<Dictionary<string, string>>(selectedVariationJson);
+
+                if (dict == null || dict.Count == 0)
+                    return string.Empty;
+
+                return string.Join(", ", dict
+                    .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                    .Select(kv => $"{kv.Key}: {kv.Value}"));
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

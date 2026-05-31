@@ -1,4 +1,3 @@
-using System;
 using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 
@@ -120,18 +119,54 @@ namespace EcommerceSystem.Observers
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
+        // ── Builds a product list with variation details ─────────────────────
+        // Example output: "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
         private static string BuildProductList(Order order)
         {
             if (order.OrderItems == null || !order.OrderItems.Any())
                 return "N/A";
 
-            var names = order.OrderItems
+            var entries = order.OrderItems
                 .Where(oi => oi.Product != null)
-                .Select(oi => oi.Product.Name)
-                .Distinct()
+                .Select(oi =>
+                {
+                    var name = oi.Product.Name;
+                    var variationSuffix = BuildVariationSuffix(oi.SelectedVariation);
+                    return string.IsNullOrEmpty(variationSuffix)
+                        ? name
+                        : $"{name} ({variationSuffix})";
+                })
                 .ToList();
 
-            return names.Any() ? string.Join(", ", names) : "N/A";
+            return entries.Any() ? string.Join(", ", entries) : "N/A";
+        }
+
+        // Parses SelectedVariation JSON like {"Flavour":"Honey","Size":"Large"}
+        // and returns a readable string like "Flavour: Honey, Size: Large".
+        // Returns empty string if there are no variations or JSON is empty/invalid.
+        private static string BuildVariationSuffix(string? selectedVariationJson)
+        {
+            if (string.IsNullOrWhiteSpace(selectedVariationJson)
+                || selectedVariationJson == "{}"
+                || selectedVariationJson == "null")
+                return string.Empty;
+
+            try
+            {
+                var dict = System.Text.Json.JsonSerializer
+                    .Deserialize<Dictionary<string, string>>(selectedVariationJson);
+
+                if (dict == null || dict.Count == 0)
+                    return string.Empty;
+
+                return string.Join(", ", dict
+                    .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
+                    .Select(kv => $"{kv.Key}: {kv.Value}"));
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }
