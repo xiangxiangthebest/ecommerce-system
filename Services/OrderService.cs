@@ -3,6 +3,7 @@ using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Enums;
+using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Services
@@ -10,10 +11,12 @@ namespace EcommerceSystem.Services
     public class OrderService : IOrderService
     {
         private readonly AppDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public OrderService(AppDbContext context)
+        public OrderService(AppDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         // ── Deducts stock from the matching combo inside VariationCombosJson ──
@@ -119,6 +122,15 @@ namespace EcommerceSystem.Services
             }
         }
 
+        // ── Attaches all three observers to an order ──
+        // Call this before order.SetStatus() so all parties are notified.
+        private void AttachObservers(Order order)
+        {
+            order.Attach(new CustomerDashboardObserver(_notificationService));
+            order.Attach(new SellerDashboardObserver(_notificationService));
+            order.Attach(new AdminPanelObserver(_notificationService, _context));
+        }
+
         public async Task<OperationResult> PlaceOrderAsync(PlaceOrderRequest request)
         {
             var address = await _context.DeliveryField
@@ -204,7 +216,7 @@ namespace EcommerceSystem.Services
                     };
 
                     _context.Order.Add(order);
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync();  // generates order.OrderId
 
                     foreach (var item in group)
                     {
@@ -241,6 +253,20 @@ namespace EcommerceSystem.Services
                     }
 
                     await _context.SaveChangesAsync();
+
+                    // ── Reload order with navigation properties so observers can build messages ──
+                    var orderWithDetails = await _context.Order
+                        .Include(o => o.Customer)
+                        .Include(o => o.Seller)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Product)
+                        .FirstOrDefaultAsync(o => o.OrderId == order.OrderId);
+
+                    if (orderWithDetails != null)
+                    {
+                        AttachObservers(orderWithDetails);
+                        orderWithDetails.SetStatus(OrderStatus.PENDING);
+                    }
                 }
 
                 await tx.CommitAsync();
@@ -293,7 +319,10 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Please provide a cancellation reason.");
 
             var order = await _context.Order
+                .Include(o => o.Customer)
+                .Include(o => o.Seller)
                 .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                        && o.CustomerUserId == customerId
                                        && o.CurrentStatus == OrderStatus.PENDING);
@@ -324,9 +353,12 @@ namespace EcommerceSystem.Services
                 }
             }
 
-            order.CurrentStatus = OrderStatus.CANCELED;
             order.CancelReason = reason.Trim();
             order.CanceledAt = DateTime.UtcNow;
+
+            // ── Notify all parties then persist ──
+            AttachObservers(order);
+            order.SetStatus(OrderStatus.CANCELED);
 
             await _context.SaveChangesAsync();
 
@@ -336,6 +368,10 @@ namespace EcommerceSystem.Services
         public async Task<OperationResult> ConfirmReceivedAsync(int customerId, int orderId)
         {
             var order = await _context.Order
+                .Include(o => o.Customer)
+                .Include(o => o.Seller)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                        && o.CustomerUserId == customerId
                                        && o.CurrentStatus == OrderStatus.DELIVERED);
@@ -343,8 +379,11 @@ namespace EcommerceSystem.Services
             if (order == null)
                 return OperationResult.Fail("Order not found or already confirmed.");
 
-            order.CurrentStatus = OrderStatus.RECEIVED;
             order.ReceivedAt = DateTime.UtcNow;
+
+            // ── Notify all parties then persist ──
+            AttachObservers(order);
+            order.SetStatus(OrderStatus.RECEIVED);
 
             await _context.SaveChangesAsync();
 
@@ -357,6 +396,10 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Please provide a return/refund reason.");
 
             var order = await _context.Order
+                .Include(o => o.Customer)
+                .Include(o => o.Seller)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o =>
                     o.OrderId == orderId &&
                     o.CustomerUserId == userId);
@@ -374,7 +417,9 @@ namespace EcommerceSystem.Services
             order.ReturnInitiatedAt = DateTime.UtcNow;
             order.ReturnInitiatedBy = initiatedBy;
 
-            order.CurrentStatus = OrderStatus.RETURN_REFUND;
+            // ── Notify all parties then persist ──
+            AttachObservers(order);
+            order.SetStatus(OrderStatus.RETURN_REFUND);
 
             await _context.SaveChangesAsync();
 
