@@ -124,11 +124,27 @@
 
             <div class="pd-divider"></div>
 
-            <div class="pd-shop-row">
-                <div class="pd-shop-avatar">@shopInitial</div>
-                <span class="pd-shop-name">
-                    Sold by <strong>@(Model.Seller?.ShopName ?? "Unknown Shop")</strong>
-                </span>
+            <div class="pd-chat-section">
+                <div class="pd-chat-seller-info">
+                    <div class="pd-chat-avatar">@shopInitial</div>
+                    <div class="pd-chat-meta">
+                        <span class="pd-chat-meta-name">@(Model.Seller?.ShopName ?? "Unknown Shop")</span>
+                        <span class="pd-chat-meta-sub">
+                            <span class="pd-chat-online-dot"></span>@(Model.Seller?.State ?? "Unknown location")
+                        </span>
+                    </div>
+                </div>
+
+                <form asp-controller="Chat" asp-action="StartConversation" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <input type="hidden" id="chatVariationJson" name="variationJson" value="{}" />
+                    <button class="pd-chat-seller-btn" type="submit">
+                        <i class="ti ti-message-circle-2"></i>
+                        Chat with Seller
+                    </button>
+                </form>
             </div>
 
             <div class="pd-price-block">
@@ -247,21 +263,6 @@
                     </button>
                 </form>
             </div>
-
-
-       <form asp-controller="Chat" asp-action="StartConversation" method="post">
-    @Html.AntiForgeryToken()
-
-    <input type="hidden" name="sellerId" value="@Model.SellerId" />
-
-    <input type="hidden" name="productId" value="@Model.ProductId" />
-
-    <input type="hidden" id="chatVariationJson" name="variationJson" value="{}" />
-
-    <button class="pd-chat-seller-btn" type="submit">
-        <i class="ti ti-message"></i> Chat with Seller
-    </button>
-</form>
 
             <div class="pd-trust">
                 <div class="pd-trust-item">

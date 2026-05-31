@@ -25,7 +25,7 @@ namespace EcommerceSystem.Services
             var query = _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Seller)
-                .Where(p => !p.IsDraft && p.Seller != null && p.Seller.IsApproved);
+                .Where(p => !p.IsDraft && !p.IsDeleted && p.Seller != null && p.Seller.IsApproved);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -46,7 +46,7 @@ namespace EcommerceSystem.Services
             var product = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Seller)
-                .FirstOrDefaultAsync(p => p.ProductId == productId && !p.IsDraft);
+                .FirstOrDefaultAsync(p => p.ProductId == productId && !p.IsDraft && !p.IsDeleted);
 
             if (product == null) return null;
 
@@ -84,7 +84,7 @@ namespace EcommerceSystem.Services
             var product = await _context.Products
                 .Include(p => p.Category)
                 .Include(p => p.Seller)
-                .FirstOrDefaultAsync(p => p.ProductId == productId && !p.IsDraft);
+                .FirstOrDefaultAsync(p => p.ProductId == productId && !p.IsDraft && !p.IsDeleted);
 
             if (product == null) return null;
 

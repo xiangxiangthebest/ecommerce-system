@@ -115,6 +115,9 @@
 </div>
 
 <div class="modal-footer" style="background: #f9fafb; border-top: 1px solid rgba(100,200,255,0.15); padding: 1.5rem;">
+    <a href="@Url.Action("ViewSellerProducts", "Admin", new { id = Model.UserId })" class="glass-btn primary btn-sm">
+        <i class="fas fa-box me-1"></i> View Products
+    </a>
     <button type="button" class="glass-btn secondary btn-sm" data-bs-dismiss="modal">
         <i class="fas fa-times me-1"></i> Close
     </button>

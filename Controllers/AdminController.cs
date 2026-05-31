@@ -244,6 +244,147 @@ namespace EcommerceSystem.Controllers
             return PartialView("SellerDetails", seller);
         }
 
+        // Inventory Review - View all products from all sellers
+        public async Task<IActionResult> InventoryReview(string searchTerm, string statusFilter, string stockFilter, string deleteFilter)
+        {
+            var query = _context.Products.Include(p => p.Seller).Include(p => p.Category).AsQueryable();
+
+            // 1. Keyword Search (Product Name, SKU, or Shop Name)
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                query = query.Where(p =>
+                    p.Name.Contains(searchTerm) ||
+                    p.SKU.Contains(searchTerm) ||
+                    p.Seller.ShopName.Contains(searchTerm));
+            }
+
+            // 2. Deleted Filter (Active, Deleted, or All)
+            if (!string.IsNullOrEmpty(deleteFilter))
+            {
+                query = deleteFilter switch
+                {
+                    "Active" => query.Where(p => !p.IsDeleted),
+                    "Deleted" => query.Where(p => p.IsDeleted),
+                    _ => query  // "All" or any other value shows all products
+                };
+            }
+            else
+            {
+                // Default: show only active products
+                query = query.Where(p => !p.IsDeleted);
+            }
+
+            // 3. Status Filter (Draft, Published)
+            if (!string.IsNullOrEmpty(statusFilter))
+            {
+                query = statusFilter switch
+                {
+                    "Draft" => query.Where(p => p.IsDraft),
+                    "Published" => query.Where(p => !p.IsDraft),
+                    _ => query
+                };
+            }
+
+            // 4. Stock Filter
+            if (!string.IsNullOrEmpty(stockFilter))
+            {
+                query = stockFilter switch
+                {
+                    "OutOfStock" => query.Where(p => p.StockQuantity == 0),
+                    "LowStock" => query.Where(p => p.StockQuantity > 0 && p.StockQuantity < 10),
+                    "InStock" => query.Where(p => p.StockQuantity >= 10),
+                    _ => query
+                };
+            }
+
+            var products = await query.OrderByDescending(p => p.ProductId).ToListAsync();
+
+            // Calculate statistics (all products)
+            var allProducts = await _context.Products.Where(p => !p.IsDeleted).ToListAsync();
+            ViewBag.TotalProducts = allProducts.Count;
+            ViewBag.PublishedCount = allProducts.Count(p => !p.IsDraft);
+            ViewBag.DraftCount = allProducts.Count(p => p.IsDraft);
+            ViewBag.OutOfStockCount = allProducts.Count(p => p.StockQuantity == 0);
+            ViewBag.LowStockCount = allProducts.Count(p => p.StockQuantity > 0 && p.StockQuantity < 10);
+            ViewBag.DeletedCount = await _context.Products.CountAsync(p => p.IsDeleted);
+
+            ViewBag.SearchTerm = searchTerm;
+            ViewBag.StatusFilter = statusFilter;
+            ViewBag.StockFilter = stockFilter;
+            ViewBag.DeleteFilter = deleteFilter;
+
+            return View(products);
+        }
+
+        // View Seller Products and Stock
+        public async Task<IActionResult> ViewSellerProducts(int id)
+        {
+            var seller = await _context.Seller.FirstOrDefaultAsync(s => s.UserId == id);
+            if (seller == null)
+            {
+                TempData["AdminError"] = "Seller not found.";
+                return RedirectToAction("ManageSellers");
+            }
+
+            // Fetch all products uploaded by the seller (including drafts)
+            var products = await _context.Products
+                .Include(p => p.Category)
+                .Where(p => p.SellerId == id)
+                .OrderByDescending(p => p.ProductId)
+                .ToListAsync();
+
+            ViewBag.Seller = seller;
+            ViewBag.ProductCount = products.Count;
+            
+            return View(products);
+        }
+
+        // Delete Product (Soft Delete)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                TempData["AdminError"] = "Product not found.";
+                return RedirectToAction("InventoryReview");
+            }
+
+            // Soft delete
+            product.IsDeleted = true;
+            product.DeletedAt = DateTime.Now;
+
+            _context.Products.Update(product);
+            await _context.SaveChangesAsync();
+
+            TempData["AdminSuccess"] = $"Product '{product.Name}' has been deleted.";
+            return RedirectToAction("InventoryReview");
+        }
+
+        // Restore Product (Undo Soft Delete)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RestoreProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                TempData["AdminError"] = "Product not found.";
+                return RedirectToAction("InventoryReview");
+            }
+
+            // Restore
+            product.IsDeleted = false;
+            product.DeletedAt = null;
+
+            _context.Products.Update(product);
+            await _context.SaveChangesAsync();
+
+            TempData["AdminSuccess"] = $"Product '{product.Name}' has been restored.";
+            return RedirectToAction("InventoryReview");
+        }
+
         // System Settings
         public IActionResult Home()
         {

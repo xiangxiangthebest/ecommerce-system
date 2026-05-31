@@ -32,6 +32,8 @@ namespace EcommerceSystem.Services
 
             var product = await _context.Products.FindAsync(productId);
             if (product == null) return OperationResult.Fail("Product not found.");
+            if (product.IsDeleted) return OperationResult.Fail("This product has been deleted.");
+            if (product.IsDraft) return OperationResult.Fail("This product is not yet available.");
 
             var cart = await _context.Cart
                 .Include(c => c.CartItems)
@@ -140,6 +142,8 @@ namespace EcommerceSystem.Services
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return OperationResult<Checkout>.Fail("Product not found.");
+            if (product.IsDeleted) return OperationResult<Checkout>.Fail("This product has been deleted.");
+            if (product.IsDraft) return OperationResult<Checkout>.Fail("This product is not yet available.");
 
             var buyNowItem = new CartItem
             {
