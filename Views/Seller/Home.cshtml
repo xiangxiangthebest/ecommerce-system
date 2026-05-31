@@ -17,6 +17,11 @@
                     <span class="nav-text">General</span>
                 </a>
             </li>
+            <li class="@(ViewBag.ActiveTab == "Profile" ? "active" : "")">
+                <a href="@Url.Action("Home", "Seller", new { tab = "Profile" })">
+                    <span class="nav-text">Profile</span>
+                </a>
+            </li>
             @if (isApproved)
             {
                 <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
@@ -431,6 +436,101 @@
                 }
             }
             </script>
+        }
+        else if (ViewBag.ActiveTab == "Profile")
+        {
+            var profileSeller = ViewBag.ProfileSeller as EcommerceSystem.Models.Seller;
+
+            <div class="details-container" style="max-width:620px; margin:0 auto;">
+                <h1 class="welcome-text" style="font-size:28px; text-align:center;">My Profile</h1>
+                <div class="separator"></div>
+
+                @if (TempData["ProfileError"] != null)
+                {
+                    <div class="alert-banner alert-error" style="margin-bottom:18px;">
+                        <i class="fas fa-exclamation-circle"></i> @TempData["ProfileError"]
+                    </div>
+                }
+                @if (TempData["ProfileSuccess"] != null)
+                {
+                    <div class="alert-banner alert-success" style="margin-bottom:18px;">
+                        <i class="fas fa-check-circle"></i> @TempData["ProfileSuccess"]
+                    </div>
+                }
+
+                @* ── Read-only fields ── *@
+                <div class="profile-field">
+                    <label class="profile-label">Full Name</label>
+                    <div class="profile-value">@(profileSeller?.FullName ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">Email</label>
+                    <div class="profile-value">@(profileSeller?.Email ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">Contact Number</label>
+                    <div class="profile-value">@(profileSeller?.PhoneNumber ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">TIN Number</label>
+                    <div class="profile-value">@(profileSeller?.TIN ?? "—")</div>
+                </div>
+
+                <div class="separator" style="margin:22px 0;"></div>
+
+                @* ── Editable address field only ── *@
+                <form asp-action="UpdateAddress" asp-controller="Seller" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="profile-field">
+                        <label class="profile-label" for="address">
+                            Address
+                            <span style="color:#6366f1;font-size:11px;font-weight:600;
+                                         text-transform:none;letter-spacing:0;margin-left:6px;">
+                                (editable)
+                            </span>
+                        </label>
+                        <textarea id="address" name="address" rows="3"
+                                  style="width:100%;padding:10px 14px;
+                                         border:1.5px solid #e0e0f0;border-radius:10px;
+                                         font-size:14px;resize:vertical;font-family:inherit;
+                                         color:#1e1b4b;outline:none;transition:border-color .2s;"
+                                  onfocus="this.style.borderColor='#6366f1'"
+                                  onblur="this.style.borderColor='#e0e0f0'">@(profileSeller?.PickupAddress)</textarea>
+                    </div>
+                    <button type="submit"
+                            style="margin-top:10px;background:#1e1b4b;color:#fff;border:none;
+                                   padding:10px 28px;border-radius:8px;font-size:14px;
+                                   font-weight:700;cursor:pointer;transition:background .2s;"
+                            onmouseover="this.style.background='#312e81'"
+                            onmouseout="this.style.background='#1e1b4b'">
+                        <i class="fas fa-save" style="margin-right:6px;"></i>Save Address
+                    </button>
+                </form>
+            </div>
+
+            <style>
+                .profile-field {
+                    margin-bottom: 18px;
+                }
+                .profile-label {
+                    display: block;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #9a98b6;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    margin-bottom: 6px;
+                }
+                .profile-value {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #1e1b4b;
+                    background: #f5f5fb;
+                    padding: 10px 14px;
+                    border-radius: 10px;
+                    border: 1.5px solid #e8eaf6;
+                }
+            </style>
         }
         else
         {

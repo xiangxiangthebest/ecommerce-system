@@ -112,12 +112,17 @@ namespace EcommerceSystem.Controllers
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
 
-            if (!seller.IsApproved && tab != "General")
+            if (!seller.IsApproved && tab != "General" && tab != "Profile")
                 tab = "General";
 
             ViewBag.ActiveTab  = tab;
             ViewBag.ShopName   = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
+
+            if (tab == "Profile")
+            {
+                ViewBag.ProfileSeller = seller;
+            }
 
             if (seller.IsApproved)
             {
@@ -141,6 +146,33 @@ namespace EcommerceSystem.Controllers
             }
 
             return View();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // SELLER PROFILE — Update Address
+        //
+        // Only the Address field is editable.
+        // Email, ContactNumber, TINNumber, and FullName are read-only and are
+        // never bound from the form — they can only be changed by an admin.
+        // ─────────────────────────────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateAddress(string address)
+        {
+            var seller = await GetCurrentSellerAsync();
+            if (seller == null) return RedirectToAction("Login", "Auth");
+
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                TempData["ProfileError"] = "Address cannot be empty.";
+                return RedirectToAction("Home", new { tab = "Profile" });
+            }
+
+            seller.PickupAddress = address.Trim();
+            await _context.SaveChangesAsync();
+
+            TempData["ProfileSuccess"] = "Your address has been updated successfully.";
+            return RedirectToAction("Home", new { tab = "Profile" });
         }
 
         [HttpGet]
@@ -652,12 +684,18 @@ namespace EcommerceSystem.Controllers
  
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
             var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
- 
+
+            // ── Calculate the actual approved refund amount ───────────────────
+            // Sum only approved items × approved qty × unit price.
+            // This is what shows in the notification — NOT the full order total.
+            decimal approvedRefundAmount = 0;
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
- 
+
+                approvedRefundAmount += qty * orderItem.Price;
+
                 if (isReturnRefund)
                 {
                     // Physical return: restore the approved quantity to stock
@@ -667,11 +705,78 @@ namespace EcommerceSystem.Controllers
                 }
                 // RefundOnly: no stock change — items were not physically returned
             }
- 
+
             order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
             order.ReturnApprovedAt = DateTime.UtcNow;
  
             await _context.SaveChangesAsync();
+
+            // ── Notify Customer, Seller, and Admin after return approval ──────
+            // ReturnStatus moves to Approved but CurrentStatus stays RETURN_REFUND,
+            // so the standard observers won't fire — we send notifications directly.
+            try
+            {
+                // Reload with nav props so messages can include names/details
+                var orderWithDetails = await _context.Order
+                    .Include(o => o.Customer)
+                    .Include(o => o.Seller)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+                if (orderWithDetails != null)
+                {
+                    var returnTypeLabel = isReturnRefund ? "Return & Refund" : "Refund Only";
+                    var customerName    = orderWithDetails.Customer?.FullName ?? "Customer";
+                    var customerId      = orderWithDetails.Customer?.UserId;
+                    var sellerId        = orderWithDetails.Seller?.UserId;
+                    var shopName        = orderWithDetails.Seller?.ShopName   ?? "the seller";
+                    // Use the calculated approved amount, not the full order total
+                    var total           = approvedRefundAmount;
+
+                    // Notify Customer
+                    if (customerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  customerId.Value,
+                            title:   "Return & Refund Approved",
+                            message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
+                                     $"has been approved. Total: RM{total:F2}"
+                        );
+                    }
+
+                    // Notify Seller (confirmation echo)
+                    if (sellerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  sellerId.Value,
+                            title:   "Return & Refund Approved",
+                            message: $"You have approved the {returnTypeLabel} request for Order #{orderId} " +
+                                     $"from {customerName}. Total: RM{total:F2}"
+                        );
+                    }
+
+                    // Notify all Admins
+                    var adminIds = await _context.Users
+                        .Where(u => u.Role == "Admin" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+
+                    foreach (var adminId in adminIds)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  adminId,
+                            title:   "Return & Refund Approved",
+                            message: $"Order #{orderId} — {shopName} has approved a {returnTypeLabel} " +
+                                     $"request from {customerName}. Total: RM{total:F2}"
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SellerController] Return approval notification failed for order #{orderId}: {ex.Message}");
+            }
  
             var stockMsg = isReturnRefund
                 ? "Stock has been restored."
