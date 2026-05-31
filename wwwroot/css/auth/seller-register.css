@@ -495,3 +495,59 @@ body {
     .auth-card { padding: 1.5rem 1.25rem; }
     .form-row  { grid-template-columns: 1fr; }
 }
+
+/* ── Back button (shared with auth.css) ── */
+.auth-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    margin-bottom: 20px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+    align-self: flex-start;
+}
+
+.auth-back:hover {
+    background: rgba(0,0,0,0.05);
+    color: var(--ink);
+}
+
+.auth-back svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+/* ── Eye icon SVGs ── */
+.eye-icon, .eye-off-icon {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: block;
+}
+
+/* ── Error icon ── */
+.error-icon {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}

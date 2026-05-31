@@ -18,6 +18,12 @@
         </div>
     }
 
+    @* ── Back button ── *@
+    <a class="auth-back" href="http://localhost:5141/">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+    </a>
+
     @* ── Brand ── *@
     <div class="auth-brand">
         <div class="auth-brand-icon">
@@ -51,9 +57,7 @@
                 </div>
                 <span class="step-label">Seller info</span>
             </div>
-
             <div class="step-connector" id="connector"></div>
-
             <div class="step" id="step-indicator-2">
                 <div class="step-circle">
                     <span class="num">2</span>
@@ -66,7 +70,7 @@
         @if (ViewBag.Error != null)
         {
             <div class="error-message">
-                <i class="ti ti-alert-circle"></i>
+                <svg class="error-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 @ViewBag.Error
             </div>
         }
@@ -104,7 +108,6 @@
                         <input type="text" name="State" placeholder="Selangor" required />
                         <span class="field-reminder"></span>
                     </div>
-
                     <div class="form-group">
                         <label>Postal code</label>
                         <input type="text" name="PostalCode" placeholder="43200"
@@ -131,7 +134,8 @@
 
                 <div class="step-nav">
                     <button type="button" class="btn-next" onclick="goToStep(2)">
-                        Next <i class="ti ti-arrow-right"></i>
+                        Next
+                        <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                 </div>
 
@@ -179,7 +183,8 @@
                         <input type="password" id="password" name="Password"
                                placeholder="Create a password" required />
                         <span class="toggle-password" onclick="togglePassword('password', this)">
-                            <i class="ti ti-eye"></i>
+                            <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </span>
                     </div>
                     <span class="field-reminder"></span>
@@ -189,9 +194,10 @@
                     <label>Confirm password</label>
                     <div class="password-wrapper">
                         <input type="password" id="confirmPassword" name="ConfirmPassword"
-                               placeholder="Repeat your password" required />
+                               placeholder="Confirm your password" required />
                         <span class="toggle-password" onclick="togglePassword('confirmPassword', this)">
-                            <i class="ti ti-eye"></i>
+                            <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </span>
                     </div>
                     <span class="field-reminder"></span>
@@ -199,7 +205,8 @@
 
                 <div class="step-nav">
                     <button type="button" class="btn-back" onclick="goToStep(1)">
-                        <i class="ti ti-arrow-left"></i> Back
+                        <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                        Back
                     </button>
                     <button type="submit" class="btn-submit">Submit</button>
                 </div>
@@ -222,14 +229,17 @@
 
 <script>
 function togglePassword(inputId, el) {
-    const input = document.getElementById(inputId);
-    const icon  = el.querySelector('i');
+    const input  = document.getElementById(inputId);
+    const eyeOn  = el.querySelector('.eye-icon');
+    const eyeOff = el.querySelector('.eye-off-icon');
     if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('ti-eye', 'ti-eye-off');
+        input.type          = 'text';
+        eyeOn.style.display  = 'none';
+        eyeOff.style.display = 'block';
     } else {
-        input.type = 'password';
-        icon.classList.replace('ti-eye-off', 'ti-eye');
+        input.type          = 'password';
+        eyeOn.style.display  = 'block';
+        eyeOff.style.display = 'none';
     }
 }
 
@@ -259,18 +269,18 @@ function goToStep(step) {
         var address  = document.querySelector('textarea[name="DetailAddress"]');
         var tin      = document.querySelector('input[name="TIN"]');
 
-        if (!fullName.value.trim())                          { showError(fullName, 'Full name is required.'); isValid = false; if (!first) first = fullName; } else hideError(fullName);
-        if (!nric.value.trim() || nric.value.length !== 12) { showError(nric, 'NRIC must be exactly 12 digits.'); isValid = false; if (!first) first = nric; } else hideError(nric);
-        if (!state.value.trim())                             { showError(state, 'Please enter your state.'); isValid = false; if (!first) first = state; } else hideError(state);
-        if (!postal.value.trim() || postal.value.length !== 5) { showError(postal, 'Postal code must be exactly 5 digits.'); isValid = false; if (!first) first = postal; } else hideError(postal);
-        if (!address.value.trim())                           { showError(address, 'Detailed address is required.'); isValid = false; if (!first) first = address; } else hideError(address);
+        if (!fullName.value.trim())                              { showError(fullName, 'Full name is required.'); isValid = false; if (!first) first = fullName; } else hideError(fullName);
+        if (!nric.value.trim() || nric.value.length !== 12)     { showError(nric, 'NRIC must be exactly 12 digits.'); isValid = false; if (!first) first = nric; } else hideError(nric);
+        if (!state.value.trim())                                 { showError(state, 'Please enter your state.'); isValid = false; if (!first) first = state; } else hideError(state);
+        if (!postal.value.trim() || postal.value.length !== 5)  { showError(postal, 'Postal code must be exactly 5 digits.'); isValid = false; if (!first) first = postal; } else hideError(postal);
+        if (!address.value.trim())                               { showError(address, 'Detailed address is required.'); isValid = false; if (!first) first = address; } else hideError(address);
 
         var tinPattern = /^[A-Z]{1,2}[0-9]{10,12}$/;
-        if (!tin.value.trim())                              { showError(tin, 'TIN is required.'); isValid = false; if (!first) first = tin; }
+        if (!tin.value.trim())                               { showError(tin, 'TIN is required.'); isValid = false; if (!first) first = tin; }
         else if (!tinPattern.test(tin.value.toUpperCase())) { showError(tin, 'Invalid format (e.g. IG115002000).'); isValid = false; if (!first) first = tin; }
         else hideError(tin);
 
-        if (!isValid) { if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return; }
+        if (!isValid) { if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     }
 
     document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
@@ -285,7 +295,6 @@ function goToStep(step) {
         document.getElementById('step-indicator-1').classList.remove('completed');
         document.getElementById('connector').classList.remove('completed');
     }
-
     document.querySelector('.seller-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -298,24 +307,24 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
     var password        = document.querySelector('input[name="Password"]');
     var confirmPassword = document.querySelector('input[name="ConfirmPassword"]');
 
-    if (!shopName.value.trim()) { showError(shopName, 'Shop name is required.'); isValid = false; if (!first) first = shopName; } else hideError(shopName);
+    if (!shopName.value.trim())      { showError(shopName, 'Shop name is required.'); isValid = false; if (!first) first = shopName; } else hideError(shopName);
     if (!pickupAddress.value.trim()) { showError(pickupAddress, 'Pickup address is required.'); isValid = false; if (!first) first = pickupAddress; } else hideError(pickupAddress);
 
     var emailOk = /^[^\s]+@@[^\s]+\.[^\s]+$/.test(email.value.trim());
-    if (!email.value.trim()) { showError(email, 'Email address is required.'); isValid = false; if (!first) first = email; }
-    else if (!emailOk) { showError(email, 'Please enter a valid email address.'); isValid = false; if (!first) first = email; }
+    if (!email.value.trim())  { showError(email, 'Email address is required.'); isValid = false; if (!first) first = email; }
+    else if (!emailOk)        { showError(email, 'Please enter a valid email address.'); isValid = false; if (!first) first = email; }
     else hideError(email);
 
-    if (!phone.value.trim()) { showError(phone, 'Phone number is required.'); isValid = false; if (!first) first = phone; }
+    if (!phone.value.trim())                                     { showError(phone, 'Phone number is required.'); isValid = false; if (!first) first = phone; }
     else if (phone.value.length < 7 || phone.value.length > 10) { showError(phone, 'Phone must be 7–10 digits.'); isValid = false; if (!first) first = phone; }
     else hideError(phone);
 
-    if (!password.value.trim()) { showError(password, 'Password is required.'); isValid = false; if (!first) first = password; }
-    else if (password.value.length < 8) { showError(password, 'Password must be at least 8 characters.'); isValid = false; if (!first) first = password; }
+    if (!password.value.trim())          { showError(password, 'Password is required.'); isValid = false; if (!first) first = password; }
+    else if (password.value.length < 8)  { showError(password, 'Password must be at least 8 characters.'); isValid = false; if (!first) first = password; }
     else hideError(password);
 
-    if (!confirmPassword.value.trim()) { showError(confirmPassword, 'Please confirm your password.'); isValid = false; if (!first) first = confirmPassword; }
-    else if (confirmPassword.value !== password.value) { showError(confirmPassword, 'Passwords do not match.'); isValid = false; if (!first) first = confirmPassword; }
+    if (!confirmPassword.value.trim())                      { showError(confirmPassword, 'Please confirm your password.'); isValid = false; if (!first) first = confirmPassword; }
+    else if (confirmPassword.value !== password.value)      { showError(confirmPassword, 'Passwords do not match.'); isValid = false; if (!first) first = confirmPassword; }
     else hideError(confirmPassword);
 
     if (!isValid) { e.preventDefault(); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
@@ -340,9 +349,9 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
             var ctrl = ['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Home','End'];
             if (ctrl.indexOf(e.key) !== -1) return;
             var pos = tin.selectionStart, key = e.key.toUpperCase();
-            if (pos === 0 && !/^[A-Z]$/.test(key))      e.preventDefault();
+            if (pos === 0 && !/^[A-Z]$/.test(key))         e.preventDefault();
             else if (pos === 1 && !/^[A-Z0-9]$/.test(key)) e.preventDefault();
-            else if (pos >= 2 && !/^[0-9]$/.test(key))  e.preventDefault();
+            else if (pos >= 2 && !/^[0-9]$/.test(key))     e.preventDefault();
         });
 
         tin.addEventListener('paste', function (e) {
@@ -351,9 +360,9 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
             var result = '';
             for (var i = 0; i < pasted.length && result.length < 14; i++) {
                 var c = pasted[i];
-                if (result.length === 0 && /[A-Z]/.test(c)) result += c;
+                if (result.length === 0 && /[A-Z]/.test(c))      result += c;
                 else if (result.length === 1 && /[A-Z0-9]/.test(c)) result += c;
-                else if (result.length >= 2 && /[0-9]/.test(c)) result += c;
+                else if (result.length >= 2 && /[0-9]/.test(c))  result += c;
             }
             tin.value = result;
         });

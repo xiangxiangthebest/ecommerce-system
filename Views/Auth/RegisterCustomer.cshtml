@@ -9,6 +9,11 @@
 
 <div class="auth-container">
 
+    <a class="auth-back" href="http://localhost:5141/">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+    </a>
+
     <div class="auth-brand">
         <div class="auth-brand-icon">
             <svg viewBox="0 0 24 24">
@@ -49,9 +54,11 @@
             <div class="form-group">
                 <label>Password</label>
                 <div class="password-wrapper">
-                    <input asp-for="Password" type="password" id="password" placeholder="Create a password" />
+                    <input asp-for="Password" type="password" id="password"
+                           placeholder="Create a password" />
                     <span class="toggle-password" onclick="togglePassword('password', this)">
-                        <i class="ti ti-eye"></i>
+                        <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </span>
                 </div>
                 <span asp-validation-for="Password" class="text-danger"></span>
@@ -60,9 +67,11 @@
             <div class="form-group">
                 <label>Confirm password</label>
                 <div class="password-wrapper">
-                    <input asp-for="ConfirmPassword" type="password" id="confirmPassword" placeholder="Confirm your password" />
+                    <input asp-for="ConfirmPassword" type="password" id="confirmPassword"
+                           placeholder="Confirm your password" />
                     <span class="toggle-password" onclick="togglePassword('confirmPassword', this)">
-                        <i class="ti ti-eye"></i>
+                        <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </span>
                 </div>
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
@@ -84,15 +93,18 @@
 </div>
 
 <script>
-    function togglePassword(inputId, el) {
-        const input = document.getElementById(inputId);
-        const icon  = el.querySelector('i');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.replace('ti-eye', 'ti-eye-off');
-        } else {
-            input.type = 'password';
-            icon.classList.replace('ti-eye-off', 'ti-eye');
-        }
+function togglePassword(inputId, el) {
+    const input   = document.getElementById(inputId);
+    const eyeOn   = el.querySelector('.eye-icon');
+    const eyeOff  = el.querySelector('.eye-off-icon');
+    if (input.type === 'password') {
+        input.type          = 'text';
+        eyeOn.style.display  = 'none';
+        eyeOff.style.display = 'block';
+    } else {
+        input.type          = 'password';
+        eyeOn.style.display  = 'block';
+        eyeOff.style.display = 'none';
     }
+}
 </script>
