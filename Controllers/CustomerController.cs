@@ -20,6 +20,8 @@ namespace EcommerceSystem.Controllers
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
         private readonly IReturnImageStorage _returnImageStorage;
+        private readonly INotificationService _notificationService;
+
 
         public CustomerController(
             ICustomerContext customerContext,
@@ -28,7 +30,8 @@ namespace EcommerceSystem.Controllers
             IOrderService orderService,
             IReviewService reviewService,
             IProfileService profileService,
-            IReturnImageStorage returnImageStorage)
+            IReturnImageStorage returnImageStorage,
+            INotificationService notificationService)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -37,15 +40,21 @@ namespace EcommerceSystem.Controllers
             _reviewService = reviewService;
             _profileService = profileService;
             _returnImageStorage = returnImageStorage;
+            _notificationService = notificationService; 
         }
 
         // =========================
-        // NAVBAR CART COUNT
+        // NAVBAR HELPERS
         // =========================
-        private async Task LoadCartCountAsync()
+        private async Task LoadNavbarAsync()
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return;
+
             ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
+
+            var notifications = await _notificationService.GetForUserAsync(customer.UserId);
+            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
         }
 
         // =========================
@@ -53,7 +62,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Home(string? search, int? categoryId)
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var categories = await _productService.GetCategoriesAsync();
             var products = await _productService.GetBrowseProductsAsync(search, categoryId);
@@ -80,7 +89,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> ProductDetails(int id)
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var vm = await _productService.GetProductDetailsAsync(id);
             if (vm == null) return NotFound();
@@ -125,7 +134,7 @@ namespace EcommerceSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> BuyNow(int productId, int quantity, string selectedVariations)
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -146,12 +155,13 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Cart()
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
             var cart = await _cartService.GetCartAsync(customer.UserId);
+            
             return View(cart);
         }
 
@@ -186,7 +196,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Checkout(string? selectedItems, string? source, int? productId)
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -274,7 +284,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> PurchaseHistory()
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -359,7 +369,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Profile()
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -454,7 +464,7 @@ namespace EcommerceSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> ChangePassword()
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
             return View();
         }
 
@@ -492,9 +502,17 @@ namespace EcommerceSystem.Controllers
         // =========================
         public async Task<IActionResult> Notifications()
         {
-            await LoadCartCountAsync();
+            await LoadNavbarAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
             
-            return View();
+            // Pass the full list to the view so it can render server-side,
+            // AND the JS dropdown still works via /Notifications/GetDropdown
+            var notifications = await _notificationService.GetForUserAsync(customer.UserId)
+                                ?? new List<EcommerceSystem.Models.Notification>();
+            return View(notifications);
         }
+
     }
 }

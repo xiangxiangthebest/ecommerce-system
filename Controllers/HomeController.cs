@@ -15,7 +15,7 @@ public class HomeController : Controller
     public IActionResult Index()
     {
         ViewBag.Category = _context.Category.ToList();
-        var products = _context.Products.ToList();
+        var products = _context.Products.Where(p => !p.IsDeleted).ToList();
         return View(products);
     }
 }

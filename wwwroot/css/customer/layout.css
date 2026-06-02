@@ -157,15 +157,25 @@ body {
   text-decoration: none;
 }
 
-.icon-btn .notification-dot {
+/* ─── Notification Badge ─────────────────────────────── */
+.notification-badge {
   position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 7px;
-  height: 7px;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   background: #e24b4a;
-  border-radius: 50%;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  line-height: 16px;
+  border-radius: 8px;
   border: 1.5px solid #ffffff;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
 }
 
 /* ─── Cart Button ────────────────────────────────────── */
@@ -332,8 +342,7 @@ body {
   color: #e24b4a;
 }
 
-/* ─── Active link detection (ASP.NET tag helpers add
-       "active" class automatically via asp-controller) ── */
+/* ─── Active link detection ──────────────────────────── */
 .nav-link.active {
   background: #1a1a2e;
   color: #ffffff !important;
@@ -409,49 +418,41 @@ body {
     padding: 10px 16px;
   }
 
-  /* Hide desktop nav links — shown in drawer instead */
   .nav-links {
     display: none;
   }
 
-  /* Hide the divider between nav links and right side */
   .nav-divider-v {
     display: none;
   }
 
-  /* Show hamburger */
   .hamburger-btn {
     display: flex;
   }
 
-  /* Push right-side controls (bell, cart, profile) all the way right */
   .nav-right {
     margin-left: auto;
     gap: 4px;
   }
 
-  /* Keep the divider inside nav-right visible */
   .nav-right .nav-divider-v {
     display: block;
   }
 
-  /* Hide profile name — avatar only on mobile */
   .profile-name {
     display: none;
   }
 
-  /* Hide "Cart" text — icon + badge only */
   .cart-btn span:not(.cart-count) {
     display: none;
   }
 
-  /* Keep cart button compact but not icon-only */
   .cart-btn {
     padding: 7px 10px;
   }
 }
 
-/* ─── Prevent search bar wrapping to two lines ────────── */
+/* ─── Prevent search bar wrapping ────────────────────── */
 .nav-search {
   flex-shrink: 0;
   white-space: nowrap;

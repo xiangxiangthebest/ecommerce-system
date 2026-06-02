@@ -5,6 +5,7 @@ using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
 using EcommerceSystem.Observers;
+using EcommerceSystem.Interfaces;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -13,10 +14,13 @@ namespace EcommerceSystem.Controllers
     public class SellerController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public SellerController(AppDbContext context)
+
+        public SellerController(AppDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         private async Task<Seller?> GetCurrentSellerAsync()
@@ -109,12 +113,17 @@ namespace EcommerceSystem.Controllers
             if (seller == null) return RedirectToAction("Login", "Auth");
             var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
 
-            if (!seller.IsApproved && tab != "General")
+            if (!seller.IsApproved && tab != "General" && tab != "Profile")
                 tab = "General";
 
             ViewBag.ActiveTab = tab;
             ViewBag.ShopName = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
+
+            if (tab == "Profile")
+            {
+                ViewBag.ProfileSeller = seller;
+            }
 
             if (seller.IsApproved)
             {
@@ -160,6 +169,33 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // SELLER PROFILE — Update Address
+        //
+        // Only the Address field is editable.
+        // Email, ContactNumber, TINNumber, and FullName are read-only and are
+        // never bound from the form — they can only be changed by an admin.
+        // ─────────────────────────────────────────────────────────────────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateAddress(string address)
+        {
+            var seller = await GetCurrentSellerAsync();
+            if (seller == null) return RedirectToAction("Login", "Auth");
+
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                TempData["ProfileError"] = "Address cannot be empty.";
+                return RedirectToAction("Home", new { tab = "Profile" });
+            }
+
+            seller.PickupAddress = address.Trim();
+            await _context.SaveChangesAsync();
+
+            TempData["ProfileSuccess"] = "Your address has been updated successfully.";
+            return RedirectToAction("Home", new { tab = "Profile" });
+        }
+
         [HttpGet]
         public async Task<IActionResult> AddProduct()
         {
@@ -192,15 +228,37 @@ namespace EcommerceSystem.Controllers
 
             if (!isDraft)
             {
+                var publishErrors = new List<string>();
                 if (string.IsNullOrWhiteSpace(model.Name))
-                    ModelState.AddModelError("Name", "Product name is required to publish.");
+                    publishErrors.Add("Product name is required to publish.");
                 if (model.Price <= 0)
-                    ModelState.AddModelError("Price", "Price must be greater than 0 to publish.");
-                if (!ModelState.IsValid)
+                    publishErrors.Add("Price must be greater than 0 to publish.");
+
+                if (publishErrors.Any())
                 {
                     ViewBag.ShopName = seller.ShopName;
+                    ViewBag.PublishErrors = publishErrors;
                     return View(model);
                 }
+            }
+
+            if (model.OriginalPrice <= 0)
+            {
+                model.OriginalPrice = model.Price;
+            }
+
+            if (model.OriginalPrice > model.Price)
+            {
+                model.DiscountPercentage =
+                    Math.Round(
+                        ((model.OriginalPrice - model.Price)
+                        / model.OriginalPrice) * 100,
+                        0
+                    );
+            }
+            else
+            {
+                model.DiscountPercentage = 0;
             }
 
             if (!await _context.Category.AnyAsync())
@@ -313,7 +371,27 @@ namespace EcommerceSystem.Controllers
             existing.SKU = model.SKU ?? string.Empty;
             existing.Price = model.Price;
             existing.StockQuantity = model.StockQuantity;
-            existing.IsDraft = actionType == "Draft";
+            existing.IsDraft       = actionType == "Draft";
+            existing.OriginalPrice = model.OriginalPrice;
+
+            if (existing.OriginalPrice <= 0)
+            {
+                existing.OriginalPrice = existing.Price;
+            }
+
+            if (existing.OriginalPrice > existing.Price)
+            {
+                existing.DiscountPercentage =
+                    Math.Round(
+                        ((existing.OriginalPrice - existing.Price)
+                        / existing.OriginalPrice) * 100,
+                        0
+                    );
+            }
+            else
+            {
+                existing.DiscountPercentage = 0;
+            }
 
             var variationsJson = Request.Form["VariationsJson"].ToString();
             existing.VariationsJson = string.IsNullOrWhiteSpace(variationsJson) ? "[]" : variationsJson;
@@ -568,8 +646,9 @@ namespace EcommerceSystem.Controllers
             var order = await _context.Order
                 .Include(o => o.Customer)
                 .Include(o => o.Seller)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId && o.SellerUserId == seller.UserId);
-
+                .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId && o.SellerUserId == seller.UserId);
             if (order == null)
             {
                 TempData["OrderError"] = "Order not found.";
@@ -597,9 +676,9 @@ namespace EcommerceSystem.Controllers
             }
 
             // Attach observers — they are called inside SetStatus()
-            order.Attach(new CustomerDashboardObserver());
-            order.Attach(new SellerDashboardObserver());
-            order.Attach(new AdminPanelObserver());
+            order.Attach(new CustomerDashboardObserver(_notificationService));
+            order.Attach(new SellerDashboardObserver(_notificationService));
+            order.Attach(new AdminPanelObserver(_notificationService, _context));
 
             // SetStatus does the final validation, stamps timestamps, notifies observers
             order.SetStatus(newStatus);
@@ -666,10 +745,16 @@ namespace EcommerceSystem.Controllers
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
             var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
 
+            // ── Calculate the actual approved refund amount ───────────────────
+            // Sum only approved items × approved qty × unit price.
+            // This is what shows in the notification — NOT the full order total.
+            decimal approvedRefundAmount = 0;
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
+
+                approvedRefundAmount += qty * orderItem.Price;
 
                 if (isReturnRefund)
                 {
@@ -681,11 +766,78 @@ namespace EcommerceSystem.Controllers
                 // RefundOnly: no stock change — items were not physically returned
             }
 
-            order.ReturnStatus = EcommerceSystem.Enums.ReturnStatus.Approved;
+            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
             order.ReturnApprovedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
+            // ── Notify Customer, Seller, and Admin after return approval ──────
+            // ReturnStatus moves to Approved but CurrentStatus stays RETURN_REFUND,
+            // so the standard observers won't fire — we send notifications directly.
+            try
+            {
+                // Reload with nav props so messages can include names/details
+                var orderWithDetails = await _context.Order
+                    .Include(o => o.Customer)
+                    .Include(o => o.Seller)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+                if (orderWithDetails != null)
+                {
+                    var returnTypeLabel = isReturnRefund ? "Return & Refund" : "Refund Only";
+                    var customerName    = orderWithDetails.Customer?.FullName ?? "Customer";
+                    var customerId      = orderWithDetails.Customer?.UserId;
+                    var sellerId        = orderWithDetails.Seller?.UserId;
+                    var shopName        = orderWithDetails.Seller?.ShopName   ?? "the seller";
+                    // Use the calculated approved amount, not the full order total
+                    var total           = approvedRefundAmount;
+
+                    // Notify Customer
+                    if (customerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  customerId.Value,
+                            title:   "Return & Refund Approved",
+                            message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
+                                     $"has been approved. Total: RM{total:F2}"
+                        );
+                    }
+
+                    // Notify Seller (confirmation echo)
+                    if (sellerId.HasValue)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  sellerId.Value,
+                            title:   "Return & Refund Approved",
+                            message: $"You have approved the {returnTypeLabel} request for Order #{orderId} " +
+                                     $"from {customerName}. Total: RM{total:F2}"
+                        );
+                    }
+
+                    // Notify all Admins
+                    var adminIds = await _context.Users
+                        .Where(u => u.Role == "Admin" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+
+                    foreach (var adminId in adminIds)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  adminId,
+                            title:   "Return & Refund Approved",
+                            message: $"Order #{orderId} — {shopName} has approved a {returnTypeLabel} " +
+                                     $"request from {customerName}. Total: RM{total:F2}"
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SellerController] Return approval notification failed for order #{orderId}: {ex.Message}");
+            }
+ 
             var stockMsg = isReturnRefund
                 ? "Stock has been restored."
                 : "Stock unchanged (Refund Only — items not physically returned).";

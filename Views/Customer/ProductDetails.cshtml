@@ -20,6 +20,8 @@
 
     bool hasVariations = variations.Count > 0;
 
+    bool hasDiscount = Model.DiscountPercentage > 0;
+
     string stockClass, stockLabel;
     if (!hasVariations) {
         if (Model.StockQuantity <= 0)      { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
@@ -124,15 +126,39 @@
 
             <div class="pd-divider"></div>
 
-            <div class="pd-shop-row">
-                <div class="pd-shop-avatar">@shopInitial</div>
-                <span class="pd-shop-name">
-                    Sold by <strong>@(Model.Seller?.ShopName ?? "Unknown Shop")</strong>
-                </span>
+            <div class="pd-chat-section">
+                <div class="pd-chat-seller-info">
+                    <div class="pd-chat-avatar">@shopInitial</div>
+                    <div class="pd-chat-meta">
+                        <span class="pd-chat-meta-name">@(Model.Seller?.ShopName ?? "Unknown Shop")</span>
+                        <span class="pd-chat-meta-sub">
+                            <span class="pd-chat-online-dot"></span>@(Model.Seller?.State ?? "Unknown location")
+                        </span>
+                    </div>
+                </div>
+
+                <form asp-controller="Chat" asp-action="StartConversation" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <input type="hidden" id="chatVariationJson" name="variationJson" value="{}" />
+                    <button class="pd-chat-seller-btn" type="submit">
+                        <i class="ti ti-message-circle-2"></i>
+                        Chat with Seller
+                    </button>
+                </form>
             </div>
 
             <div class="pd-price-block">
-                <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
+                @if (hasDiscount) {
+                    <div class="pd-original-price">RM @Model.OriginalPrice.ToString("0.00")</div>
+                }
+                <div class="pd-price-row">
+                    <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
+                    @if (hasDiscount) {
+                        <span class="pd-discount-badge">-@Model.DiscountPercentage%</span>
+                    }
+                </div>
                 <div class="pd-price-note">Price includes SST where applicable</div>
             </div>
 

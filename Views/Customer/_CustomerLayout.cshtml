@@ -44,8 +44,11 @@
 
             <div class="nav-right">
                 <a class="icon-btn" asp-controller="Customer" asp-action="Notifications">
-                <i class="ti ti-bell"></i>
-                <span class="notification-dot"></span>
+                    <i class="ti ti-bell"></i>
+                    @if (ViewBag.UnreadNotificationCount is int count && count > 0)
+                    {
+                        <span class="notification-badge">@(count > 99 ? "99+" : count.ToString())</span>
+                    }
                 </a>
                 <a class="cart-btn" asp-controller="Customer" asp-action="Cart">
                 <i class="ti ti-shopping-cart"></i>

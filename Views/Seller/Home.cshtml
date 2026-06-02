@@ -19,6 +19,11 @@
                     <span class="nav-text">General</span>
                 </a>
             </li>
+            <li class="@(ViewBag.ActiveTab == "Profile" ? "active" : "")">
+                <a href="@Url.Action("Home", "Seller", new { tab = "Profile" })">
+                    <span class="nav-text">Profile</span>
+                </a>
+            </li>
             @if (isApproved)
             {
                 <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
@@ -258,6 +263,8 @@
                 <h2 class="section-title">Your Orders</h2>
             </div>
 
+            <!-- Bell Icon (moved to fixed overlay so it is never occluded) -->
+
             <div class="order-tabs" id="orderTabs">
                 <button class="order-tab active" data-status="ALL">All <span class="order-tab-badge">@cntAll</span></button>
                 <button class="order-tab" data-status="PENDING">Pending <span class="order-tab-badge">@cntPending</span></button>
@@ -423,6 +430,101 @@
             }
             </script>
         }
+        else if (ViewBag.ActiveTab == "Profile")
+        {
+            var profileSeller = ViewBag.ProfileSeller as EcommerceSystem.Models.Seller;
+
+            <div class="details-container" style="max-width:620px; margin:0 auto;">
+                <h1 class="welcome-text" style="font-size:28px; text-align:center;">My Profile</h1>
+                <div class="separator"></div>
+
+                @if (TempData["ProfileError"] != null)
+                {
+                    <div class="alert-banner alert-error" style="margin-bottom:18px;">
+                        <i class="fas fa-exclamation-circle"></i> @TempData["ProfileError"]
+                    </div>
+                }
+                @if (TempData["ProfileSuccess"] != null)
+                {
+                    <div class="alert-banner alert-success" style="margin-bottom:18px;">
+                        <i class="fas fa-check-circle"></i> @TempData["ProfileSuccess"]
+                    </div>
+                }
+
+                @* ── Read-only fields ── *@
+                <div class="profile-field">
+                    <label class="profile-label">Full Name</label>
+                    <div class="profile-value">@(profileSeller?.FullName ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">Email</label>
+                    <div class="profile-value">@(profileSeller?.Email ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">Contact Number</label>
+                    <div class="profile-value">@(profileSeller?.PhoneNumber ?? "—")</div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-label">TIN Number</label>
+                    <div class="profile-value">@(profileSeller?.TIN ?? "—")</div>
+                </div>
+
+                <div class="separator" style="margin:22px 0;"></div>
+
+                @* ── Editable address field only ── *@
+                <form asp-action="UpdateAddress" asp-controller="Seller" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="profile-field">
+                        <label class="profile-label" for="address">
+                            Address
+                            <span style="color:#6366f1;font-size:11px;font-weight:600;
+                                         text-transform:none;letter-spacing:0;margin-left:6px;">
+                                (editable)
+                            </span>
+                        </label>
+                        <textarea id="address" name="address" rows="3"
+                                  style="width:100%;padding:10px 14px;
+                                         border:1.5px solid #e0e0f0;border-radius:10px;
+                                         font-size:14px;resize:vertical;font-family:inherit;
+                                         color:#1e1b4b;outline:none;transition:border-color .2s;"
+                                  onfocus="this.style.borderColor='#6366f1'"
+                                  onblur="this.style.borderColor='#e0e0f0'">@(profileSeller?.PickupAddress)</textarea>
+                    </div>
+                    <button type="submit"
+                            style="margin-top:10px;background:#1e1b4b;color:#fff;border:none;
+                                   padding:10px 28px;border-radius:8px;font-size:14px;
+                                   font-weight:700;cursor:pointer;transition:background .2s;"
+                            onmouseover="this.style.background='#312e81'"
+                            onmouseout="this.style.background='#1e1b4b'">
+                        <i class="fas fa-save" style="margin-right:6px;"></i>Save Address
+                    </button>
+                </form>
+            </div>
+
+            <style>
+                .profile-field {
+                    margin-bottom: 18px;
+                }
+                .profile-label {
+                    display: block;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #9a98b6;
+                    text-transform: uppercase;
+                    letter-spacing: 0.06em;
+                    margin-bottom: 6px;
+                }
+                .profile-value {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #1e1b4b;
+                    background: #f5f5fb;
+                    padding: 10px 14px;
+                    border-radius: 10px;
+                    border: 1.5px solid #e8eaf6;
+                }
+            </style>
+        }
         else if (ViewBag.ActiveTab == "Chat")
         {
             <div class="p-3 bg-white rounded shadow-sm">
@@ -446,6 +548,76 @@
             </div>
         }
     </main>
+</div>
+
+{{!-- ── Fixed notification bell (always on top, never occluded) ── --}}
+<div id="notifWrapper" style="position:fixed;top:18px;right:24px;z-index:2000;">
+    <button class="notif-bell" id="notifBell" onclick="toggleNotifDropdown()"
+            style="background:#1e1b4b;border:none;border-radius:50%;width:44px;height:44px;
+                   display:flex;align-items:center;justify-content:center;cursor:pointer;
+                   box-shadow:0 2px 12px rgba(30,27,75,0.25);position:relative;">
+        <i class="fas fa-bell" style="color:#fff;font-size:17px;"></i>
+        <span class="notif-badge" id="notifBadge"
+              style="display:none;position:absolute;top:-4px;right:-4px;
+                     background:#ef4444;color:#fff;font-size:11px;font-weight:700;
+                     min-width:18px;height:18px;border-radius:9px;
+                     display:none;align-items:center;justify-content:center;
+                     padding:0 4px;border:2px solid #fff;">0</span>
+    </button>
+
+    <div class="notif-dropdown" id="notifDropdown"
+         style="display:none;position:absolute;top:52px;right:0;
+                width:320px;max-height:400px;background:#fff;
+                border-radius:14px;box-shadow:0 8px 32px rgba(30,27,75,0.18);
+                overflow:hidden;z-index:2001;border:1px solid #e8eaf6;">
+        <div class="notif-header"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:12px 16px 10px;border-bottom:1px solid #f0f0f8;">
+            <span style="font-weight:700;font-size:14px;color:#1e1b4b;">Notifications</span>
+            <button onclick="markAllRead()" class="notif-mark-all"
+                    style="background:none;border:none;color:#6366f1;font-size:12px;
+                           font-weight:600;cursor:pointer;padding:0;">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notifList"
+             style="overflow-y:auto;max-height:340px;padding:4px 0;">
+            <p class="notif-empty" style="color:#9a98b6;font-size:13px;text-align:center;padding:24px;">Loading...</p>
+        </div>
+    </div>
+</div>
+
+{{!-- ── Fixed notification bell (always on top, never occluded) ── --}}
+<div id="notifWrapper" style="position:fixed;top:18px;right:24px;z-index:2000;">
+    <button class="notif-bell" id="notifBell" onclick="toggleNotifDropdown()"
+            style="background:#1e1b4b;border:none;border-radius:50%;width:44px;height:44px;
+                   display:flex;align-items:center;justify-content:center;cursor:pointer;
+                   box-shadow:0 2px 12px rgba(30,27,75,0.25);position:relative;">
+        <i class="fas fa-bell" style="color:#fff;font-size:17px;"></i>
+        <span class="notif-badge" id="notifBadge"
+              style="display:none;position:absolute;top:-4px;right:-4px;
+                     background:#ef4444;color:#fff;font-size:11px;font-weight:700;
+                     min-width:18px;height:18px;border-radius:9px;
+                     display:none;align-items:center;justify-content:center;
+                     padding:0 4px;border:2px solid #fff;">0</span>
+    </button>
+
+    <div class="notif-dropdown" id="notifDropdown"
+         style="display:none;position:absolute;top:52px;right:0;
+                width:320px;max-height:400px;background:#fff;
+                border-radius:14px;box-shadow:0 8px 32px rgba(30,27,75,0.18);
+                overflow:hidden;z-index:2001;border:1px solid #e8eaf6;">
+        <div class="notif-header"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:12px 16px 10px;border-bottom:1px solid #f0f0f8;">
+            <span style="font-weight:700;font-size:14px;color:#1e1b4b;">Notifications</span>
+            <button onclick="markAllRead()" class="notif-mark-all"
+                    style="background:none;border:none;color:#6366f1;font-size:12px;
+                           font-weight:600;cursor:pointer;padding:0;">Mark all read</button>
+        </div>
+        <div class="notif-list" id="notifList"
+             style="overflow-y:auto;max-height:340px;padding:4px 0;">
+            <p class="notif-empty" style="color:#9a98b6;font-size:13px;text-align:center;padding:24px;">Loading...</p>
+        </div>
+    </div>
 </div>
 
 @if (ViewBag.ActiveTab == "Order" && ViewBag.Orders != null)
@@ -1073,4 +1245,75 @@ document.addEventListener("DOMContentLoaded", function () {
 
     
 </style>
+<script>
+    function toggleNotifDropdown() {
+        const dd = document.getElementById('notifDropdown');
+        dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+        if (dd.style.display === 'block') loadNotifications();
+    }
 
+    document.addEventListener('click', function(e) {
+        const wrapper = document.getElementById('notifWrapper');
+        if (wrapper && !wrapper.contains(e.target))
+            document.getElementById('notifDropdown').style.display = 'none';
+    });
+
+    async function loadNotifications() {
+        const res = await fetch('/Notifications/GetDropdown');
+        const data = await res.json();
+        const badge = document.getElementById('notifBadge');
+        badge.textContent = data.unreadCount;
+        badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+        const list = document.getElementById('notifList');
+        if (data.items.length === 0) {
+            list.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+            return;
+        }
+        list.innerHTML = data.items.map(n => `
+            <div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="markRead(${n.notificationId}, this)">
+                <div class="notif-item-title">${n.title}</div>
+                <div class="notif-item-msg">${n.message}</div>
+                <div class="notif-item-time">${n.createdAt}</div>
+            </div>
+        `).join('');
+    }
+
+    async function markRead(id, el) {
+        await fetch(`/Notifications/MarkRead?id=${id}`, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+        });
+        el.classList.remove('unread');
+        refreshBadge();
+    }
+
+    async function markAllRead() {
+        await fetch('/Notifications/MarkAllRead', {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': getAntiForgeryToken() }
+        });
+        document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+        const badge = document.getElementById('notifBadge');
+        if (badge) badge.style.display = 'none';
+    }
+
+    async function refreshBadge() {
+        try {
+            const res = await fetch('/Notifications/GetDropdown');
+            if (!res.ok) return;
+            const data = await res.json();
+            const badge = document.getElementById('notifBadge');
+            if (badge) {
+                badge.textContent = data.unreadCount;
+                badge.style.display = data.unreadCount > 0 ? 'flex' : 'none';
+            }
+        } catch {}
+    }
+
+    function getAntiForgeryToken() {
+        return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    }
+
+    setInterval(refreshBadge, 30000);
+    window.addEventListener('load', refreshBadge);
+</script>

@@ -80,10 +80,7 @@
                 int fullStars  = (int)Math.Floor(rating);
                 int emptyStars = 5 - fullStars;
 
-                bool hasDiscount = item.OriginalPrice > item.Price;
-                int discountPct  = hasDiscount
-                    ? (int)Math.Round((1 - item.Price / item.OriginalPrice) * 100)
-                    : 0;
+                bool hasDiscount = item.DiscountPercentage > 0;
 
                 <a asp-action="ProductDetails"
                    asp-route-id="@item.ProductId"
@@ -133,7 +130,7 @@
                                 <div class="price-row">
                                     <span class="product-price">RM @item.Price.ToString("0.00")</span>
                                     @if (hasDiscount) {
-                                        <span class="price-discount">−@discountPct%</span>
+                                        <span class="price-discount">−@item.DiscountPercentage%</span>
                                     }
                                 </div>
                             </div>

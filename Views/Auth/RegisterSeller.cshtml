@@ -6,54 +6,71 @@
 <link rel="stylesheet" href="~/css/auth/seller-register.css" />
 
 <div class="auth-container">
-    <div class="auth-card seller-card">
 
+    @* ── Error modal ── *@
     @if (ViewBag.Error != null)
     {
         <div id="errorBackdrop" class="modal-backdrop">
-            <div id="errorToast" class="modal-window">
-                <h2>⚠️ Registration Error</h2>
-                @* Use Html.Raw to allow the <br /> tag to work *@
+            <div class="modal-window">
+                <h2>Registration error</h2>
                 <p>@Html.Raw(ViewBag.Error)</p>
             </div>
         </div>
     }
 
-        @**Badge + Title*@
+    @* ── Back button ── *@
+    <a class="auth-back" href="http://localhost:5141/">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+    </a>
+
+    @* ── Brand ── *@
+    <div class="auth-brand">
+        <div class="auth-brand-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 01-8 0"/>
+            </svg>
+        </div>
+        <span class="auth-brand-name">MMU Shop</span>
+    </div>
+
+    <div class="auth-card seller-card">
+
+        @* ── Header ── *@
         <div class="auth-top">
-            <div class="auth-badge">Seller Portal</div>
-            <h1>Seller Registration</h1>
+            <div class="auth-badge">
+                <span class="auth-badge-dot"></span>
+                Seller Portal
+            </div>
+            <h1>Seller registration</h1>
             <p>Register your business and start selling on the platform.</p>
         </div>
 
-
-
-        @**── Progress Stepper ──*@
+        @* ── Progress stepper ── *@
         <div class="progress-stepper">
-
             <div class="step active" id="step-indicator-1">
                 <div class="step-circle">
                     <span class="num">1</span>
                     <span class="check">✓</span>
                 </div>
-                <span class="step-label">Seller Info</span>
+                <span class="step-label">Seller info</span>
             </div>
-
             <div class="step-connector" id="connector"></div>
-
             <div class="step" id="step-indicator-2">
                 <div class="step-circle">
                     <span class="num">2</span>
                     <span class="check">✓</span>
                 </div>
-                <span class="step-label">Shop Info</span>
+                <span class="step-label">Shop info</span>
             </div>
-
         </div>
 
         @if (ViewBag.Error != null)
         {
             <div class="error-message">
+                <svg class="error-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 @ViewBag.Error
             </div>
         }
@@ -61,27 +78,24 @@
         <form asp-controller="Auth" asp-action="RegisterSeller" method="post" id="seller-form">
             @Html.AntiForgeryToken()
 
+            @* ══════════════════════ *@
+            @* STEP 1 — Seller Info  *@
+            @* ══════════════════════ *@
             <div class="form-step active" id="form-step-1">
 
-                <div class="section-label">Seller Information</div>
+                <div class="section-label">Seller information</div>
 
                 <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text"
-                           name="FullName"
-                           maxlength="50"
-                           placeholder="Enter full name"
-                           required />
+                    <label>Full name</label>
+                    <input type="text" name="FullName" maxlength="50"
+                           placeholder="Enter full name" required />
                     <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>NRIC Number</label>
-                    <input type="text"
-                           name="NRICNumber"
-                           maxlength="12"
-                           placeholder="980101012345"
-                           inputmode="numeric"
+                    <label>NRIC number</label>
+                    <input type="text" name="NRICNumber" maxlength="12"
+                           placeholder="980101012345" inputmode="numeric"
                            pattern="[0-9]*"
                            oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                            required />
@@ -91,21 +105,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>State</label>
-                        <input type="text"
-                               name="State"
-                               placeholder="Selangor"
-                               required />
+                        <input type="text" name="State" placeholder="Selangor" required />
                         <span class="field-reminder"></span>
                     </div>
-
                     <div class="form-group">
-                        <label>Postal Code</label>
-                        <input type="text"
-                               name="PostalCode"
-                               placeholder="43200"
-                               maxlength="5"
-                               inputmode="numeric"
-                               pattern="[0-9]*"
+                        <label>Postal code</label>
+                        <input type="text" name="PostalCode" placeholder="43200"
+                               maxlength="5" inputmode="numeric" pattern="[0-9]*"
                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
                                required />
                         <span class="field-reminder"></span>
@@ -113,162 +119,149 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Detail Address</label>
-                    <textarea name="DetailAddress"
-                              rows="3"
-                              placeholder="Enter detailed address"
-                              required></textarea>
+                    <label>Detail address</label>
+                    <textarea name="DetailAddress" rows="3"
+                              placeholder="Enter detailed address" required></textarea>
                     <span class="field-reminder"></span>
                 </div>
 
-                @* ── TIN Field ── *@
                 <div class="form-group">
-                    <label>Tax Identification Number (TIN)</label>
-                    <input type="text"
-                        id="tinInput"
-                        name="TIN"
-                        maxlength="14"
-                        placeholder="e.g., IG115002000"
-                        required />
+                    <label>Tax identification number (TIN)</label>
+                    <input type="text" id="tinInput" name="TIN" maxlength="14"
+                           placeholder="e.g. IG115002000" required />
                     <span class="field-reminder"></span>
                 </div>
 
                 <div class="step-nav">
-                    <button type="button" class="btn-next" onclick="goToStep(2)">Next</button>
+                    <button type="button" class="btn-next" onclick="goToStep(2)">
+                        Next
+                        <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
                 </div>
 
             </div>
 
-            @**════════════════════════════*@
-            @**STEP 2 — Shop Information  *@
-            @**════════════════════════════*@
-            <!-- RegisterSeller.cshtml (Step 2 portion) -->
+            @* ══════════════════════ *@
+            @* STEP 2 — Shop Info    *@
+            @* ══════════════════════ *@
             <div class="form-step" id="form-step-2">
-                <div class="section-label">Shop Information</div>
+
+                <div class="section-label">Shop information</div>
 
                 <div class="form-group">
-                    <label>Shop Name</label>
-                    <input type="text" name="ShopName" placeholder="Enter Shop Name" required />
-                    <span class="field-reminder"></span> 
+                    <label>Shop name</label>
+                    <input type="text" name="ShopName" placeholder="Enter shop name" required />
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Pickup Address</label>
-                    <textarea name="PickupAddress" rows="3" placeholder="Enter Pickup Address" required></textarea>
-                    <span class="field-reminder"></span> 
+                    <label>Pickup address</label>
+                    <textarea name="PickupAddress" rows="3"
+                              placeholder="Enter pickup address" required></textarea>
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" name="Email" placeholder="Enter Email Address" required />
-                    <span class="field-reminder"></span> 
+                    <label>Email address</label>
+                    <input type="email" name="Email" placeholder="you@example.com" required />
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Phone Number</label>
+                    <label>Phone number</label>
                     <div class="phone-input">
                         <span>+60</span>
-                        <input type="text" name="PhoneNumber" maxlength="10" placeholder="123456789" required />
+                        <input type="text" name="PhoneNumber" maxlength="10"
+                               placeholder="123456789" required />
                     </div>
-                    <span class="field-reminder"></span> 
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
                     <label>Password</label>
                     <div class="password-wrapper">
-                        <input type="password" id="password" name="Password" placeholder="Create a Password" required />
+                        <input type="password" id="password" name="Password"
+                               placeholder="Create a password" required />
                         <span class="toggle-password" onclick="togglePassword('password', this)">
-                            <i class="fa-solid fa-eye"></i>
+                            <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </span>
                     </div>
-                    <span class="field-reminder"></span> 
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Confirm Password</label>
+                    <label>Confirm password</label>
                     <div class="password-wrapper">
-                        <input type="password" id="confirmPassword" name="ConfirmPassword" placeholder="Confirm Password" required />
+                        <input type="password" id="confirmPassword" name="ConfirmPassword"
+                               placeholder="Confirm your password" required />
                         <span class="toggle-password" onclick="togglePassword('confirmPassword', this)">
-                            <i class="fa-solid fa-eye"></i>
+                            <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </span>
                     </div>
-                    <span class="field-reminder"></span> 
+                    <span class="field-reminder"></span>
                 </div>
 
                 <div class="step-nav">
-                    <button type="button" class="btn-back" onclick="goToStep(1)">Back</button>
+                    <button type="button" class="btn-back" onclick="goToStep(1)">
+                        <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                        Back
+                    </button>
                     <button type="submit" class="btn-submit">Submit</button>
                 </div>
+
             </div>
 
         </form>
 
+        <div class="auth-divider"></div>
         <div class="auth-bottom">
-            <span>Already have an account?</span>
-            <a href="/Auth/Login?role=Seller">Login</a>
+            Already have an account?
+            <a href="/Auth/Login?role=Seller">Sign in</a>
         </div>
 
     </div>
+
+    <p class="auth-footer">© 2026 CSE6234 TT5L Group 4. All rights reserved.</p>
+
 </div>
 
 <script>
-
-function togglePassword(inputId, element) {
-
-    const input = document.getElementById(inputId);
-    const icon = element.querySelector("i");
-
-    if (input.type === "password") {
-        input.type = "text";
-
-        icon.classList.remove("fa-eye");
-        icon.classList.add("fa-eye-slash");
-    }
-    else {
-        input.type = "password";
-
-        icon.classList.remove("fa-eye-slash");
-        icon.classList.add("fa-eye");
+function togglePassword(inputId, el) {
+    const input  = document.getElementById(inputId);
+    const eyeOn  = el.querySelector('.eye-icon');
+    const eyeOff = el.querySelector('.eye-off-icon');
+    if (input.type === 'password') {
+        input.type          = 'text';
+        eyeOn.style.display  = 'none';
+        eyeOff.style.display = 'block';
+    } else {
+        input.type          = 'password';
+        eyeOn.style.display  = 'block';
+        eyeOff.style.display = 'none';
     }
 }
 
-// ─── HELPER FUNCTIONS FOR ERRORS ───
 function showError(input, message) {
     input.classList.add('invalid-field');
-
-    // For phone input, the field-reminder is on the parent .form-group, not inside .phone-input
     var container = input.closest('.phone-input') ? input.closest('.form-group') : input.parentNode;
-    var errorMsg = container.querySelector('.field-reminder');
-    if (!errorMsg) {
-        errorMsg = document.createElement('span');
-        errorMsg.className = 'field-reminder';
-        container.appendChild(errorMsg);
-    }
-    errorMsg.style.color = '#d8000c';
-    errorMsg.style.fontSize = '12px';
-    errorMsg.style.marginTop = '4px';
-    errorMsg.style.fontWeight = '500';
-    errorMsg.textContent = message;
-    errorMsg.style.display = 'block';
+    var span = container.querySelector('.field-reminder');
+    if (!span) { span = document.createElement('span'); span.className = 'field-reminder'; container.appendChild(span); }
+    span.textContent = message;
+    span.style.display = 'block';
 }
 
 function hideError(input) {
     input.classList.remove('invalid-field');
     var container = input.closest('.phone-input') ? input.closest('.form-group') : input.parentNode;
-    var errorMsg = container.querySelector('.field-reminder');
-    if (errorMsg) {
-        errorMsg.style.display = 'none';
-    }
+    var span = container.querySelector('.field-reminder');
+    if (span) span.style.display = 'none';
 }
 
-// ─── NAVIGATION FUNCTION ───
 function goToStep(step) {
-
     if (step === 2) {
-        var isValid = true;
-        var firstInvalidInput = null;
-
-        // Select all required inputs in Step 1
+        var isValid = true, first = null;
         var fullName = document.querySelector('input[name="FullName"]');
         var nric     = document.querySelector('input[name="NRICNumber"]');
         var state    = document.querySelector('input[name="State"]');
@@ -276,171 +269,89 @@ function goToStep(step) {
         var address  = document.querySelector('textarea[name="DetailAddress"]');
         var tin      = document.querySelector('input[name="TIN"]');
 
-        // 1. Validate Full Name
-        if (!fullName.value.trim()) {
-            showError(fullName, "Full Name is required.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = fullName;
-        } else { hideError(fullName); }
+        if (!fullName.value.trim())                              { showError(fullName, 'Full name is required.'); isValid = false; if (!first) first = fullName; } else hideError(fullName);
+        if (!nric.value.trim() || nric.value.length !== 12)     { showError(nric, 'NRIC must be exactly 12 digits.'); isValid = false; if (!first) first = nric; } else hideError(nric);
+        if (!state.value.trim())                                 { showError(state, 'Please enter your state.'); isValid = false; if (!first) first = state; } else hideError(state);
+        if (!postal.value.trim() || postal.value.length !== 5)  { showError(postal, 'Postal code must be exactly 5 digits.'); isValid = false; if (!first) first = postal; } else hideError(postal);
+        if (!address.value.trim())                               { showError(address, 'Detailed address is required.'); isValid = false; if (!first) first = address; } else hideError(address);
 
-        // 2. Validate NRIC (12 digits)
-        if (!nric.value.trim() || nric.value.length !== 12) {
-            showError(nric, "NRIC must be exactly 12 digits.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = nric;
-        } else { hideError(nric); }
-
-        // 3. Validate State
-        if (!state.value.trim()) {
-            showError(state, "Please enter your State.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = state;
-        } else { hideError(state); }
-
-        // 4. Validate Postal Code (5 digits)
-        if (!postal.value.trim() || postal.value.length !== 5) {
-            showError(postal, "Postal Code must be exactly 5 digits.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = postal;
-        } else { hideError(postal); }
-
-        // 5. Validate Detail Address
-        if (!address.value.trim()) {
-            showError(address, "Detailed Address is required.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = address;
-        } else { hideError(address); }
-
-        // 6. Validate TIN
         var tinPattern = /^[A-Z]{1,2}[0-9]{10,12}$/;
-        if (!tin.value.trim()) {
-            showError(tin, "Tax Identification Number is required.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = tin;
-        } else if (!tinPattern.test(tin.value.toUpperCase())) {
-            showError(tin, "Invalid format (e.g., IG115002000).");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = tin;
-        } else { hideError(tin); }
+        if (!tin.value.trim())                               { showError(tin, 'TIN is required.'); isValid = false; if (!first) first = tin; }
+        else if (!tinPattern.test(tin.value.toUpperCase())) { showError(tin, 'Invalid format (e.g. IG115002000).'); isValid = false; if (!first) first = tin; }
+        else hideError(tin);
 
-        if (!isValid) {
-            if (firstInvalidInput) {
-                firstInvalidInput.reportValidity();
-                firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            return;   
-        }
+        if (!isValid) { if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     }
 
-    // Step Switching Logic
     document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
-
     document.getElementById('form-step-' + step).classList.add('active');
     document.getElementById('step-indicator-' + step).classList.add('active');
 
     if (step === 2) {
         document.getElementById('step-indicator-1').classList.add('completed');
         document.getElementById('connector').classList.add('completed');
+    } else {
+        document.getElementById('step-indicator-1').classList.remove('completed');
+        document.getElementById('connector').classList.remove('completed');
     }
     document.querySelector('.seller-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ─── STEP 2 VALIDATION (when clicking Submit) ───
 document.getElementById('seller-form').addEventListener('submit', function (e) {
-        var isValid = true;
-        var firstInvalidInput = null;
-
-    var shopName = document.querySelector('input[name="ShopName"]');
-    var pickupAddress = document.querySelector('textarea[name="PickupAddress"]');
-    var email = document.querySelector('input[name="Email"]');
-    var phone  = document.querySelector('input[name="PhoneNumber"]');
-    var password = document.querySelector('input[name="Password"]');
+    var isValid = true, first = null;
+    var shopName        = document.querySelector('input[name="ShopName"]');
+    var pickupAddress   = document.querySelector('textarea[name="PickupAddress"]');
+    var email           = document.querySelector('input[name="Email"]');
+    var phone           = document.querySelector('input[name="PhoneNumber"]');
+    var password        = document.querySelector('input[name="Password"]');
     var confirmPassword = document.querySelector('input[name="ConfirmPassword"]');
 
-    // 1. Validate Shop Name
-    if (!shopName.value.trim()) {
-            showError(shopName, "Shop Name is required.");
-            isValid = false; if(!firstInvalidInput) firstInvalidInput = shopName;
-        } else { hideError(shopName); }
+    if (!shopName.value.trim())      { showError(shopName, 'Shop name is required.'); isValid = false; if (!first) first = shopName; } else hideError(shopName);
+    if (!pickupAddress.value.trim()) { showError(pickupAddress, 'Pickup address is required.'); isValid = false; if (!first) first = pickupAddress; } else hideError(pickupAddress);
 
-    // 2. Validate Pickup Address
-    if (!pickupAddress.value.trim()) {
-        showError(pickupAddress, "Pickup Address is required.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = pickupAddress;
-    } else { hideError(pickupAddress); }
+    var emailOk = /^[^\s]+@@[^\s]+\.[^\s]+$/.test(email.value.trim());
+    if (!email.value.trim())  { showError(email, 'Email address is required.'); isValid = false; if (!first) first = email; }
+    else if (!emailOk)        { showError(email, 'Please enter a valid email address.'); isValid = false; if (!first) first = email; }
+    else hideError(email);
 
-    // 3. Validate Email
-    var emailPattern = new RegExp('^[^\\s]+' + String.fromCharCode(64) + '[^\\s]+\\.[^\\s]+$');
-    if (!email.value.trim()) {
-        showError(email, "Email Address is required.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = email;
-    } else if (!emailPattern.test(email.value.trim())) {
-        showError(email, "Please enter a valid email address.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = email;
-    } else { hideError(email); }
+    if (!phone.value.trim())                                     { showError(phone, 'Phone number is required.'); isValid = false; if (!first) first = phone; }
+    else if (phone.value.length < 7 || phone.value.length > 10) { showError(phone, 'Phone must be 7–10 digits.'); isValid = false; if (!first) first = phone; }
+    else hideError(phone);
 
-    // 4. Validate Phone Number
-    if (!phone.value.trim()) {
-        showError(phone, "Phone Number is required.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = phone;
-    } else if (phone.value.length < 7 || phone.value.length > 10) {
-        showError(phone, "Phone Number must be 7-10 digits.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = phone;
-    } else { hideError(phone); }
+    if (!password.value.trim())          { showError(password, 'Password is required.'); isValid = false; if (!first) first = password; }
+    else if (password.value.length < 8)  { showError(password, 'Password must be at least 8 characters.'); isValid = false; if (!first) first = password; }
+    else hideError(password);
 
-    // 5. Validate Password
-    if (!password.value.trim()) {
-        showError(password, "Password is required.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = password;
-    } else if (password.value.length < 8) {
-        showError(password, "Password must be at least 8 characters.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = password;
-    } else { hideError(password); }
+    if (!confirmPassword.value.trim())                      { showError(confirmPassword, 'Please confirm your password.'); isValid = false; if (!first) first = confirmPassword; }
+    else if (confirmPassword.value !== password.value)      { showError(confirmPassword, 'Passwords do not match.'); isValid = false; if (!first) first = confirmPassword; }
+    else hideError(confirmPassword);
 
-    // 6. Validate Confirm Password
-    if (!confirmPassword.value.trim()) {
-        showError(confirmPassword, "Please confirm your password.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = confirmPassword;
-    } else if (confirmPassword.value !== password.value) {
-        showError(confirmPassword, "Passwords do not match.");
-        isValid = false; if(!firstInvalidInput) firstInvalidInput = confirmPassword;
-    } else { hideError(confirmPassword); }
-
-        if (!isValid) {
-            e.preventDefault();
-            if (firstInvalidInput) {
-                firstInvalidInput.reportValidity();
-                firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
+    if (!isValid) { e.preventDefault(); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 });
 
-// ─── TIN INPUT ENFORCEMENT ───
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
-        // 1. Toast Timer Logic first
-        const backdrop = document.getElementById('errorBackdrop');
-            if (backdrop) {
-                setTimeout(function () {
-                    backdrop.style.transition = "opacity 0.4s ease";
-                    backdrop.style.opacity = "0";
-                    setTimeout(() => backdrop.remove(), 400);
-                }, 3000); 
-            }
+        var backdrop = document.getElementById('errorBackdrop');
+        if (backdrop) {
+            setTimeout(function () {
+                backdrop.style.transition = 'opacity 0.4s ease';
+                backdrop.style.opacity = '0';
+                setTimeout(() => backdrop.remove(), 400);
+            }, 3000);
+        }
 
-        // 2. Then your TIN Input Enforcement
         var tin = document.getElementById('tinInput');
         if (!tin) return;
 
         tin.addEventListener('keydown', function (e) {
             if (e.ctrlKey || e.metaKey) return;
-            var controlKeys = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End'];
-            if (controlKeys.indexOf(e.key) !== -1) return;
-
-            var pos = tin.selectionStart;
-            var key = e.key.toUpperCase();
-
-            if (pos === 0) {
-                if (!/^[A-Z]$/.test(key)) e.preventDefault();
-            } else if (pos === 1) {
-                if (!/^[A-Z0-9]$/.test(key)) e.preventDefault();
-            } else {
-                if (!/^[0-9]$/.test(key)) e.preventDefault();
-            }
+            var ctrl = ['Backspace','Delete','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Tab','Home','End'];
+            if (ctrl.indexOf(e.key) !== -1) return;
+            var pos = tin.selectionStart, key = e.key.toUpperCase();
+            if (pos === 0 && !/^[A-Z]$/.test(key))         e.preventDefault();
+            else if (pos === 1 && !/^[A-Z0-9]$/.test(key)) e.preventDefault();
+            else if (pos >= 2 && !/^[0-9]$/.test(key))     e.preventDefault();
         });
 
         tin.addEventListener('paste', function (e) {
@@ -448,14 +359,13 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
             var pasted = (e.clipboardData || window.clipboardData).getData('text').toUpperCase().replace(/\s/g, '');
             var result = '';
             for (var i = 0; i < pasted.length && result.length < 14; i++) {
-                var char = pasted[i];
-                if (result.length === 0 && /[A-Z]/.test(char)) result += char;
-                else if (result.length === 1 && /[A-Z0-9]/.test(char)) result += char;
-                else if (result.length >= 2 && /[0-9]/.test(char)) result += char;
+                var c = pasted[i];
+                if (result.length === 0 && /[A-Z]/.test(c))      result += c;
+                else if (result.length === 1 && /[A-Z0-9]/.test(c)) result += c;
+                else if (result.length >= 2 && /[0-9]/.test(c))  result += c;
             }
             tin.value = result;
         });
     });
 })();
-
 </script>

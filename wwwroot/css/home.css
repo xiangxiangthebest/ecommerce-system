@@ -1,18 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Mulish:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
 
 :root {
-    --bg:           #f4f6ff;
+    --bg:           #f5f4f0;
     --white:        #ffffff;
-    --accent:       #5b4fcf;
-    --accent-hover: #4739b0;
-    --accent-light: #eeecff;
-    --ink:          #1e1b4b;
-    --ink-mid:      #4c4880;
-    --ink-soft:     #9896b8;
-    --border:       #e2e0f5;
-    --shadow-sm:    0 2px 8px rgba(91, 79, 207, 0.07);
-    --shadow-lg:    0 20px 60px rgba(91, 79, 207, 0.15);
-    --radius:       16px;
+    --ink:          #1a1a2e;
+    --ink-mid:      #555;
+    --ink-soft:     #999;
+    --border:       rgba(0,0,0,0.08);
+    --border-hover: rgba(0,0,0,0.18);
+    --shadow-sm:    0 1px 3px rgba(0,0,0,0.05);
+    --shadow-md:    0 4px 20px rgba(0,0,0,0.08);
+    --radius:       18px;
+    --radius-sm:    12px;
 }
 
 *, *::before, *::after {
@@ -24,7 +23,7 @@
 body {
     background-color: var(--bg);
     color: var(--ink);
-    font-family: 'Mulish', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
 }
@@ -32,246 +31,179 @@ body {
 /* ── Page shell ── */
 .home-wrapper {
     min-height: 100vh;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    position: relative;
-    overflow: hidden;
-}
-
-.home-wrapper::before {
-    content: '';
-    position: fixed;
-    top: -160px;
-    right: -120px;
-    width: 480px;
-    height: 480px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(232,89,58,0.10) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.home-wrapper::after {
-    content: '';
-    position: fixed;
-    bottom: -100px;
-    left: -80px;
-    width: 360px;
-    height: 360px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(232,89,58,0.07) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* ── Main ── */
-.home-main {
-    position: relative;
-    z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 64px 24px 48px;
-    gap: 52px;
+    padding: 48px 24px;
 }
 
-/* ── Hero ── */
-.home-hero {
-    text-align: center;
-    max-width: 560px;
-    animation: fadeUp 0.65s 0.1s ease both;
-}
-
-.hero-tag {
-    display: inline-flex;
+/* ── Brand ── */
+.home-brand {
+    display: flex;
     align-items: center;
-    gap: 8px;
-    background: var(--accent-light);
-    color: var(--accent-dark);
-    font-size: 11px;
+    gap: 10px;
+    margin-bottom: 36px;
+    animation: fadeUp 0.4s ease both;
+}
+
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--ink);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.brand-name {
+    font-size: 18px;
     font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    padding: 6px 14px;
-    border-radius: 100px;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+}
+
+/* ── Card ── */
+.home-card {
+    background: var(--white);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem 1.75rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-sm);
+    animation: fadeUp 0.4s 0.08s ease both;
+}
+
+.home-card-header {
     margin-bottom: 24px;
 }
 
-.hero-tag-line {
-    width: 16px;
-    height: 1px;
-    background: var(--accent);
-}
-
-.home-hero h1 {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(36px, 6vw, 62px);
-    font-weight: 800;
-    line-height: 1.08;
-    letter-spacing: -0.03em;
+.home-card-header h1 {
+    font-size: 17px;
+    font-weight: 600;
     color: var(--ink);
-    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
 }
 
-.home-hero h1 span {
-    color: var(--accent);
-    position: relative;
+.home-card-header p {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-weight: 400;
 }
 
-.home-hero h1 span::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    bottom: 2px;
-    width: 100%;
-    height: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    opacity: 0.22;
-}
-
-.home-hero p {
-    font-size: 16px;
-    font-weight: 300;
-    color: var(--ink-mid);
-    line-height: 1.7;
-    max-width: 400px;
-    margin: 0 auto;
-}
-
-/* ── Role grid ── */
-.role-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    width: 100%;
-    max-width: 640px;
-    animation: fadeUp 0.65s 0.22s ease both;
+/* ── Role list ── */
+.role-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* ── Role card ── */
 .role-card {
-    position: relative;
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 28px 26px 22px;
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius);
+    align-items: center;
+    gap: 13px;
+    padding: 13px 14px;
+    background: rgba(0,0,0,0.02);
+    border: 0.5px solid rgba(0,0,0,0.09);
+    border-radius: var(--radius-sm);
     text-decoration: none;
     color: var(--ink);
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
-    overflow: hidden;
-    min-height: 156px;
-}
-
-.role-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--accent);
-    border-radius: var(--radius) var(--radius) 0 0;
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.3s ease;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .role-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-lg);
-    border-color: transparent;
+    border-color: var(--ink);
+    background: rgba(26, 26, 46, 0.04);
+    box-shadow: var(--shadow-md);
 }
 
-.role-card:hover::before {
-    transform: scaleX(1);
-}
-
-.role-card:hover .role-num {
-    color: var(--accent);
-}
-
-.role-card:hover .card-arrow {
-    background: var(--accent);
+.role-card:hover .role-icon {
+    background: var(--ink);
     color: #fff;
-    border-color: var(--accent);
-    transform: translate(2px, -2px);
 }
 
-/* Number */
-.role-num {
-    font-family: 'Syne', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: var(--ink-soft);
-    margin-bottom: 14px;
-    transition: color 0.28s ease;
-}
-
-/* Label */
-.role-label {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+.role-card:hover .role-arrow {
     color: var(--ink);
-    margin-bottom: 6px;
+    transform: translateX(2px);
 }
 
-.role-desc {
-    font-size: 12.5px;
-    font-weight: 400;
-    color: var(--ink-soft);
-    line-height: 1.55;
-}
-
-/* Footer row */
-.card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 22px;
-}
-
-.card-cta {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-}
-
-.card-arrow {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    border: 1.5px solid var(--border);
+/* Icon */
+.role-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    color: #888;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    color: var(--ink-mid);
-    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.role-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Text */
+.role-label {
+    flex: 1;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+/* Arrow */
+.role-arrow {
+    font-size: 17px;
+    color: #ccc;
+    line-height: 1;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+/* ── Divider ── */
+.role-divider {
+    height: 0.5px;
+    background: rgba(0,0,0,0.07);
+    margin: 4px 0;
+}
+
+/* ── Footer ── */
+.home-footer {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+    animation: fadeUp 0.4s 0.16s ease both;
 }
 
 /* ── Animations ── */
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-12px); }
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Responsive ── */
-@media (max-width: 540px) {
-    .role-grid { grid-template-columns: 1fr; max-width: 360px; }
-    .home-hero h1 { font-size: 34px; }
-    .home-main { gap: 40px; }
+@media (max-width: 480px) {
+    .home-card { padding: 1.5rem 1.25rem; }
 }

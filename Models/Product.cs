@@ -9,6 +9,8 @@ namespace EcommerceSystem.Models
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public double Price { get; set; }
+        public double OriginalPrice { get; set; } = 0;
+        public double DiscountPercentage { get; set; } = 0;
         public int StockQuantity { get; set; }
 
         public string SKU { get; set; } = string.Empty;
@@ -73,9 +75,12 @@ namespace EcommerceSystem.Models
 
         public bool IsInStock() => StockQuantity > 0;
 
-        public double OriginalPrice { get; set; } = 0;
         public double AverageRating { get; set; } = 0;
         public double ReviewCount   { get; set; } = 0;
+
+        // Soft delete fields
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
 
         // ── Nested types ─────────────────────────────────────────────────────
 

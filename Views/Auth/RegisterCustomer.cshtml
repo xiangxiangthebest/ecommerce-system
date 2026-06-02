@@ -2,93 +2,109 @@
 
 @{
     Layout = "_AuthLayout";
-    var role = ViewBag.Role as string;
+    var role = ViewBag.Role as string ?? "Customer";
 }
 
 <link rel="stylesheet" href="~/css/auth/auth.css" />
 
 <div class="auth-container">
 
+    <a class="auth-back" href="http://localhost:5141/">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+    </a>
+
+    <div class="auth-brand">
+        <div class="auth-brand-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 01-8 0"/>
+            </svg>
+        </div>
+        <span class="auth-brand-name">MMU Shop</span>
+    </div>
+
     <div class="auth-card">
 
         <div class="auth-top">
-            <div class="auth-badge">Customer Portal</div>
-            <h1>Create Account</h1>
-            <p>Register as a customer and start using the platform.</p>
+            <div class="auth-badge">
+                <span class="auth-badge-dot"></span>
+                Customer Portal
+            </div>
+            <h1>Create account</h1>
+            <p>Register to start shopping on MMU Shop.</p>
         </div>
-        
+
         <form asp-controller="Auth" asp-action="RegisterCustomer" method="post" class="auth-form">
             @Html.AntiForgeryToken()
 
             <div class="form-group">
-                <label>Full Name</label>
-                <input asp-for="FullName" class="form-control" placeholder="Enter your full name" />
+                <label>Full name</label>
+                <input asp-for="FullName" placeholder="Your full name" />
                 <span asp-validation-for="FullName" class="text-danger"></span>
             </div>
 
             <div class="form-group">
-                <label>Email Address</label>
-                <input asp-for="Email" class="form-control" placeholder="Enter your email" />
+                <label>Email address</label>
+                <input asp-for="Email" placeholder="you@example.com" />
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
             <div class="form-group">
                 <label>Password</label>
                 <div class="password-wrapper">
-                    <input asp-for="Password" type="password" id="password" class="form-control" placeholder="Create your password" />
+                    <input asp-for="Password" type="password" id="password"
+                           placeholder="Create a password" />
                     <span class="toggle-password" onclick="togglePassword('password', this)">
-                        <i class="fa-solid fa-eye"></i>
+                        <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </span>
                 </div>
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>
 
             <div class="form-group">
-                <label>Confirm Password</label>
+                <label>Confirm password</label>
                 <div class="password-wrapper">
-                    <input asp-for="ConfirmPassword" type="password" id="confirmPassword" class="form-control" placeholder="Confirm your password" />
+                    <input asp-for="ConfirmPassword" type="password" id="confirmPassword"
+                           placeholder="Confirm your password" />
                     <span class="toggle-password" onclick="togglePassword('confirmPassword', this)">
-                        <i class="fa-solid fa-eye"></i>
+                        <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off-icon" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </span>
                 </div>
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
 
-            <button type="submit" class="auth-btn">
-                Create Account
-            </button>
-
+            <button type="submit" class="auth-btn">Create account</button>
         </form>
 
+        <div class="auth-divider"></div>
         <div class="auth-bottom">
-            <span>Already have an account?</span>
-
-            <a href="/Auth/Login?role=@role">
-                Login
-            </a>
+            Already have an account?
+            <a href="/Auth/Login?role=@role">Sign in</a>
         </div>
 
     </div>
 
+    <p class="auth-footer">© 2026 CSE6234 TT5L Group 4. All rights reserved.</p>
+
 </div>
 
 <script>
-    function togglePassword(inputId, element) {
-
-        const input = document.getElementById(inputId);
-        const icon = element.querySelector("i");
-
-        if (input.type === "password") {
-            input.type = "text";
-
-            icon.classList.remove("fa-eye");
-            icon.classList.add("fa-eye-slash");
-        }
-        else {
-            input.type = "password";
-
-            icon.classList.remove("fa-eye-slash");
-            icon.classList.add("fa-eye");
-        }
+function togglePassword(inputId, el) {
+    const input   = document.getElementById(inputId);
+    const eyeOn   = el.querySelector('.eye-icon');
+    const eyeOff  = el.querySelector('.eye-off-icon');
+    if (input.type === 'password') {
+        input.type          = 'text';
+        eyeOn.style.display  = 'none';
+        eyeOff.style.display = 'block';
+    } else {
+        input.type          = 'password';
+        eyeOn.style.display  = 'block';
+        eyeOff.style.display = 'none';
     }
+}
 </script>
