@@ -458,7 +458,7 @@ namespace EcommerceSystem.Services
 
             // ── Notify all parties then persist ──
             AttachObservers(order);
-            order.SetStatus(OrderStatus.CANCELED);
+            await order.SetStatusAsync(OrderStatus.CANCELED);
 
             await _context.SaveChangesAsync();
 
@@ -483,7 +483,7 @@ namespace EcommerceSystem.Services
 
             // ── Notify all parties then persist ──
             AttachObservers(order);
-            order.SetStatus(OrderStatus.RECEIVED);
+            await order.SetStatusAsync(OrderStatus.RECEIVED);
 
             await _context.SaveChangesAsync();
 
@@ -519,7 +519,7 @@ namespace EcommerceSystem.Services
 
             // ── Notify all parties then persist ──
             AttachObservers(order);
-            order.SetStatus(OrderStatus.RETURN_REFUND);
+            await order.SetStatusAsync(OrderStatus.RETURN_REFUND);
 
             await _context.SaveChangesAsync();
 

@@ -5,8 +5,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using EcommerceSystem.Factories;
-using EcommerceSystem.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 
 namespace EcommerceSystem.Controllers
@@ -14,10 +12,12 @@ namespace EcommerceSystem.Controllers
     public class AuthController : Controller
     {
         private readonly IUserService _userService;
+        private readonly AppDbContext _context;  // ← ADD THIS
 
-        public AuthController(IUserService userService)
+        public AuthController(IUserService userService, AppDbContext context)  // ← ADD context
         {
             _userService = userService;
+            _context = context;  // ← ADD THIS
         }
 
         [HttpGet]
@@ -109,6 +109,46 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
+            // ── 1. Email uniqueness — checked across ALL user types ──────────
+            // If a@gmail.com is used by a Customer, Seller, or CustomerService,
+            // no one else can register with that same email.
+            bool emailTaken =
+                await _context.Users.AnyAsync(u => u.Email == model.Email) ||
+                await _context.Seller.AnyAsync(s => s.Email == model.Email);
+
+            if (emailTaken)
+            {
+                TempData["RegisterError"] = "This Email Address is already registered. Please use a different email.";
+                ViewBag.Role = "Seller";
+                ViewBag.StartAtStep = 2;
+                return View(model);
+            }
+
+            // ── 2. Shop name uniqueness ──────────────────────────────────────
+            bool shopNameTaken = await _context.Seller
+                .AnyAsync(s => s.ShopName == model.ShopName);
+
+            if (shopNameTaken)
+            {
+                TempData["RegisterError"] = "This Shop Name is already taken. Please pick a unique name.";
+                ViewBag.Role = "Seller";
+                ViewBag.StartAtStep = 2;
+                return View(model);
+            }
+
+            // ── 3. Contact number uniqueness ─────────────────────────────────
+            bool contactTaken = await _context.Seller
+                .AnyAsync(s => s.PhoneNumber == model.PhoneNumber);
+
+            if (contactTaken)
+            {
+                TempData["RegisterError"] = "This Contact Number is already registered. Please use a different number.";
+                ViewBag.Role = "Seller";
+                ViewBag.StartAtStep = 2;
+                return View(model);
+            }
+
+            // ── All checks passed — proceed with registration ─────────────────
             await _userService.RegisterSellerAsync(model);
 
             return RedirectToAction("Login", new { role = "Seller" });

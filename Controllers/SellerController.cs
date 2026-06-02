@@ -120,10 +120,8 @@ namespace EcommerceSystem.Controllers
             ViewBag.ShopName = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
 
-            if (tab == "Profile")
-            {
-                ViewBag.ProfileSeller = seller;
-            }
+            var notifications = await _notificationService.GetForUserAsync(seller.UserId);
+            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
 
             if (seller.IsApproved)
             {
@@ -142,10 +140,14 @@ namespace EcommerceSystem.Controllers
                         .Where(o => o.SellerUserId == seller.UserId)
                         .OrderByDescending(o => o.OrderTime)
                         .ToListAsync();
-                    ViewBag.Orders = orders;
+                    ViewBag.Orders = orders;                                   
                 }
+                if (tab == "Profile")
+                    {
+                        ViewBag.ProfileSeller = seller;
+                    }            
 
-                            if (tab == "Chat")
+                if (tab == "Chat")
                 {
                     // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
                     var chatList = await _context.ChatRoom
@@ -165,7 +167,6 @@ namespace EcommerceSystem.Controllers
                     return View("Home", chatList); 
                 }
             }
-
             return View();
         }
 
@@ -675,13 +676,13 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 
-            // Attach observers — they are called inside SetStatus()
+            // Attach observers — they are called inside SetStatusAsync()
             order.Attach(new CustomerDashboardObserver(_notificationService));
             order.Attach(new SellerDashboardObserver(_notificationService));
             order.Attach(new AdminPanelObserver(_notificationService, _context));
 
-            // SetStatus does the final validation, stamps timestamps, notifies observers
-            order.SetStatus(newStatus);
+            // SetStatusAsync does the final validation, stamps timestamps, notifies observers
+            await order.SetStatusAsync(newStatus);
 
             await _context.SaveChangesAsync();
 
@@ -851,7 +852,5 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("SellerInbox", "Chat");
         }
     }
-
-
 }
 
