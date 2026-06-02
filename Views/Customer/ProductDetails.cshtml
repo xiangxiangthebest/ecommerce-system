@@ -249,7 +249,7 @@
             </div>
 
 
-       <form asp-controller="Chat" asp-action="StartConversation" method="post">
+       <form asp-controller="Chat" asp-action="CustomerStartConversation" method="post">
     @Html.AntiForgeryToken()
 
     <input type="hidden" name="sellerId" value="@Model.SellerId" />

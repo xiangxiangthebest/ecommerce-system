@@ -40,7 +40,7 @@
                 @if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
                 {
                     var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
-                    <div class="product-card-bubble">
+                    <div class="product-card-bubble js-custom-card">
                         @Html.Raw(cleanHtml)
                     </div>
                 }
@@ -76,7 +76,6 @@
                 else if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
                 {
                     var cleanImgHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
-                    // 💡 包装一层点击事件，点击时提取内部 img 的 src 并塞给预览模态框
                     <div class="image-bubble cursor-pointer" onclick="previewChatImage(this)">
                         @Html.Raw(cleanImgHtml)
                     </div>
@@ -229,7 +228,6 @@
     }
     .cursor-pointer { cursor: pointer; }
     
-    /* 保证图片在气泡里不会撑破自适应样式 */
     .image-bubble img {
         max-width: 100%;
         height: auto;
@@ -239,21 +237,142 @@
 
 @section Scripts {
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // 将 Razor C# 变量安全地传递给全局 JavaScript 对象，供外部 JS 文件读取 [cite: 42, 68]
-        window.chatConfig = {
-            sellerId: "@Model.SellerId", [cite: 42]
-            chatRoomId: "@Model.ChatRoomId", [cite: 42]
-            // 如果快捷商品不为空，保存其基础信息，否则传空 [cite: 68]
-            hasChatProduct: @(ViewBag.ChatProduct != null ? "true" : "false"),
-            chatProductName: `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`, [cite: 68]
-            chatProductId: `@ViewBag.ChatProduct?.ProductId`, [cite: 68]
-            chatProductPrice: `@ViewBag.ChatProduct?.Price`, [cite: 69]
-            chatProductImagePath: `@ViewBag.ChatProduct?.ImagePath` [cite: 69]
-        };
-    </script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var messageBody = document.getElementById("messageBody");
+            if (messageBody) { messageBody.scrollTop = messageBody.scrollHeight; }
 
-    <script src="~/js/customer/chat-room.js"></script>
+            var sellerId = "@Model.SellerId";
+            var chatRoomId = "@Model.ChatRoomId";
+
+            console.log("The Chatroom Anti-Garbled Text Filter has been fully activated....");
+            
+            document.querySelectorAll(".product-card-bubble, .js-custom-card").forEach(function (bubble) {
+                const titleSpan = bubble.querySelector(".js-product-title") 
+                               || bubble.querySelector("span.fw-bold.text-dark") 
+                               || bubble.querySelector(".text-dark.fw-bold");
+                               
+                if (titleSpan) {
+                    let txt = titleSpan.innerText.trim();
+                    
+                    if (txt.includes("search=") || txt.includes("%") || txt.includes("Home?")) {
+                        try {
+                            while (txt.includes("%")) {
+                                let old = txt;
+                                txt = decodeURIComponent(txt);
+                                if (old === txt) break;
+                            }
+                            
+                            if (txt.includes("search=")) {
+                                txt = txt.split("search=")[1];
+                            }
+                            
+                            const pts = txt.split('/');
+                            let finalName = pts[pts.length - 1] || "商品";
+                            if (finalName.includes("?")) {
+                                finalName = finalName.split("?")[0];
+                            }
+                            
+                            titleSpan.innerText = finalName.trim();
+                            console.log("Successfully cleaned one garbled product name from the buyer's chat history. -> ", finalName.trim());
+                        } catch (e) {
+                            console.error("Failed to clean historical text: ", e);
+                        }
+                    }
+                }
+            });
+            // ========================================================
+
+            var sellerProductsModal = document.getElementById('sellerProductsModal');
+            if (sellerProductsModal) {
+            }
+
+            var customerOrdersModal = document.getElementById('customerOrdersModal');
+            if (customerOrdersModal) {
+            }
+
+            var sendProductBtn = document.getElementById("sendProductLinkBtn");
+            }
+
+            @if (User.HasClaim(c => c.Type == "SellerId") || User.IsInRole("Seller"))
+            {
+                <text>
+                document.addEventListener("click", function (e) {
+                    const bubble = e.target.closest(".js-custom-card, .product-card-bubble");
+                    if (bubble) {
+                        const anchor = bubble.querySelector("a");
+                        if (anchor) {
+                            e.preventDefault();
+
+                            const titleSpan = bubble.querySelector(".js-product-title") || bubble.querySelector("span.fw-bold.text-dark");
+                            let searchWord = "";
+                            
+                            if (titleSpan && !titleSpan.innerText.includes("Home?") && !titleSpan.innerText.includes("%")) {
+                                searchWord = titleSpan.innerText.trim();
+                            } else {
+                                let hrefAttr = anchor.getAttribute("href") || "";
+                                try { while (hrefAttr.includes("%")) { hrefAttr = decodeURIComponent(hrefAttr); } } catch(err) { }
+                                if (hrefAttr.includes("search=")) hrefAttr = hrefAttr.split("search=")[1];
+                                const parts = hrefAttr.split('/');
+                                searchWord = parts[parts.length - 1] || "";
+                                if (searchWord.includes("?")) searchWord = searchWord.split("?")[0];
+                            }
+
+                            if (searchWord) {
+                                window.location.href = window.location.origin + "/Seller/Home?tab=Product&search=" + encodeURIComponent(searchWord.trim());
+                            }
+                        }
+                    }
+                });
+                </text>
+            }
+        });
+
+        function sendCustomCard(type, title, id, price, img) {
+            var input = document.getElementById("messageInput");
+            var form = document.getElementById("chatForm");
+            
+            if(type === 'PRODUCT') {
+                var cleanTitle = title;
+                try { cleanTitle = decodeURIComponent(title); } catch(e){}
+                cleanTitle = cleanTitle.replace(/'/g, "").replace(/"/g, "").trim();
+
+                var standardUrl = "/Customer/ProductDetails/" + id;
+
+                input.value =
+                    "[PRODUCT_CARD]" +
+                    "<div class='product-card-bubble'>" +
+                    "<a href='" + standardUrl + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-info-subtle' style='max-width:260px; text-align:left;'>" +
+                    "<div class='p-1'>" +
+                    "<div class='text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between' style='font-size:11px;'>\n" +
+                    "<span>Products</span>" +
+                    "<span class='text-primary fw-bold'>Click to view details</span>" +
+                    "</div>" +
+                    "<div class='d-flex align-items-center mb-2'>" +
+                    "<img src='" + img + "' class='rounded border me-2' style='width:55px;height:55px;object-fit:cover;' onerror=\"this.src='/images/default-product.jpg'\" />" +
+                    "<div class='text-truncate' style='line-height:1.2;'>" +
+                    "<span class='d-block fw-bold text-dark text-truncate js-product-title' style='font-size:12px;'>" + cleanTitle + "</span>" +
+                    "<small class='text-muted d-block text-truncate' style='font-size:11px;'>Go to product page</small>" +
+                    "</div>" +
+                    "</div>" +
+                    "<div class='text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1' style='font-size:12px;'>" +
+                    "<span>Price: <b class='text-danger'>RM " + price + "</b></span>" +
+                    "<span class='text-primary' style='font-size:11px;'>View <i class='bi bi-chevron-right'></i></span>" +
+                    "</div>" +
+                    "</div>" +
+                    "</a>" +
+                    "</div>";
+            }
+            else if(type === 'ORDER') {
+                input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img;
+            }
+            input.removeAttribute("required");
+            form.submit();
+        }
+
+        function previewChatImage(element) { /* ... */ }
+    </script>
+}
 }

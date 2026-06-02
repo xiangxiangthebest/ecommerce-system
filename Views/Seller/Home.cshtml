@@ -1,3 +1,5 @@
+@using System.Linq
+
 @{
     ViewData["Title"] = "Seller Dashboard";
     bool isApproved = ViewBag.IsApproved == true;
@@ -27,6 +29,11 @@
                 <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
                         <span class="nav-text">Order</span>
+                    </a>
+                </li>
+                <li class="@(ViewBag.ActiveTab == "Chat" ? "active" : "")">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Chat" })">
+                        <span class="nav-text">Chat</span>
                     </a>
                 </li>
             }
@@ -92,7 +99,7 @@
             var allProducts    = ViewBag.Products as List<EcommerceSystem.Models.Product> ?? new List<EcommerceSystem.Models.Product>();
             var activeProducts = allProducts.Where(p => !p.IsDraft).ToList();
             var draftProducts  = allProducts.Where(p => p.IsDraft).ToList();
-            var bannedProducts = new List<EcommerceSystem.Models.Product>(); // placeholder for future admin ban feature
+            var bannedProducts = new List<EcommerceSystem.Models.Product>();
 
             <div class="product-header">
                 <h2 class="section-title">Your Products</h2>
@@ -220,6 +227,18 @@
                         card.style.display = card.getAttribute('data-name').includes(q) ? '' : 'none';
                     });
                 }
+
+                document.addEventListener('DOMContentLoaded', function () {
+                var params = new URLSearchParams(window.location.search);
+                var search = params.get('search');
+                if (search) {
+                    var input = document.getElementById('product-search');
+                    if (input) {
+                        input.value = decodeURIComponent(search);
+                        filterCards();
+                    }
+                }
+            });
             </script>
         }
         else if (ViewBag.ActiveTab == "Order")
@@ -235,50 +254,29 @@
             int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
             int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
 
-            <!-- ── Page header ── -->
             <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
             </div>
 
-            <!-- ── Status tabs ── -->
             <div class="order-tabs" id="orderTabs">
-                <button class="order-tab active" data-status="ALL">
-                    All <span class="order-tab-badge">@cntAll</span>
-                </button>
-                <button class="order-tab" data-status="PENDING">
-                    Pending <span class="order-tab-badge">@cntPending</span>
-                </button>
-                <button class="order-tab" data-status="PREPARING">
-                    Processing <span class="order-tab-badge">@cntPreparing</span>
-                </button>
-                <button class="order-tab" data-status="SHIPPED">
-                    Shipped <span class="order-tab-badge">@cntShipped</span>
-                </button>
-                <button class="order-tab" data-status="DELIVERED">
-                    Delivered <span class="order-tab-badge">@cntDelivered</span>
-                </button>
-                <button class="order-tab" data-status="RECEIVED">
-                    Completed <span class="order-tab-badge">@cntReceived</span>
-                </button>
-                <button class="order-tab" data-status="CANCELED">
-                    Cancelled <span class="order-tab-badge">@cntCanceled</span>
-                </button>
-                <button class="order-tab" data-status="RETURN_REFUND">
-                    Return/Refund <span class="order-tab-badge">@cntReturnRefund</span>
-                </button>
+                <button class="order-tab active" data-status="ALL">All <span class="order-tab-badge">@cntAll</span></button>
+                <button class="order-tab" data-status="PENDING">Pending <span class="order-tab-badge">@cntPending</span></button>
+                <button class="order-tab" data-status="PREPARING">Processing <span class="order-tab-badge">@cntPreparing</span></button>
+                <button class="order-tab" data-status="SHIPPED">Shipped <span class="order-tab-badge">@cntShipped</span></button>
+                <button class="order-tab" data-status="DELIVERED">Delivered <span class="order-tab-badge">@cntDelivered</span></button>
+                <button class="order-tab" data-status="RECEIVED">Completed <span class="order-tab-badge">@cntReceived</span></button>
+                <button class="order-tab" data-status="CANCELED">Cancelled <span class="order-tab-badge">@cntCanceled</span></button>
+                <button class="order-tab" data-status="RETURN_REFUND">Return/Refund <span class="order-tab-badge">@cntReturnRefund</span></button>
             </div>
 
-            <!-- ── Search + SKU filter bar ── -->
             <div class="order-filter-bar">
                 <div class="order-search-wrap">
                     <i class="fas fa-search" style="color:#9a98b6;font-size:13px"></i>
-                    <input type="text" id="orderSearch" placeholder="Search by Order ID or customer email…"
-                           oninput="applyOrderFilters()" />
+                    <input type="text" id="orderSearch" placeholder="Search by Order ID or customer email…" oninput="applyOrderFilters()" />
                 </div>
                 <div class="order-search-wrap">
                     <i class="fas fa-barcode" style="color:#9a98b6;font-size:13px"></i>
-                    <input type="text" id="orderSkuFilter" placeholder="Filter by product SKU…"
-                           oninput="applyOrderFilters()" />
+                    <input type="text" id="orderSkuFilter" placeholder="Filter by product SKU…" oninput="applyOrderFilters()" />
                 </div>
             </div>
 
@@ -293,8 +291,8 @@
                             <th>Total (RM)</th>
                             <th>Payment</th>
                             <th>Status</th>
-                            <th>Return Reason</th>
                             <th>Details</th>
+                            <th>Chat</th> <!-- 已加：独立的 Chat 列标题 -->
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -304,9 +302,8 @@
                             var statusKey  = order.CurrentStatus.ToString().ToUpper();
                             var skuList    = string.Join(" ", order.OrderItems.Select(oi => oi.Product?.SKU ?? "")).ToLower();
                             var searchHint = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
-                            <tr data-status="@statusKey"
-                                data-search="@searchHint"
-                                data-sku="@skuList">
+                            
+                            <tr data-status="@statusKey" data-search="@searchHint" data-sku="@skuList">
                                 <td>#@order.OrderId</td>
                                 <td>@(order.Customer?.Email ?? "—")</td>
                                 <td>@order.OrderTime.ToString("dd MMM yyyy")</td>
@@ -317,24 +314,24 @@
                                         @order.CurrentStatus
                                     </span>
                                 </td>
-                                <td style="max-width:180px;font-size:12px;color:#6b6b8a;word-break:break-word">
-                                    @if (!string.IsNullOrWhiteSpace(order.ReturnReason))
-                                    {
-                                        var displayReason = order.ReturnReason;
-                                        var sepIdx = displayReason.IndexOf("||");
-                                        if (sepIdx >= 0) displayReason = displayReason[..sepIdx];
-                                        displayReason = displayReason.Trim();
-                                        if (displayReason.StartsWith("[") && displayReason.EndsWith("]"))
-                                            displayReason = displayReason[1..^1].Trim();
-                                        @displayReason
-                                    }
-                                    else { <span style="color:#ccc">—</span> }
-                                </td>
                                 <td>
-                                    <button class="btn-view-details"
-                                            onclick="openOrderDetails(@order.OrderId)">
+                                    <button class="btn-view-details" onclick="openOrderDetails(@order.OrderId)">
                                         <i class="fas fa-eye"></i> View
                                     </button>
+                                </td>
+                                <td> <!-- 已加：独立的 Chat 按钮单元格 -->
+                                    @if (order.Customer != null)
+                                    {
+                                        <a href="@Url.Action("Home", "Seller", new { tab = "ChatRoom", customerId = order.CustomerUserId })" 
+                                           class="btn-order-chat" 
+                                           title="Chat with Customer">
+                                            <i class="fas fa-comments"></i>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:#ccc">—</span>
+                                    }
                                 </td>
                                 <td>
                                     @{
@@ -344,7 +341,7 @@
                                     }
                                     @if (sellerNext.Any())
                                     {
-                                        <form asp-action="UpdateOrderStatus" method="post" style="display:flex;gap:6px;align-items:center;">
+                                        <form asp-action="UpdateOrderStatus" method="post" style="display:flex;gap:6px;align-items:center;margin:0;">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="orderId" value="@order.OrderId" />
                                             <select name="newStatus" class="status-select">
@@ -359,22 +356,20 @@
                                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                                              && !order.ReturnApprovedAt.HasValue)
                                     {
-                                        <button class="btn-update-status"
-                                                style="background:#f97316"
-                                                onclick="openApproveReturnModal(@order.OrderId)">
+                                        <button class="btn-update-status" style="background:#f97316" onclick="openApproveReturnModal(@order.OrderId)">
                                             <i class="fas fa-check-circle"></i> Approve Return
                                         </button>
                                     }
                                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                                              && order.ReturnApprovedAt.HasValue)
                                     {
-                                        <span style="color:#22c55e;font-size:13px;font-weight:600;">
+                                        <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
                                             <i class="fas fa-check-circle"></i> Return Approved
                                         </span>
                                     }
                                     else
                                     {
-                                        <span style="color:#9a98b6;font-size:13px;font-style:italic;">No action</span>
+                                        <span style="color:#9a98b6;font-size:13px;font-style:italic;white-space:nowrap;">No action</span>
                                     }
                                 </td>
                             </tr>
@@ -382,7 +377,6 @@
                     </tbody>
                 </table>
 
-                <!-- Empty state shown when filters produce no results -->
                 <div id="orderNoResults" class="empty-state-panel" style="display:none;">
                     <i class="fas fa-search empty-icon"></i>
                     <p>No orders match your filter.</p>
@@ -397,7 +391,6 @@
             }
 
             <script>
-            // ── Order tab + filter logic ──────────────────────────────────────
             document.querySelectorAll('.order-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     document.querySelectorAll('.order-tab').forEach(t => t.classList.remove('active'));
@@ -430,6 +423,20 @@
             }
             </script>
         }
+        else if (ViewBag.ActiveTab == "Chat")
+        {
+            <div class="p-3 bg-white rounded shadow-sm">
+                <partial name="ChatList" model="Model" />
+            </div>
+        }
+
+        
+        else if (ViewBag.ActiveTab == "ChatRoom")
+        {
+            <div class="p-1 bg-white rounded shadow-sm border">
+                <partial name="~/Views/Seller/ChatRoom.cshtml" model="Model" />
+            </div>
+        }
         else
         {
             <div class="details-container">
@@ -441,25 +448,16 @@
     </main>
 </div>
 
-@* ── Seller: inject order data for the Approve Return modal ── *@
 @if (ViewBag.ActiveTab == "Order" && ViewBag.Orders != null)
 {
-    // Parse the structured ReturnReason payload written by CustomerController.
-    // Format: "[ReturnType] Reason text||description||[{json-array}]"
-    // or legacy: "[reason text]||[{json-array}]||ReturnType"
     static (string reason, string embeddedType, string description, Dictionary<int, int> requestedQtys, string returnType) ParseReturnReason(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw))
-            return ("", "", "", new Dictionary<int, int>(), "");
-
+        if (string.IsNullOrWhiteSpace(raw)) return ("", "", "", new Dictionary<int, int>(), "");
         var sep = raw.IndexOf("||");
-        if (sep < 0)
-            return (raw, "", "", new Dictionary<int, int>(), "");
+        if (sep < 0) return (raw, "", "", new Dictionary<int, int>(), "");
 
         var firstPart  = raw[..sep].Trim();
         var rest       = raw[(sep + 2)..];
-
-        // Extract embedded return type from bracket prefix e.g. "[Refund Only] Wrong item received"
         var embeddedType = "";
         var reasonText   = firstPart;
         if (firstPart.StartsWith("["))
@@ -471,19 +469,13 @@
                 reasonText   = firstPart[(closeBracket + 1)..].Trim();
             }
         }
-
-        // Extract optional return type appended as "||ReturnRefund" at end (legacy)
         var returnType = "";
         var sep2 = rest.LastIndexOf("||");
-        // Detect if last segment looks like JSON array (starts with '[') — if not, it's returnType
         if (sep2 >= 0 && !rest[(sep2 + 2)..].TrimStart().StartsWith("["))
         {
             returnType = rest[(sep2 + 2)..].Trim();
             rest       = rest[..sep2];
         }
-
-        // Check if there's a description segment before the JSON array
-        // Format may be: "description||[{json}]" or just "[{json}]"
         var description = "";
         var jsonSep = rest.IndexOf("||");
         if (jsonSep >= 0)
@@ -491,19 +483,14 @@
             description = rest[..jsonSep].Trim();
             rest        = rest[(jsonSep + 2)..];
         }
-
         try
         {
-            var items = System.Text.Json.JsonSerializer.Deserialize<
-                List<System.Text.Json.JsonElement>>(rest);
-
+            var items = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(rest);
             var dict = new Dictionary<int, int>();
             if (items != null)
                 foreach (var el in items)
                 {
-                    var id  = el.GetProperty("orderItemId").GetInt32();
-                    var qty = el.GetProperty("returnQty").GetInt32();
-                    dict[id] = qty;
+                    dict[el.GetProperty("orderItemId").GetInt32()] = el.GetProperty("returnQty").GetInt32();
                 }
             return (reasonText, embeddedType, description, dict, returnType);
         }
@@ -521,21 +508,11 @@
     }
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
-        .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                 && !o.ReturnApprovedAt.HasValue)
+        .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && !o.ReturnApprovedAt.HasValue)
         .Select(o => {
             var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
-
-            // Determine display return type: prefer the bracket-embedded type, then the
-            // dedicated DB column, then the legacy trailing segment.
-            var returnType = !string.IsNullOrWhiteSpace(embeddedType)
-                ? embeddedType
-                : (!string.IsNullOrWhiteSpace(parsedReturnType)
-                    ? parsedReturnType
-                    : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
-
+            var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
             var useAllItems = requestedQtys.Count == 0;
-
             return new {
                 orderId           = o.OrderId,
                 returnType        = returnType,
@@ -544,31 +521,24 @@
                 returnImages      = ParseImagePaths(o.ReturnImagePathsJson),
                 customerEmail     = o.Customer?.Email ?? "—",
                 customerName      = o.Customer?.FullName ?? "",
-                items = o.OrderItems
-                    .Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId))
-                    .Select(oi => new {
-                        orderItemId  = oi.OrderItemId,
-                        name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU)
-                                            ? $"[{oi.Product!.SKU}] " : "")
-                                       + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                        sku          = oi.Product?.SKU ?? "—",
-                        orderedQty   = oi.Quantity,
-                        requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
-                        unitPrice    = oi.Price.ToString("F2")
-                    }).ToList()
+                items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
+                    orderItemId  = oi.OrderItemId,
+                    name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                    sku          = oi.Product?.SKU ?? "—",
+                    orderedQty   = oi.Quantity,
+                    requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
+                    unitPrice    = oi.Price.ToString("F2")
+                }).ToList()
             };
         }).ToList();
 
-    @* ── All orders data for the View Details modal ── *@
     var allOrdersForDetails = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
         .Select(o => {
             var displayReturnReason = o.ReturnReason ?? "";
             var rSep = displayReturnReason.IndexOf("||");
             if (rSep >= 0) displayReturnReason = displayReturnReason[..rSep];
-            // Strip legacy "[]" brackets from old stored entries
             displayReturnReason = displayReturnReason.Trim();
-            if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]"))
-                displayReturnReason = displayReturnReason[1..^1].Trim();
+            if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]")) displayReturnReason = displayReturnReason[1..^1].Trim();
             return new {
                 orderId         = o.OrderId,
                 orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
@@ -579,11 +549,9 @@
                 cancelReason    = o.CancelReason ?? "",
                 returnReason    = displayReturnReason,
                 returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "",
-                // Customer info
                 customerEmail   = o.Customer?.Email ?? "—",
                 customerPhone   = o.Customer?.Phone ?? "—",
                 customerName    = (o.Customer?.FullName ?? ""),
-                // Delivery address
                 deliveryName    = o.DeliveryRecipientName,
                 deliveryPhone   = o.DeliveryPhoneNumber,
                 deliveryLine1   = o.DeliveryAddressLine1,
@@ -591,7 +559,6 @@
                 deliveryCity    = o.DeliveryCity,
                 deliveryPostcode= o.DeliveryPostcode,
                 deliveryState   = o.DeliveryState,
-                // Order items
                 items = o.OrderItems.Select(oi => new {
                     productName       = oi.Product?.Name ?? $"Product #{oi.ProductId}",
                     sku               = oi.Product?.SKU ?? "—",
@@ -613,13 +580,7 @@
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
 
-        // ── Customer Request Summary banner ──────────────────────────────
-        const typeIconMap = {
-            'Refund Only':      { icon: '💰', label: 'Refund Only' },
-            'RefundOnly':       { icon: '💰', label: 'Refund Only' },
-            'Return & Refund':  { icon: '📦', label: 'Return & Refund' },
-            'ReturnRefund':     { icon: '📦', label: 'Return & Refund' },
-        };
+        const typeIconMap = { 'Refund Only': { icon: '💰', label: 'Refund Only' }, 'RefundOnly': { icon: '💰', label: 'Refund Only' }, 'Return & Refund': { icon: '📦', label: 'Return & Refund' }, 'ReturnRefund': { icon: '📦', label: 'Return & Refund' } };
         const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
         const custName   = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
 
@@ -645,60 +606,33 @@
         if (order.returnDescription) {
             summaryHtml += `
             <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;margin-bottom:10px;">
-                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">
-                    <i class="fas fa-comment-alt" style="margin-right:4px"></i>Description
-                </div>
+                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px"><i class="fas fa-comment-alt" style="margin-right:4px"></i>Description</div>
                 <div style="font-size:13px;color:#5d4037;line-height:1.5">${order.returnDescription}</div>
             </div>`;
         }
 
         if (order.returnImages && order.returnImages.length > 0) {
-            let imgHtml = order.returnImages.map(src => `
-                <a href="${src}" target="_blank" style="display:block;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid #ffe0b2;flex-shrink:0;">
-                    <img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block"
-                         onerror="this.src='/images/placeholder.png'" />
-                </a>`).join('');
-            summaryHtml += `
-            <div>
-                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
-                    <i class="fas fa-camera" style="margin-right:4px"></i>Photo Proof (${order.returnImages.length})
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">${imgHtml}</div>
-            </div>`;
+            let imgHtml = order.returnImages.map(src => `<a href="${src}" target="_blank" style="display:block;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1.5px solid #ffe0b2;flex-shrink:0;"><img src="${src}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.src='/images/placeholder.png'" /></a>`).join('');
+            summaryHtml += `<div><div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px"><i class="fas fa-camera" style="margin-right:4px"></i>Photo Proof (${order.returnImages.length})</div><div style="display:flex;gap:8px;flex-wrap:wrap">${imgHtml}</div></div>`;
         }
 
-        const rtEl = document.getElementById('approveReturnTypeInfo');
-        if (rtEl) rtEl.innerHTML = summaryHtml;
+        document.getElementById('approveReturnTypeInfo').innerHTML = summaryHtml;
 
-        // ── Item list ────────────────────────────────────────────────────
         let html = '';
         if (!order.items || order.items.length === 0) {
-            html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">
-                        No return items found for this order.
-                    </div>`;
+            html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">No return items found.</div>`;
         } else {
             order.items.forEach(item => {
                 html += `
                 <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
-                    <input type="checkbox" class="approve-item-chk"
-                           data-order-item-id="${item.orderItemId}" data-max="${item.requestedQty}"
-                           data-unit-price="${item.unitPrice}" data-name="${item.name}"
-                           onchange="syncApproveQty(this);updateRefundBreakdown()"
-                           style="width:16px;height:16px;cursor:pointer" />
+                    <input type="checkbox" class="approve-item-chk" data-order-item-id="${item.orderItemId}" data-max="${item.requestedQty}" data-unit-price="${item.unitPrice}" data-name="${item.name}" onchange="syncApproveQty(this);updateRefundBreakdown()" style="width:16px;height:16px;cursor:pointer" />
                     <label style="flex:1">
                         <div style="font-weight:600;font-size:13px">${item.name}</div>
-                        <div style="font-size:12px;color:#9a98b6">
-                            Qty in order: ${item.orderedQty} &nbsp;|&nbsp;
-                            <span style="color:#f97316;font-weight:600">Customer requested: ${item.requestedQty}</span>
-                            &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span>
-                        </div>
+                        <div style="font-size:12px;color:#9a98b6">Qty in order: ${item.orderedQty} &nbsp;|&nbsp; <span style="color:#f97316;font-weight:600">Requested: ${item.requestedQty}</span> &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span></div>
                     </label>
                     <div style="display:flex;align-items:center;gap:6px">
                         <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
-                        <input type="number" class="approve-item-qty"
-                               min="1" max="${item.requestedQty}" value="${item.requestedQty}" disabled
-                               oninput="updateRefundBreakdown()"
-                               style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+                        <input type="number" class="approve-item-qty" min="1" max="${item.requestedQty}" value="${item.requestedQty}" disabled oninput="updateRefundBreakdown()" style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
                     </div>
                 </div>`;
             });
@@ -724,8 +658,7 @@
         if (!tbody || !totalEl) return;
 
         const checked = document.querySelectorAll('.approve-item-chk:checked');
-        let total = 0;
-        let rows  = '';
+        let total = 0; let rows  = '';
 
         checked.forEach(chk => {
             const row   = chk.closest('.ph-return-item');
@@ -763,11 +696,9 @@
         const params = new URLSearchParams();
         params.append('orderId', orderId);
         params.append('returnType', order?.returnType ?? '');
-        params.append('__RequestVerificationToken',
-            document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
+        params.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '');
 
-        let i = 0;
-        let valid = true;
+        let i = 0; let valid = true;
         checked.forEach(chk => {
             const row = chk.closest('.ph-return-item');
             const qty = parseInt(row.querySelector('.approve-item-qty').value);
@@ -788,15 +719,10 @@
             body: params.toString()
         });
 
-        if (res.ok) {
-            location.reload();
-        } else {
-            btn.disabled = false; btn.textContent = 'Approve & Process';
-            alert('Failed to approve return. Please try again.');
-        }
+        if (res.ok) { location.reload(); } 
+        else { btn.disabled = false; btn.textContent = 'Approve & Process'; alert('Failed to approve return.'); }
     }
 
-    // ── Order Details Modal ──────────────────────────────────────────────────
     const statusLabels = {
         'PENDING':       { label: 'Pending',       color: '#f57f17', bg: '#fff9c4' },
         'PREPARING':     { label: 'Preparing',      color: '#1565c0', bg: '#e3f2fd' },
@@ -813,34 +739,26 @@
 
         const st = statusLabels[o.status] || { label: o.status, color: '#555', bg: '#f5f5f5' };
 
-        // ── Header ──
         document.getElementById('od-title').textContent  = `Order #${o.orderId}`;
         document.getElementById('od-time').textContent   = o.orderTime;
         document.getElementById('od-status').textContent = st.label;
         document.getElementById('od-status').style.background = st.bg;
         document.getElementById('od-status').style.color      = st.color;
 
-        // ── Customer section ──
         document.getElementById('od-cust-name').textContent  = o.customerName.trim() || '—';
         document.getElementById('od-cust-email').textContent = o.customerEmail;
         document.getElementById('od-cust-phone').textContent = o.customerPhone;
 
-        // ── Delivery section ──
         document.getElementById('od-del-name').textContent  = o.deliveryName || '—';
         document.getElementById('od-del-phone').textContent = o.deliveryPhone || '—';
-        const addrParts = [o.deliveryLine1, o.deliveryLine2, o.deliveryCity, o.deliveryPostcode, o.deliveryState]
-            .filter(Boolean).join(', ');
+        const addrParts = [o.deliveryLine1, o.deliveryLine2, o.deliveryCity, o.deliveryPostcode, o.deliveryState].filter(Boolean).join(', ');
         document.getElementById('od-del-addr').textContent = addrParts || '—';
 
-        // ── Items ──
         let itemHtml = '';
         o.items.forEach(item => {
             itemHtml += `
             <div class="od-item-row">
-                <div class="od-item-img-wrap">
-                    <img src="${item.imagePath}" alt="${item.productName}" class="od-item-img"
-                         onerror="this.src='/images/placeholder.png'" />
-                </div>
+                <div class="od-item-img-wrap"><img src="${item.imagePath}" alt="${item.productName}" class="od-item-img" onerror="this.src='/images/placeholder.png'" /></div>
                 <div class="od-item-info">
                     <div class="od-item-name">${item.productName}</div>
                     <div class="od-item-meta">
@@ -857,11 +775,9 @@
         });
         document.getElementById('od-items-wrap').innerHTML = itemHtml || '<p style="color:#aaa;font-size:13px">No items found.</p>';
 
-        // ── Total ──
         document.getElementById('od-total').textContent   = `RM ${o.totalAmount}`;
         document.getElementById('od-payment').textContent = o.paymentMethod;
 
-        // ── Notes section ──
         const notesEl = document.getElementById('od-notes-section');
         const noteLines = [];
         if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
@@ -870,11 +786,7 @@
         if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
 
         if (noteLines.length) {
-            let noteHtml = noteLines.map(n => `
-                <div class="od-note-row">
-                    <i class="fas ${n.icon} od-note-icon"></i>
-                    <div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div>
-                </div>`).join('');
+            let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
             notesEl.innerHTML = `<div class="od-section-label">Notes & Remarks</div>${noteHtml}`;
             notesEl.style.display = 'block';
         } else {
@@ -897,46 +809,113 @@
     });
     </script>
 
+    <script>
+document.addEventListener("DOMContentLoaded", function () {
+    // 1. 💡 捕获网址中的 ?tab=Order&search=xxx 参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    const searchParam = urlParams.get('search');
+
+    // 2. 如果明确指定了要跳到 Order 标签页
+    if (tabParam === 'Order') {
+        // 先确保切换到订单对应的 Tab 面板上
+        // 假设你们切换 Tab 的按钮类名叫 .nav-link 或者有特殊的 id
+        const orderTabBtn = document.querySelector('[data-bs-target="#Order"]') || document.querySelector('#order-tab');
+        if (orderTabBtn) {
+            orderTabBtn.click(); // 仿真点击，切过去
+        }
+    }
+
+    // 3. 🔥【核心新增】：如果网址里带了订单号参数，自动联动搜索
+    if (searchParam) {
+        // 查找商家管理页面上【订单专用的搜索框】（请把下面的 'orderSearchInput' 换成你页面真实的 Input ID）
+        const orderSearchInput = document.getElementById('orderSearchInput') 
+                              || document.querySelector('input[placeholder*="订单"]') 
+                              || document.querySelector('input[placeholder*="Order"]');
+                              
+        if (orderSearchInput) {
+            // A. 自动填入单号
+            orderSearchInput.value = searchParam.trim();
+            
+            // B. 💡 主动触发搜索：为了让列表立刻刷新，必须让搜索框触发 input 或 change 事件，或者模拟点击搜索按钮
+            orderSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            orderSearchInput.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // C. 兜底方案：如果你们页面有一个专门的“搜索”或者“筛选”按钮，模拟点击它
+            const searchBtn = orderSearchInput.closest('form')?.querySelector('button[type="submit"]')
+                           || document.getElementById('orderSearchBtn');
+            if (searchBtn) {
+                searchBtn.click();
+            } else {
+                // 如果是纯前端 JS 过滤，则直接调用你们原本的过滤函数
+                // 例如：if (typeof filterOrders === 'function') { filterOrders(); }
+            }
+        }
+    }
+});
+</script>
+
+@* <script>
+    document.addEventListener("DOMContentLoaded", function () {
+    // 1. 💡 优先获取后端 C# 转发过来的关键字，如果为空则从客户端 URL 解析兜底
+    let searchKeyword = '@(ViewBag.AutoSearchKeyword ?? "")';
+    if (!searchKeyword) {
+        const urlParams = new URLSearchParams(window.location.search);
+        searchKeyword = urlParams.get('search') || '';
+    }
+
+    // 2. 🔥【核心联动核心】：如果存在搜索关键字，立即激活自动化搜索
+    if (searchKeyword) {
+        // 设置延迟执行（等 300 毫秒），防止因为局部视图异步渲染导致 DOM 节点还没生成
+        setTimeout(function() {
+            // A. 精准定位商家后台的【商品搜索框】
+            // 提示：自动兼容你们项目中可能叫 productSearchInput 或带 Product 占位符的 input 框
+            const searchInput = document.getElementById('productSearchInput')
+                             || document.querySelector('input[placeholder*="Product"]')
+                             || document.querySelector('input[placeholder*="商品"]')
+                             || document.querySelector('.search-box input');
+
+            if (searchInput) {
+                // B. 将商品 ID 强行写入搜索框
+                searchInput.value = searchKeyword.trim();
+
+                // C. 🔥【最最关键一步】：向输入框连续派发 input 和 change 事件！
+                // 只有派发了这两个原生事件，才能彻底激活你们前端框架（如 jQuery/Vue/原生JS）中绑定的实时过滤或 Ajax 刷新数据代码
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                // D. 兜底策略：如果你们系统的搜索需要手动点击旁边的“搜索按钮”才能生效，模拟点击它
+                const searchBtn = searchInput.closest('form')?.querySelector('button[type="submit"]')
+                               || document.getElementById('searchBtn')
+                               || searchInput.nextElementSibling;
+                if (searchBtn && typeof searchBtn.click === 'function') {
+                    searchBtn.click();
+                }
+                
+                console.log("成功为商家触发商品自动化过滤追踪: " + searchKeyword);
+            } else {
+                console.warn("未能在页面中定位到商品搜索框元素。");
+            }
+        }, 300);
+    }
+});
+</script> *@
+
+
     <!-- Approve Return Modal -->
-    <div id="approveReturnBackdrop"
-         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000"
-         onclick="closeApproveReturnModal()"
-         class="approve-return-backdrop"></div>
-    <div id="approveReturnModal"
-         style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-                background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;
-                z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)"
-         class="approve-return-modal">
+    <div id="approveReturnBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000" onclick="closeApproveReturnModal()" class="approve-return-backdrop"></div>
+    <div id="approveReturnModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)" class="approve-return-modal">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
             <i class="fas fa-check-circle" style="color:#f97316;font-size:22px"></i>
             <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b">Approve Return Request</h3>
-            <button onclick="closeApproveReturnModal()"
-                    style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;color:#9a98b6">✕</button>
+            <button onclick="closeApproveReturnModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;color:#9a98b6">✕</button>
         </div>
-
-        <!-- Customer Request Summary banner -->
-        <div style="font-size:10px;color:#a16207;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px">
-            <i class="fas fa-clipboard-list" style="margin-right:4px"></i>Customer Request Summary
-        </div>
-        <div id="approveReturnTypeInfo"
-             style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:12px 14px;
-                    font-size:13px;color:#6d4c41;margin-bottom:14px;line-height:1.5"></div>
-
-        <p style="font-size:13px;color:#6b6b8a;margin:0 0 16px">
-            Tick the items you are approving and confirm the quantity.
-        </p>
-
-        <!-- Item list -->
+        <div style="font-size:10px;color:#a16207;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px"><i class="fas fa-clipboard-list" style="margin-right:4px"></i>Customer Request Summary</div>
+        <div id="approveReturnTypeInfo" style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:12px 14px;font-size:13px;color:#6d4c41;margin-bottom:14px;line-height:1.5"></div>
+        <p style="font-size:13px;color:#6b6b8a;margin:0 0 16px">Tick the items you are approving and confirm the quantity.</p>
         <div id="approveItemsWrap"></div>
-
-        <!-- Refund breakdown table -->
-        <div id="approveRefundBreakdown"
-             style="background:#f8f8ff;border:1.5px solid #e8eaf6;border-radius:10px;
-                    padding:12px 16px;margin-top:14px;font-size:13px;">
-            <div style="font-weight:700;color:#1e1b4b;margin-bottom:8px;font-size:13px;
-                        letter-spacing:0.03em;text-transform:uppercase;font-size:11px">
-                Refund Breakdown
-            </div>
+        <div id="approveRefundBreakdown" style="background:#f8f8ff;border:1.5px solid #e8eaf6;border-radius:10px;padding:12px 16px;margin-top:14px;font-size:13px;">
+            <div style="font-weight:700;color:#1e1b4b;margin-bottom:8px;font-size:11px;letter-spacing:0.03em;text-transform:uppercase">Refund Breakdown</div>
             <table style="width:100%;border-collapse:collapse;" id="approveBreakdownTable">
                 <thead>
                     <tr style="font-size:11px;color:#9a98b6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">
@@ -946,31 +925,19 @@
                         <th style="text-align:right;padding-bottom:6px;">Subtotal</th>
                     </tr>
                 </thead>
-                <tbody id="approveBreakdownBody">
-                </tbody>
+                <tbody id="approveBreakdownBody"></tbody>
                 <tfoot>
                     <tr style="border-top:1.5px solid #e8eaf6;">
-                        <td colspan="3"
-                            style="padding-top:8px;font-weight:700;color:#1e1b4b;font-size:13px;">
-                            Total Refund Amount
-                        </td>
-                        <td style="padding-top:8px;font-weight:800;color:#f97316;font-size:15px;
-                                   text-align:right;" id="approveRefundTotal">RM 0.00</td>
+                        <td colspan="3" style="padding-top:8px;font-weight:700;color:#1e1b4b;font-size:13px;">Total Refund Amount</td>
+                        <td style="padding-top:8px;font-weight:800;color:#f97316;font-size:15px;text-align:right;" id="approveRefundTotal">RM 0.00</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-
         <input type="hidden" id="approveReturnOrderId" />
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
-            <button onclick="closeApproveReturnModal()"
-                    style="padding:9px 20px;border-radius:8px;border:1px solid #e0e0f0;
-                           background:#fff;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-            <button id="approveReturnBtn" onclick="submitApproveReturn()"
-                    style="padding:9px 20px;border-radius:8px;border:none;
-                           background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer">
-                <i class="fas fa-check"></i> Approve &amp; Process
-            </button>
+            <button onclick="closeApproveReturnModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #e0e0f0;background:#fff;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+            <button id="approveReturnBtn" onclick="submitApproveReturn()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i> Approve &amp; Process</button>
         </div>
     </div>
 
@@ -979,408 +946,131 @@
         .approve-return-modal.active    { display:block !important; }
     </style>
 
-    <!-- ── Order Details Modal ─────────────────────────────────────────── -->
-    <div id="od-backdrop"
-         style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000"
-         onclick="closeOrderDetails()"
-         class="od-backdrop"></div>
-
-    <div id="od-modal"
-         style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-                background:#fff;border-radius:18px;width:min(660px,96vw);max-height:88vh;
-                overflow-y:auto;z-index:1001;box-shadow:0 12px 50px rgba(0,0,0,.22)"
-         class="od-modal">
-
-        <!-- Modal header -->
-        <div style="display:flex;align-items:center;gap:12px;padding:22px 24px 16px;
-                    border-bottom:1px solid #f0f0f8;position:sticky;top:0;background:#fff;z-index:2;">
-            <div style="width:38px;height:38px;border-radius:10px;background:#1e1b4b;
-                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <i class="fas fa-receipt" style="color:#fff;font-size:16px"></i>
-            </div>
+    <!-- Order Details Modal -->
+    <div id="od-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000" onclick="closeOrderDetails()" class="od-backdrop"></div>
+    <div id="od-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;width:min(660px,96vw);max-height:88vh;overflow-y:auto;z-index:1001;box-shadow:0 12px 50px rgba(0,0,0,.22)" class="od-modal">
+        <div style="display:flex;align-items:center;gap:12px;padding:22px 24px 16px;border-bottom:1px solid #f0f0f8;position:sticky;top:0;background:#fff;z-index:2;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#1e1b4b;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-receipt" style="color:#fff;font-size:16px"></i></div>
             <div style="flex:1;min-width:0">
                 <h3 id="od-title" style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b"></h3>
                 <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
                     <span id="od-time" style="font-size:12px;color:#9a98b6"></span>
-                    <span id="od-status" style="font-size:11px;font-weight:700;padding:2px 10px;
-                          border-radius:20px;letter-spacing:0.04em;text-transform:uppercase"></span>
+                    <span id="od-status" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase"></span>
                 </div>
             </div>
-            <button onclick="closeOrderDetails()"
-                    style="background:none;border:none;cursor:pointer;font-size:20px;
-                           color:#9a98b6;line-height:1;padding:4px;flex-shrink:0;">✕</button>
+            <button onclick="closeOrderDetails()" style="background:none;border:none;cursor:pointer;font-size:20px;color:#9a98b6;line-height:1;padding:4px;flex-shrink:0;">✕</button>
         </div>
-
-        <!-- Modal body -->
         <div style="padding:20px 24px 24px;display:flex;flex-direction:column;gap:18px;">
-
-            <!-- Customer info -->
             <div class="od-section">
                 <div class="od-section-label">Customer Information</div>
                 <div class="od-info-grid">
-                    <div class="od-info-item">
-                        <i class="fas fa-user od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Full Name</div>
-                            <div id="od-cust-name" class="od-info-val"></div>
-                        </div>
-                    </div>
-                    <div class="od-info-item">
-                        <i class="fas fa-envelope od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Email</div>
-                            <div id="od-cust-email" class="od-info-val"></div>
-                        </div>
-                    </div>
-                    <div class="od-info-item">
-                        <i class="fas fa-phone od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Phone</div>
-                            <div id="od-cust-phone" class="od-info-val"></div>
-                        </div>
-                    </div>
+                    <div class="od-info-item"><i class="fas fa-user od-info-icon"></i><div><div class="od-info-sub">Full Name</div><div id="od-cust-name" class="od-info-val"></div></div></div>
+                    <div class="od-info-item"><i class="fas fa-envelope od-info-icon"></i><div><div class="od-info-sub">Email</div><div id="od-cust-email" class="od-info-val"></div></div></div>
+                    <div class="od-info-item"><i class="fas fa-phone od-info-icon"></i><div><div class="od-info-sub">Phone</div><div id="od-cust-phone" class="od-info-val"></div></div></div>
                 </div>
             </div>
-
-            <!-- Delivery address -->
             <div class="od-section">
                 <div class="od-section-label">Delivery Address</div>
                 <div class="od-info-grid">
-                    <div class="od-info-item">
-                        <i class="fas fa-user-tag od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Recipient</div>
-                            <div id="od-del-name" class="od-info-val"></div>
-                        </div>
-                    </div>
-                    <div class="od-info-item">
-                        <i class="fas fa-phone-alt od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Contact</div>
-                            <div id="od-del-phone" class="od-info-val"></div>
-                        </div>
-                    </div>
-                    <div class="od-info-item od-info-item--full">
-                        <i class="fas fa-map-marker-alt od-info-icon"></i>
-                        <div>
-                            <div class="od-info-sub">Address</div>
-                            <div id="od-del-addr" class="od-info-val"></div>
-                        </div>
-                    </div>
+                    <div class="od-info-item"><i class="fas fa-user-tag od-info-icon"></i><div><div class="od-info-sub">Recipient</div><div id="od-del-name" class="od-info-val"></div></div></div>
+                    <div class="od-info-item"><i class="fas fa-phone-alt od-info-icon"></i><div><div class="od-info-sub">Contact</div><div id="od-del-phone" class="od-info-val"></div></div></div>
+                    <div class="od-info-item od-info-item--full"><i class="fas fa-map-marker-alt od-info-icon"></i><div><div class="od-info-sub">Address</div><div id="od-del-addr" class="od-info-val"></div></div></div>
                 </div>
             </div>
-
-            <!-- Order items -->
             <div class="od-section">
                 <div class="od-section-label">Ordered Items</div>
                 <div id="od-items-wrap" style="display:flex;flex-direction:column;gap:0"></div>
             </div>
-
-            <!-- Total row -->
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                        padding:14px 18px;background:#f8f8ff;border-radius:12px;
-                        border:1px solid #ebebf8;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <i class="fas fa-credit-card" style="color:#9a98b6;font-size:15px"></i>
-                    <div>
-                        <div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Payment</div>
-                        <div id="od-payment" style="font-size:14px;font-weight:600;color:#1e1b4b"></div>
-                    </div>
-                </div>
-                <div style="text-align:right">
-                    <div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Order Total</div>
-                    <div id="od-total" style="font-size:22px;font-weight:800;color:#1e1b4b"></div>
-                </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#f8f8ff;border-radius:12px;border:1px solid #ebebf8;">
+                <div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-credit-card" style="color:#9a98b6;font-size:15px"></i><div><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Payment</div><div id="od-payment" style="font-size:14px;font-weight:600;color:#1e1b4b"></div></div></div>
+                <div style="text-align:right"><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Order Total</div><div id="od-total" style="font-size:22px;font-weight:800;color:#1e1b4b"></div></div>
             </div>
-
-            <!-- Notes section (conditionally shown) -->
-            <div id="od-notes-section" style="display:none;background:#fffbf0;border:1px solid #ffe082;
-                 border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:10px">
-            </div>
-
+            <div id="od-notes-section" style="display:none;background:#fffbf0;border:1px solid #ffe082;border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:10px"></div>
         </div>
     </div>
+
 
     <style>
         .od-backdrop.active { display:block !important; }
         .od-modal.active    { display:block !important; }
-
         .od-section { display:flex;flex-direction:column;gap:10px; }
-
-        .od-section-label {
-            font-size:11px;font-weight:600;letter-spacing:0.08em;
-            text-transform:uppercase;color:#9a98b6;margin-bottom:4px;
-        }
-
-        .od-info-grid {
-            display:grid;grid-template-columns:1fr 1fr;gap:10px;
-        }
-
-        .od-info-item {
-            display:flex;align-items:flex-start;gap:10px;
-            background:#f8f8ff;border-radius:10px;padding:11px 13px;
-        }
-
+        .od-section-label { font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9a98b6;margin-bottom:4px; }
+        .od-info-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+        .od-info-item { display:flex;align-items:flex-start;gap:10px;background:#f8f8ff;border-radius:10px;padding:11px 13px; }
         .od-info-item--full { grid-column:1/-1; }
-
-        .od-info-icon {
-            color:#9a98b6;font-size:14px;margin-top:2px;flex-shrink:0;
-        }
-
+        .od-info-icon { color:#9a98b6;font-size:14px;margin-top:2px;flex-shrink:0; }
         .od-info-sub { font-size:11px;color:#9a98b6;font-weight:500;margin-bottom:2px; }
         .od-info-val { font-size:13.5px;font-weight:600;color:#1e1b4b;word-break:break-word; }
-
-        /* Item rows */
-        .od-item-row {
-            display:flex;align-items:center;gap:13px;
-            padding:12px 0;border-bottom:1px solid #f0f0f8;
-        }
+        .od-item-row { display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:1px solid #f0f0f8; }
         .od-item-row:last-child { border-bottom:none; }
-
-        .od-item-img-wrap {
-            width:60px;height:60px;border-radius:10px;overflow:hidden;
-            background:#f5f5fb;flex-shrink:0;border:1px solid #ebebf8;
-        }
+        .od-item-img-wrap { width:60px;height:60px;border-radius:10px;overflow:hidden;background:#f5f5fb;flex-shrink:0;border:1px solid #ebebf8; }
         .od-item-img { width:100%;height:100%;object-fit:cover;display:block; }
-
         .od-item-info { flex:1;min-width:0; }
-        .od-item-name { font-size:13.5px;font-weight:600;color:#1e1b4b;margin-bottom:5px;
-                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .od-item-name { font-size:13.5px;font-weight:600;color:#1e1b4b;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
         .od-item-meta { display:flex;flex-wrap:wrap;gap:5px; }
-        .od-meta-chip {
-            font-size:11px;color:#6b6b8a;background:#f0f0f8;
-            border-radius:5px;padding:2px 7px;display:inline-flex;align-items:center;gap:4px;
-        }
-
+        .od-meta-chip { font-size:11px;color:#6b6b8a;background:#f0f0f8;border-radius:5px;padding:2px 7px;display:inline-flex;align-items:center;gap:4px; }
         .od-item-pricing { text-align:right;flex-shrink:0; }
         .od-item-qty     { font-size:13px;color:#9a98b6;font-weight:500; }
         .od-item-unit    { font-size:11.5px;color:#9a98b6; }
         .od-item-subtotal{ font-size:15px;font-weight:700;color:#1e1b4b;margin-top:2px; }
-
-        /* Notes */
         .od-note-row  { display:flex;align-items:flex-start;gap:10px; }
         .od-note-icon { color:#f9a825;font-size:14px;margin-top:2px;flex-shrink:0; }
         .od-note-label{ font-size:11px;color:#9a98b6;font-weight:500;margin-bottom:1px; }
         .od-note-val  { font-size:13px;color:#5d4037;font-weight:500; }
-
-        /* View Details button */
-        .btn-view-details {
-            display:inline-flex;align-items:center;gap:5px;
-            padding:5px 12px;border-radius:7px;border:1.5px solid #c5cae9;
-            background:#fff;color:#1e1b4b;font-size:12px;font-weight:600;
-            cursor:pointer;transition:background 0.15s,border-color 0.15s;
-            white-space:nowrap;
-        }
+        .btn-view-details { display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:7px;border:1.5px solid #c5cae9;background:#fff;color:#1e1b4b;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s,border-color 0.15s;white-space:nowrap; }
         .btn-view-details:hover { background:#e8eaf6;border-color:#9fa8da; }
     </style>
 }
 
 <style>
-    /* Sub-tab navigation bar */
-    .product-sub-tabs {
-        display: flex;
-        gap: 0;
-        margin-bottom: 28px;
-        border-bottom: 2px solid #e8eaf6;
-    }
-
-    .pst-btn {
-        background: none;
-        border: none;
-        padding: 10px 22px;
-        font-size: 14px;
-        font-weight: 600;
-        color: #9a98b6;
-        cursor: pointer;
-        position: relative;
-        transition: color 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        font-family: 'Syne', sans-serif;
-    }
-
+    .product-sub-tabs { display: flex; gap: 0; margin-bottom: 28px; border-bottom: 2px solid #e8eaf6; }
+    .pst-btn { background: none; border: none; padding: 10px 22px; font-size: 14px; font-weight: 600; color: #9a98b6; cursor: pointer; position: relative; transition: color 0.2s; display: flex; align-items: center; gap: 7px; font-family: 'Syne', sans-serif; }
     .pst-btn.active { color: #1e1b4b; }
-
-    .pst-btn.active::after {
-        content: '';
-        position: absolute;
-        bottom: -2px;
-        left: 0; right: 0;
-        height: 2px;
-        background: #1e1b4b;
-        border-radius: 2px 2px 0 0;
-    }
-
-    .pst-count {
-        background: #e8eaf6;
-        color: #5b587d;
-        border-radius: 10px;
-        padding: 1px 8px;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .pst-btn.active .pst-count {
-        background: #1e1b4b;
-        color: #fff;
-    }
-
-    /* Large product card grid */
-    .product-grid-large {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 24px;
-    }
-
-    .product-card-large {
-        background: #fff;
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 2px 12px rgba(30,27,75,0.07);
-        display: flex;
-        flex-direction: column;
-        transition: box-shadow 0.2s, transform 0.2s;
-    }
-
-    .product-card-large:hover {
-        box-shadow: 0 6px 24px rgba(30,27,75,0.13);
-        transform: translateY(-2px);
-    }
-
-    .pcl-image {
-        height: 220px;
-        background: #f8f9ff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    }
-
-    .pcl-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .draft-badge {
-        position: absolute;
-        top: 10px; left: 10px;
-        background: #fff3cd;
-        color: #856404;
-        font-size: 11px;
-        font-weight: 700;
-        padding: 3px 10px;
-        border-radius: 20px;
-        border: 1px solid #ffc107;
-    }
-
-    .pcl-info {
-        padding: 18px 18px 14px;
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-    }
-
-    .pcl-category {
-        font-size: 11px;
-        color: #9a98b6;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-bottom: 5px;
-    }
-
-    .pcl-name {
-        font-size: 15px;
-        font-weight: 700;
-        color: #1e1b4b;
-        margin: 0 0 6px;
-        line-height: 1.3;
-    }
-
-    .pcl-price {
-        font-size: 20px;
-        font-weight: 800;
-        color: #4f46e5;
-        margin-bottom: 8px;
-    }
-
-    .pcl-desc {
-        font-size: 13px;
-        color: #6b6b8a;
-        margin: 0 0 14px;
-        line-height: 1.45;
-        flex: 1;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-    }
-
-    .pcl-actions {
-        display: flex;
-        gap: 8px;
-        border-top: 1px solid #f0f0f8;
-        padding-top: 12px;
-        margin-top: auto;
-    }
-
-    .btn-pcl-edit {
-        flex: 1;
-        background: #1e1b4b;
-        color: #fff;
-        text-align: center;
-        padding: 9px 0;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 13px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        transition: background 0.2s;
-    }
-
+    .pst-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: #1e1b4b; border-radius: 2px 2px 0 0; }
+    .pst-count { background: #e8eaf6; color: #5b587d; border-radius: 10px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+    .pst-btn.active .pst-count { background: #1e1b4b; color: #fff; }
+    .product-grid-large { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+    .product-card-large { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 12px rgba(30,27,75,0.07); display: flex; flex-direction: column; transition: box-shadow 0.2s, transform 0.2s; }
+    .product-card-large:hover { box-shadow: 0 6px 24px rgba(30,27,75,0.13); transform: translateY(-2px); }
+    .pcl-image { height: 220px; background: #f8f9ff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .pcl-image img { width: 100%; height: 100%; object-fit: cover; }
+    .draft-badge { position: absolute; top: 10px; left: 10px; background: #fff3cd; color: #856404; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1px solid #ffc107; }
+    .pcl-info { padding: 18px 18px 14px; display: flex; flex-direction: column; flex: 1; }
+    .pcl-category { font-size: 11px; color: #9a98b6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+    .pcl-name { font-size: 15px; font-weight: 700; color: #1e1b4b; margin: 0 0 6px; line-height: 1.3; }
+    .pcl-price { font-size: 20px; font-weight: 800; color: #4f46e5; margin-bottom: 8px; }
+    .pcl-desc { font-size: 13px; color: #6b6b8a; margin: 0 0 14px; line-height: 1.45; flex: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pcl-actions { display: flex; gap: 8px; border-top: 1px solid #f0f0f8; padding-top: 12px; margin-top: auto; }
+    .btn-pcl-edit { flex: 1; background: #1e1b4b; color: #fff; text-align: center; padding: 9px 0; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s; }
     .btn-pcl-edit:hover { background: #312e81; color: #fff; }
+    .btn-pcl-delete { flex: 1; background: #ffebee; color: #c62828; border: none; padding: 9px 0; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s; width: 100%; }
+    .btn-pcl-delete:hover { background: #ffcdd2; }
+    .empty-state-panel { text-align: center; padding: 60px 20px; color: #9a98b6; }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; display: block; }
+    .empty-state-panel p { font-size: 15px; font-weight: 500; }
 
-    .btn-pcl-delete {
-        flex: 1;
-        background: #ffebee;
-        color: #c62828;
-        border: none;
-        padding: 9px 0;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
+    /* 独立的 Chat 按钮精致样式 */
+    .btn-order-chat {
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        transition: background 0.2s;
-        width: 100%;
-    }
-
-    .btn-pcl-delete:hover { background: #ffcdd2; }
-
-    /* Empty state panel */
-    .empty-state-panel {
-        text-align: center;
-        padding: 60px 20px;
-        color: #9a98b6;
-    }
-
-    .empty-icon {
-        font-size: 48px;
-        margin-bottom: 16px;
-        opacity: 0.4;
-        display: block;
-    }
-
-    .empty-state-panel p {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background-color: #e0e7ff; /* 明亮清爽的浅蓝背景 */
+        color: #4f46e5;            /* 靛蓝色图标 */
+        text-decoration: none;
         font-size: 15px;
-        font-weight: 500;
+        transition: all 0.2s ease-in-out;
+        border: none;
+        cursor: pointer;
     }
+    .btn-order-chat:hover {
+        background-color: #4f46e5; /* 悬停变为经典靛蓝 */
+        color: #ffffff;            /* 图标变纯白 */
+        transform: scale(1.05);    /* 微弱放大增加交互感 */
+    }
+
+    
 </style>
+

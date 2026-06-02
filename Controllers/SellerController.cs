@@ -107,12 +107,13 @@ namespace EcommerceSystem.Controllers
         {
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
+            var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
 
             if (!seller.IsApproved && tab != "General")
                 tab = "General";
 
-            ViewBag.ActiveTab  = tab;
-            ViewBag.ShopName   = seller.ShopName;
+            ViewBag.ActiveTab = tab;
+            ViewBag.ShopName = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
 
             if (seller.IsApproved)
@@ -133,6 +134,26 @@ namespace EcommerceSystem.Controllers
                         .OrderByDescending(o => o.OrderTime)
                         .ToListAsync();
                     ViewBag.Orders = orders;
+                }
+
+                            if (tab == "Chat")
+                {
+                    // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
+                    var chatList = await _context.ChatRoom
+                        .Where(r => r.SellerId == currentUserId)
+                        .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
+                        {
+                            ChatRoomId = r.ChatRoomId,
+                            CustomerName = r.Customer.FullName, // 注意检查你模型里的名称是 Username 还是 UserName
+                            LastMessage = r.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault().MessageText,
+                            LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault().SentAt,
+                            UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
+                        })
+                        .OrderByDescending(x => x.LastMessageTime)
+                        .ToListAsync();
+
+                    // 💡 返回的是卖家主视图，但带上了聊天列表数据模型
+                    return View("Home", chatList); 
                 }
             }
 
@@ -196,11 +217,11 @@ namespace EcommerceSystem.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            model.SellerId    = seller.UserId;
-            model.Name        = model.Name        ?? string.Empty;
+            model.SellerId = seller.UserId;
+            model.Name = model.Name ?? string.Empty;
             model.Description = model.Description ?? string.Empty;
-            model.SKU         = model.SKU         ?? string.Empty;
-            model.IsDraft     = isDraft;
+            model.SKU = model.SKU ?? string.Empty;
+            model.IsDraft = isDraft;
 
             model.VariationsJson = Request.Form["VariationsJson"].ToString();
             if (string.IsNullOrWhiteSpace(model.VariationsJson))
@@ -225,12 +246,12 @@ namespace EcommerceSystem.Controllers
 
             if (mergedPaths.Count > 0)
             {
-                model.ImagePath      = mergedPaths[0];
+                model.ImagePath = mergedPaths[0];
                 model.ImagePathsJson = JsonSerializer.Serialize(mergedPaths);
             }
             else
             {
-                model.ImagePath      = "/images/placeholder.png";
+                model.ImagePath = "/images/placeholder.png";
                 model.ImagePathsJson = "[]";
             }
 
@@ -287,12 +308,12 @@ namespace EcommerceSystem.Controllers
 
             if (existing == null) return NotFound();
 
-            existing.Name          = model.Name        ?? string.Empty;
-            existing.Description   = model.Description ?? string.Empty;
-            existing.SKU           = model.SKU         ?? string.Empty;
-            existing.Price         = model.Price;
+            existing.Name = model.Name ?? string.Empty;
+            existing.Description = model.Description ?? string.Empty;
+            existing.SKU = model.SKU ?? string.Empty;
+            existing.Price = model.Price;
             existing.StockQuantity = model.StockQuantity;
-            existing.IsDraft       = actionType == "Draft";
+            existing.IsDraft = actionType == "Draft";
 
             var variationsJson = Request.Form["VariationsJson"].ToString();
             existing.VariationsJson = string.IsNullOrWhiteSpace(variationsJson) ? "[]" : variationsJson;
@@ -322,7 +343,7 @@ namespace EcommerceSystem.Controllers
 
             if (mergedPaths.Count > 0)
             {
-                existing.ImagePath      = mergedPaths[0];
+                existing.ImagePath = mergedPaths[0];
                 existing.ImagePathsJson = JsonSerializer.Serialize(mergedPaths);
             }
 
@@ -348,7 +369,7 @@ namespace EcommerceSystem.Controllers
                 var result = new List<object>();
                 for (int gi = 0; gi < groups.Count; gi++)
                 {
-                    var g    = groups[gi];
+                    var g = groups[gi];
                     var name = g.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
                     var vals = g.TryGetProperty("values", out var vs)
                         ? vs.EnumerateArray().ToList()
@@ -357,7 +378,7 @@ namespace EcommerceSystem.Controllers
                     var newValues = new List<object>();
                     for (int vi = 0; vi < vals.Count; vi++)
                     {
-                        var v     = vals[vi];
+                        var v = vals[vi];
                         var label = v.TryGetProperty("label", out var l) ? l.GetString() ?? "" : "";
 
                         string existingImg = "";
@@ -365,10 +386,10 @@ namespace EcommerceSystem.Controllers
                         else if (v.TryGetProperty("image", out var img)) existingImg = img.GetString() ?? "";
 
                         if (existingImg.StartsWith("data:")) existingImg = "";
-                        if (existingImg.StartsWith("blob:"))  existingImg = "";
+                        if (existingImg.StartsWith("blob:")) existingImg = "";
 
                         var fileKey = $"VarImg_{gi}_{vi}";
-                        var file    = allFiles[fileKey];
+                        var file = allFiles[fileKey];
                         string imagePath = existingImg;
 
                         if (file != null && file.Length > 0)
@@ -604,52 +625,52 @@ namespace EcommerceSystem.Controllers
         {
             var seller = await GetCurrentSellerAsync();
             if (seller == null) return RedirectToAction("Login", "Auth");
- 
+
             if (!seller.IsApproved)
             {
                 TempData["OrderError"] = "Your account is pending admin approval.";
                 return RedirectToAction("Home", new { tab = "General" });
             }
- 
+
             var order = await _context.Order
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                      && o.SellerUserId == seller.UserId
                                      && o.CurrentStatus == OrderStatus.RETURN_REFUND);
- 
+
             if (order == null)
             {
                 TempData["OrderError"] = "Order not found or not in RETURN_REFUND status.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
- 
+
             if (order.ReturnApprovedAt.HasValue)
             {
                 TempData["OrderError"] = "Return has already been approved for this order.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
- 
+
             if (approveItemIds == null || approveItemIds.Count == 0)
             {
                 TempData["OrderError"] = "Please select at least one item to approve.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
- 
+
             // ── Stock restoration logic ──────────────────────────────────────
             // ReturnRefund : customer physically sends item back → add stock back.
             // RefundOnly   : item was never received / partially missing → stock
             //                stays as-is (items were never returned to warehouse).
             bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
                                       StringComparison.OrdinalIgnoreCase);
- 
+
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
             var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
- 
+
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
- 
+
                 if (isReturnRefund)
                 {
                     // Physical return: restore the approved quantity to stock
@@ -659,18 +680,26 @@ namespace EcommerceSystem.Controllers
                 }
                 // RefundOnly: no stock change — items were not physically returned
             }
- 
-            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
+
+            order.ReturnStatus = EcommerceSystem.Enums.ReturnStatus.Approved;
             order.ReturnApprovedAt = DateTime.UtcNow;
- 
+
             await _context.SaveChangesAsync();
- 
+
             var stockMsg = isReturnRefund
                 ? "Stock has been restored."
                 : "Stock unchanged (Refund Only — items not physically returned).";
- 
+
             TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
             return RedirectToAction("Home", new { tab = "Order" });
         }
+
+        public IActionResult Chat()
+        {
+            return RedirectToAction("SellerInbox", "Chat");
+        }
     }
+
+
 }
+

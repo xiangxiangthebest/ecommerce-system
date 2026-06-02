@@ -17,15 +17,17 @@ namespace EcommerceSystem.Controllers
     {
         private readonly IChatService _chatService;
         private readonly ICustomerContext _customerContext;
+        private readonly ISellerContext _sellerContext;
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _environment;
 
-        public ChatController(IChatService chatService, ICustomerContext customerContext, AppDbContext context,IWebHostEnvironment environment)
+        public ChatController(IChatService chatService, ICustomerContext customerContext, AppDbContext context, IWebHostEnvironment environment,ISellerContext sellerContext)
         {
             _chatService = chatService;
             _customerContext = customerContext;
             _context = context;
             _environment = environment;
+            _sellerContext = sellerContext;
         }
 
         [HttpGet]
@@ -42,20 +44,19 @@ namespace EcommerceSystem.Controllers
             return View(inboxList);
         }
 
+        // This chat room is opened from the product detail page, so the productId should be passed as a parameter.
         [HttpPost]
-public async Task<IActionResult> StartConversation(int sellerId, int? productId, string? variationJson)
-{
-    var customer = await _customerContext.GetCurrentCustomerAsync(User);
-    var chatRoom = await _chatService.GetChatRoomAsync(sellerId, customer.UserId, productId);
+        public async Task<IActionResult> CustomerStartConversation(int sellerId, int? productId, string? variationJson)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            var chatRoom = await _chatService.GetChatRoomAsync(sellerId, customer.UserId, productId);
+            if (chatRoom.ChatRoomId == 0)
+            {
+                return RedirectToAction("CustomerConversation", new { id = 0, sellerId = sellerId, productId = productId });
+            }
 
-    // 💡 无论新旧房间，只要是从商品页点进来的，都把 productId 传过去
-    if (chatRoom.ChatRoomId == 0)
-    {
-        return RedirectToAction("Conversation", new { id = 0, sellerId = sellerId, productId = productId });
-    }
-
-    return RedirectToAction("Conversation", new { id = chatRoom.ChatRoomId, productId = productId });
-}
+            return RedirectToAction("CustomerConversation", new { id = chatRoom.ChatRoomId, productId = productId });
+        }
 
         [HttpPost]
         public async Task<IActionResult> SendMessage(int chatRoomId, int sellerId, string message)
@@ -81,9 +82,35 @@ public async Task<IActionResult> StartConversation(int sellerId, int? productId,
                 chatRoomId = newRoom.ChatRoomId;
             }
             await _chatService.SendMessageAsync(chatRoomId, currentUserId, message);
-            return RedirectToAction("Conversation", new { id = chatRoomId });
+            return RedirectToAction("CustomerConversation", new { id = chatRoomId });
         }
 
+        [HttpPost]
+        public async Task<IActionResult> SellerSendMessage(int chatRoomId, int sellerId, string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return BadRequest("消息不能为空");
+            }
+
+            var seller = await _sellerContext.GetCurrentSellerAsync(User);
+            var currentUserId = seller.UserId;
+
+            if (chatRoomId == 0)
+            {
+                var newRoom = new ChatRoom
+                {
+                    CustomerId = currentUserId,
+                    SellerId = sellerId
+                };
+                _context.ChatRoom.Add(newRoom);
+                await _context.SaveChangesAsync();
+
+                chatRoomId = newRoom.ChatRoomId;
+            }
+            await _chatService.SendMessageAsync(chatRoomId, currentUserId, message);
+            return RedirectToAction("SellerConversation", new { id = chatRoomId });
+        }
 
         [HttpGet]
         [Route("Customer/CustomerInbox")]
@@ -91,12 +118,12 @@ public async Task<IActionResult> StartConversation(int sellerId, int? productId,
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             var inboxList = await _chatService.GetCustomerInboxListAsync(customer.UserId);
-            
+
             return View("~/Views/Customer/ChatList.cshtml", inboxList);
         }
 
         [HttpGet]
-        public async Task<IActionResult> Conversation(int id, int? sellerId, int? productId)
+        public async Task<IActionResult> CustomerConversation(int id, int? sellerId, int? productId)
         {
             ChatRoom chatRoom;
 
@@ -159,15 +186,16 @@ public async Task<IActionResult> StartConversation(int sellerId, int? productId,
 
             return View("~/Views/Customer/ChatRoom.cshtml", chatRoom);
         }
-        
-                // 1. 💡 获取当前商家名下的所有上架商品
+
+
         [HttpGet]
         public async Task<IActionResult> GetSellerProducts(int sellerId)
         {
             // 从你的商品表查出属于该 sellerId 的前10条产品数据
             var products = await _context.Products
                 .Where(p => p.SellerId == sellerId)
-                .Select(p => new {
+                .Select(p => new
+                {
                     p.ProductId,
                     p.Name,
                     p.Price,
@@ -228,55 +256,196 @@ public async Task<IActionResult> StartConversation(int sellerId, int? productId,
 
             return Json(orders);
         }
-        
-                [HttpPost]
-        public async Task<IActionResult> UploadChatImage(IFormFile file, int chatRoomId, int sellerId)
-        {
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest("没有选择任何图片");
-            }
 
-            // 1. 确保 wwwroot/uploads/chat/ 文件夹存在
-            var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "chat");
-            if (!Directory.Exists(uploadsFolder))
-            {
-                Directory.CreateDirectory(uploadsFolder);
-            }
-
-            // 2. 生成唯一的文件名（例如：20260525143022_guid.jpg）
-            var uniqueFileName = DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + Guid.NewGuid().ToString().Substring(0, 8) + Path.GetExtension(file.FileName);
-            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            // 3. 把图片保存到服务器硬盘
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(fileStream);
-            }
-
-            // 4. 组装网页可以访问的相对路径 URL
-            var imageUrl = "/uploads/chat/" + uniqueFileName;
-
-            // 5. 组装成带 [IMAGE_CARD] 标签的 HTML
-            var imageMessageText = $"[IMAGE_CARD]<a href='{imageUrl}' target='_blank'><img src='{imageUrl}' class='img-fluid rounded border shadow-sm' style='max-width: 200px; cursor: zoom-in;' /></a>";
-
-            // 6. 获取当前用户，如果房间号是 0 则先建房间（复用你以前的逻辑）
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            var currentUserId = customer.UserId;
-
-            if (chatRoomId == 0)
-            {
-                var newRoom = new ChatRoom { CustomerId = currentUserId, SellerId = sellerId };
-                _context.ChatRoom.Add(newRoom);
-                await _context.SaveChangesAsync();
-                chatRoomId = newRoom.ChatRoomId;
-            }
-
-            // 7. 将图片消息存入数据库
-            await _chatService.SendMessageAsync(chatRoomId, currentUserId, imageMessageText);
-
-            // 返回成功，让前端刷新页面
-            return Json(new { success = true, chatRoomId = chatRoomId });
-        }
+        [HttpGet]
+public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
+{
+    // 1. 获取当前登录的商家用户
+    var seller = await _sellerContext.GetCurrentSellerAsync(User);
+    if (seller == null)
+    {
+        return Unauthorized(new { message = "登录状态已过期，请重新登录" });
     }
+    var currentUserId = seller.UserId; // 商家在主用户表中的 ID
+
+    // 2. 💡【核心筛选】：精准过滤出【买家是当前聊天的客户】且【订单属于当前登录商家】的所有订单
+    // 提示：根据您真实的数据库关联，我们直接从 Order 订单总表或明细表出发检索均可。
+    // 这里保持您原汁原味的 OrderItems 链路，但彻底纠正条件映射：
+    var matchedOrderData = await _context.OrderItems
+        .Include(oi => oi.Order)
+        .Include(oi => oi.Product)
+        .Where(oi => oi.Order.CustomerUserId == customerId              // A. 必须是这个买家下的单
+                  && (oi.Order.SellerUserId == currentUserId || oi.Product.SellerId == currentUserId)) // B. 订单或者商品必须属于当前登录商家
+        .Select(oi => new
+        {
+            OrderId = oi.OrderId,
+            TotalAmount = oi.Order.TotalAmount,                     // 订单总金额                      // 先拿原始 DateTime 对象，后续进行内存化处理或转 String
+            Status = oi.Order.CurrentStatus,                  // 订单状态 (如 Pending/Shipped)
+            
+            // 💡【安全防错】：优先做 ?.Null 保护，再清除可能破坏前端 JS 拼接的特殊字符
+            ProductName = oi.Product != null && oi.Product.Name != null
+                ? oi.Product.Name.Replace("'", "").Replace("\"", "").Replace("\r", "").Replace("\n", "")
+                : "商品",
+                
+            ProductImage = oi.Product != null ? oi.Product.ImagePath : "/images/default-product.jpg", // 商品图保底
+            Quantity = oi.Quantity,
+            Price = oi.Price
+        })
+        .ToListAsync();
+
+    // 3. 把明细按照 OrderId 进行分组聚合，这样一个订单就算买了当前店铺多个商品也能漂亮地合并显示
+    var orders = matchedOrderData
+        .GroupBy(x => x.OrderId)
+        .Select(g => new
+        {
+            OrderId = g.Key,
+            TotalAmount = g.First().TotalAmount,
+            // 后端格式化好标准时间字符串传回给前端直接显
+            Status = g.First().Status,
+            // 顺便把买的第一个商品的图文提出来当做卡片封面
+            CoverImage = g.First().ProductImage,
+            CoverName = g.First().ProductName,
+            ItemCount = g.Count() // 买了该店多少件商品
+        })
+        .ToList();
+
+    // 4. 返回干净透彻的 JSON 数组供前端动态 Ajax 捞取渲染
+    return Json(orders);
 }
+
+        // 1. 卖家从订单页点击 Chat 图标触发的中转 Action
+        [HttpPost]
+        public async Task<IActionResult> SellerStartConversation(int customerId, int? orderId)
+        {
+            // 获取当前登录用户的 ID 
+            var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            
+            // 💡 优先通过数据库查找这两名用户之间是否已经开通过聊天室
+            var chatRoom = await _context.ChatRoom
+                .FirstOrDefaultAsync(r => r.SellerId == currentUserId && r.CustomerId == customerId);
+
+            if (chatRoom == null)
+            {
+                // 如果没有真实聊天室，带上 id = 0 标记进入临时虚拟房，并把 customerId 和 orderId 作为上下文传下去
+                return RedirectToAction("SellerConversation", new { id = 0, customerId = customerId, orderId = orderId });
+            }
+
+            // 如果原先就有聊天，则带上真实的房间 ID 进去
+            return RedirectToAction("SellerConversation", new { id = chatRoom.ChatRoomId, orderId = orderId });
+        }
+
+// 2. 🌟 卖家端专属聊天会话 Action (独立出来，避免和买家端页面揉在一起报错)
+        [HttpGet]
+        public async Task<IActionResult> SellerConversation(int id, int? customerId, int? orderId)
+        {
+            ChatRoom chatRoom;
+            var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+
+            // ======= 情况 A: 虚拟聊天室（初次点进来，还未正式创建记录） =======
+            if (id == 0)
+            {
+                if (!customerId.HasValue) return BadRequest("缺少顾客参数");
+
+                // 在内存中构建虚拟的 ChatRoom 供前端渲染框架使用，不 Save 进数据库
+                var customerInfo = await _context.Customers.FirstOrDefaultAsync(c => c.UserId == customerId.Value);
+                var sellerInfo = await _context.Seller.FirstOrDefaultAsync(s => s.UserId == currentUserId);
+
+                chatRoom = new ChatRoom
+                {
+                    ChatRoomId = 0, // 0 代表临时虚拟房
+                    CustomerId = customerId.Value,
+                    SellerId = currentUserId,
+                    Messages = new List<ChatMessage>(),
+                    Customer = customerInfo,
+                    Seller = sellerInfo
+                };
+            }
+            // ======= 情况 B: 真实聊天室（已有历史记录，或直接从 Inbox 点击加载） =======
+            else
+            {
+                chatRoom = await _context.ChatRoom
+                    .Include(r => r.Messages)
+                    .Include(r => r.Customer)
+                    .Include(r => r.Seller)
+                    .FirstOrDefaultAsync(r => r.ChatRoomId == id);
+
+                if (chatRoom == null) return NotFound("该聊天室不存在");
+            }
+
+            // ======= 提取订单信息（如果存在）传给前端展示预载小框 =======
+            if (orderId.HasValue)
+            {
+                var orderContext = await _context.Order
+                    .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == orderId.Value);
+
+                if (orderContext != null)
+                {
+                    ViewBag.InitiatedOrder = orderContext;
+                    ViewBag.IsOrderInitiated = true; // 开启订单推荐开关
+                }
+            }
+
+            // ======= 设置 Dashboard 主页面框架侧边栏高亮环境变量 =======
+            ViewBag.ActiveTab = "ChatRoom"; 
+            ViewBag.IsApproved = true;
+            ViewBag.ShopName = chatRoom.Seller?.ShopName ?? "Seller Dashboard";
+
+            if (!string.IsNullOrEmpty(HttpContext.Request.Query["search"]))
+            {
+                ViewBag.AutoSearchKeyword = HttpContext.Request.Query["search"].ToString();
+            }
+
+            // 💡 重点：把当前会话投递给卖家主框架 Home.cshtml，由它在右侧内嵌渲染 ChatRoom
+            return View("~/Views/Seller/Home.cshtml", chatRoom);
+        }
+
+        // 3. 💡 纯异步轻量接口：供前端 JS 延迟创建聊天室使用
+        [HttpPost]
+        public async Task<IActionResult> CreateChatRoom(int customerId)
+        {
+            var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+
+            // 再次安全拦截，防止并发时重复创建
+            var existing = await _context.ChatRoom
+                .FirstOrDefaultAsync(r => r.SellerId == currentUserId && r.CustomerId == customerId);
+
+            if (existing != null)
+            {
+                return Json(new { chatRoomId = existing.ChatRoomId });
+            }
+
+            var newRoom = new ChatRoom
+            {
+                SellerId = currentUserId,
+                CustomerId = customerId
+            };
+
+            _context.ChatRoom.Add(newRoom);
+            await _context.SaveChangesAsync();
+
+            return Json(new { chatRoomId = newRoom.ChatRoomId });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetProductNameById(int id)
+        {
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.ProductId == id);
+            if (product != null)
+            {
+                // 顺便洗掉商品名字里可能存在的特殊换行符
+                var cleanName = product.Name?
+                    .Replace("\r", "")
+                    .Replace("\n", "")
+                    .Trim();
+
+                return Json(new { name = cleanName });
+            }
+            return Json(new { name = "" });
+        }
+
+    }
+
+}
+
