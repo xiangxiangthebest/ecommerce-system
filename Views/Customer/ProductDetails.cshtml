@@ -20,6 +20,8 @@
 
     bool hasVariations = variations.Count > 0;
 
+    bool hasDiscount = Model.DiscountPercentage > 0;
+
     string stockClass, stockLabel;
     if (!hasVariations) {
         if (Model.StockQuantity <= 0)      { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
@@ -148,7 +150,15 @@
             </div>
 
             <div class="pd-price-block">
-                <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
+                @if (hasDiscount) {
+                    <div class="pd-original-price">RM @Model.OriginalPrice.ToString("0.00")</div>
+                }
+                <div class="pd-price-row">
+                    <div class="pd-price">RM @Model.Price.ToString("0.00")</div>
+                    @if (hasDiscount) {
+                        <span class="pd-discount-badge">-@Model.DiscountPercentage%</span>
+                    }
+                </div>
                 <div class="pd-price-note">Price includes SST where applicable</div>
             </div>
 

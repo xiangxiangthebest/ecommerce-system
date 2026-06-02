@@ -221,6 +221,25 @@ namespace EcommerceSystem.Controllers
                 }
             }
 
+            if (model.OriginalPrice <= 0)
+            {
+                model.OriginalPrice = model.Price;
+            }
+
+            if (model.OriginalPrice > model.Price)
+            {
+                model.DiscountPercentage =
+                    Math.Round(
+                        ((model.OriginalPrice - model.Price)
+                        / model.OriginalPrice) * 100,
+                        0
+                    );
+            }
+            else
+            {
+                model.DiscountPercentage = 0;
+            }
+
             if (!await _context.Category.AnyAsync())
             {
                 _context.Category.AddRange(new List<Category>
@@ -332,6 +351,26 @@ namespace EcommerceSystem.Controllers
             existing.Price         = model.Price;
             existing.StockQuantity = model.StockQuantity;
             existing.IsDraft       = actionType == "Draft";
+            existing.OriginalPrice = model.OriginalPrice;
+
+            if (existing.OriginalPrice <= 0)
+            {
+                existing.OriginalPrice = existing.Price;
+            }
+
+            if (existing.OriginalPrice > existing.Price)
+            {
+                existing.DiscountPercentage =
+                    Math.Round(
+                        ((existing.OriginalPrice - existing.Price)
+                        / existing.OriginalPrice) * 100,
+                        0
+                    );
+            }
+            else
+            {
+                existing.DiscountPercentage = 0;
+            }
 
             var variationsJson = Request.Form["VariationsJson"].ToString();
             existing.VariationsJson = string.IsNullOrWhiteSpace(variationsJson) ? "[]" : variationsJson;

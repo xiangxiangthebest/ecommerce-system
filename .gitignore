@@ -56,3 +56,9 @@ nunit-*.xml
 *.db-shm
 *.db-wal
 *.db
+
+# Ignore uploaded images
+/wwwroot/images/
+
+# Ignore EF Core migrations
+/Migrations/

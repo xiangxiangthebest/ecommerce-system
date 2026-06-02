@@ -19,6 +19,8 @@
     const badge        = document.getElementById('qaStockBadge');
     const nameEl       = document.getElementById('qaProductName');
     const priceEl      = document.getElementById('qaPrice');
+    const originalPriceEl = document.getElementById('qaOriginalPrice');
+    const discountEl      = document.getElementById('qaDiscountBadge');
     const descEl       = document.getElementById('qaDescription');
     const varWrap      = document.getElementById('qaVariations');
     const varNote      = document.getElementById('qaVariationNote');
@@ -332,7 +334,31 @@
         /* Text fields */
         shopEl.textContent  = 'Sold by ' + (p.shopName || 'Unknown Shop');
         nameEl.textContent  = p.name;
-        priceEl.textContent = 'RM ' + parseFloat(p.price).toFixed(2);
+
+        const original = parseFloat(p.originalPrice || 0);
+        const selling  = parseFloat(p.price || 0);
+
+        priceEl.textContent = 'RM ' + selling.toFixed(2);
+
+        originalPriceEl.style.display = 'none';
+        discountEl.style.display = 'none';
+
+        if (original > selling && original > 0) {
+
+            const discount =
+                Math.round(((original - selling) / original) * 100);
+
+            originalPriceEl.style.display = 'block';
+            originalPriceEl.textContent = 'RM ' + original.toFixed(2);
+
+            discountEl.style.display = 'block';
+            discountEl.textContent = '-' + discount + '%';
+        } else {
+
+            if (originalPriceEl) originalPriceEl.style.display = 'none';
+            if (discountEl) discountEl.style.display = 'none';
+        }
+        
         descEl.textContent  = p.description || 'No description provided.';
         viewFullLink.href   = '/Customer/ProductDetails/' + p.productId;
         productIdEl.value   = p.productId;

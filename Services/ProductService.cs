@@ -69,6 +69,7 @@ namespace EcommerceSystem.Services
                 ProductId = product.ProductId,
                 Name = product.Name,
                 Price = product.Price,
+                OriginalPrice = product.OriginalPrice,
                 SKU = product.SKU,
                 Description = product.Description,
                 StockQuantity = product.StockQuantity,
