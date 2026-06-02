@@ -119,11 +119,6 @@ namespace EcommerceSystem.Controllers
             ViewBag.ShopName   = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
 
-            if (tab == "Profile")
-            {
-                ViewBag.ProfileSeller = seller;
-            }
-
             if (seller.IsApproved)
             {
                 var products = await _context.Products
@@ -143,6 +138,10 @@ namespace EcommerceSystem.Controllers
                         .ToListAsync();
                     ViewBag.Orders = orders;
                 }
+                if (tab == "Profile")
+                    {
+                        ViewBag.ProfileSeller = seller;
+                    }
             }
 
             return View();

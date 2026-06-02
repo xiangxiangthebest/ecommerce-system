@@ -17,11 +17,7 @@
                     <span class="nav-text">General</span>
                 </a>
             </li>
-            <li class="@(ViewBag.ActiveTab == "Profile" ? "active" : "")">
-                <a href="@Url.Action("Home", "Seller", new { tab = "Profile" })">
-                    <span class="nav-text">Profile</span>
-                </a>
-            </li>
+
             @if (isApproved)
             {
                 <li class="@(ViewBag.ActiveTab == "Product" ? "active" : "")">
@@ -32,6 +28,11 @@
                 <li class="@(ViewBag.ActiveTab == "Order" ? "active" : "")">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Order" })">
                         <span class="nav-text">Order</span>
+                    </a>
+                </li>
+                <li class="@(ViewBag.ActiveTab == "Profile" ? "active" : "")">
+                    <a href="@Url.Action("Home", "Seller", new { tab = "Profile" })">
+                        <span class="nav-text">Profile</span>
                     </a>
                 </li>
             }
@@ -45,6 +46,11 @@
                 <li class="nav-locked" title="Pending admin approval">
                     <span class="nav-text nav-text-locked">
                         <i class="fas fa-lock nav-lock-icon"></i> Order
+                    </span>
+                </li>
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Profile
                     </span>
                 </li>
             }
