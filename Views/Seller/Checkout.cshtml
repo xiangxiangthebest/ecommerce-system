@@ -1,0 +1,394 @@
+@model EcommerceSystem.ViewModels.Checkout
+@using System.Text.Json
+
+<link rel="stylesheet" href="~/css/customer/checkout.css" asp-append-version="true" />
+
+@{
+    var customer  = Model.Customer;
+    var items     = Model.CartItems ?? new List<EcommerceSystem.Models.CartItem>();
+    var addresses = Model.Addresses ?? new List<EcommerceSystem.Models.DeliveryField>();
+
+    bool hasAddresses = addresses.Any();
+
+    double merchandiseSubtotal = items.Sum(i => i.Price * i.Quantity);
+    double shippingFeeBase     = merchandiseSubtotal >= 100 ? 0 : 10;
+    double shippingSst         = Math.Round(shippingFeeBase * 0.08, 2);
+    double totalPayment        = merchandiseSubtotal + shippingFeeBase + shippingSst;
+}
+
+<div class="checkout-page">
+
+    <!-- Page title -->
+    <div class="checkout-header">
+        <a asp-action="Cart" class="back-link" id="backBtn"><i class="ti ti-arrow-left"></i></a>
+        <h1 class="checkout-title">Checkout</h1>
+        <span class="checkout-step-label">Review &amp; Place Order</span>
+    </div>
+
+    <form asp-action="PlaceOrder" method="post" id="checkoutForm">
+        @{
+            var source = (string)ViewBag.Source ?? "cart";
+            var productId = ViewBag.ProductId;
+        }
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" name="source" value="@source" />
+        <input type="hidden" name="productId" value="@productId" />
+
+        @if (source == "product")
+        {
+            var item = Model.CartItems.First();
+            <input type="hidden" name="buyNowQuantity" value="@item.Quantity" />
+            <input type="hidden" name="buyNowSelectedVariations" value="@item.SelectedVariations" />
+        }
+        else
+        {
+            @foreach (var item in Model.CartItems)
+            {
+                <input type="hidden" name="selectedItemIds" value="@item.CartItemId" />
+            }
+        }
+
+        <div class="checkout-layout">
+
+            <!-- ══════════════════════════════
+                 LEFT COLUMN
+            ══════════════════════════════ -->
+            <div class="checkout-left">
+
+                <!-- 1. Delivery Address -->
+                <section class="checkout-card">
+                    <div class="card-heading">
+                        <span class="card-num">1</span>
+                        <div>
+                            <h2 class="card-title">Delivery Address</h2>
+                            <p class="card-sub">Where should we send your order?</p>
+                        </div>
+                    </div>
+
+                    @if (!hasAddresses)
+                    {
+                        <!-- ✅ EMPTY STATE -->
+                        <div class="empty-address">
+                            <i class="ti ti-alert-circle"></i>
+                            <div class="empty-address-text">
+                                <p class="empty-address-title">No delivery address found</p>
+                                <p class="empty-address-sub">
+                                    Please update your delivery address at
+                                    <a asp-controller="Customer" asp-action="Profile">Profile page</a>
+                                    to continue.
+                                </p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="saved-address-row">
+                            @foreach (var addr in addresses.OrderByDescending(x => x.IsDefault))
+                            {
+                                <label class="saved-address-card @(addr.IsDefault ? "selected" : "")">
+                                    <input type="radio"
+                                           name="SelectedAddressId"
+                                           value="@addr.AddressId"
+                                           class="sr-only"
+                                           @(addr.IsDefault ? "checked" : "")
+                                           required />
+
+                                    <div class="saved-addr-inner">
+
+                                        <div class="saved-addr-icon">
+                                            <i class="ti ti-map-pin"></i>
+                                        </div>
+
+                                        <div class="saved-addr-text">
+                                            <div class="saved-addr-top">
+                                                <span class="saved-addr-name">@addr.RecipientName</span>
+                                                <span class="saved-addr-phone">@addr.PhoneNumber</span>
+
+                                                @if (addr.IsDefault)
+                                                {
+                                                    <span class="saved-addr-badge">Default</span>
+                                                }
+                                            </div>
+
+                                            <span class="saved-addr-line">
+                                                @addr.AddressLine1
+                                                @(!string.IsNullOrWhiteSpace(addr.AddressLine2) ? ", " + addr.AddressLine2 : "")
+                                            </span>
+
+                                            <span class="saved-addr-line">
+                                                @addr.Postcode, @addr.City, @addr.State
+                                            </span>
+                                        </div>
+
+                                    </div>
+                                </label>
+                            }
+                        </div>
+
+                        <div class="address-manage-link">
+                            <a asp-controller="Customer" asp-action="Profile">
+                                <i class="ti ti-settings"></i> Manage addresses in Profile
+                            </a>
+                        </div>
+                    }
+                </section>
+
+                <!-- 2. Order Items -->
+                <section class="checkout-card">
+                    <div class="card-heading">
+                        <span class="card-num">2</span>
+                        <div>
+                            <h2 class="card-title">Order Items</h2>
+                            <p class="card-sub">@items.Count() @(items.Count() == 1 ? "item" : "items") from your cart</p>
+                        </div>
+                    </div>
+
+                    @{
+                        var grouped = items
+                            .Where(i => i.Product != null)
+                            .GroupBy(i => i.Product!.Seller?.ShopName ?? "Unknown Shop");
+                    }
+
+                    @foreach (var group in grouped)
+                    {
+                        <div class="seller-group">
+                            <div class="seller-group-header">
+                                <i class="ti ti-building-store"></i>
+                                <span>@group.Key</span>
+                            </div>
+
+                            @foreach (var item in group)
+                            {
+                                var varDict = new Dictionary<string, string>();
+                                if (!string.IsNullOrWhiteSpace(item.SelectedVariations) && item.SelectedVariations != "{}")
+                                {
+                                    try
+                                    {
+                                        varDict = JsonSerializer.Deserialize<Dictionary<string, string>>(item.SelectedVariations) ?? new();
+                                    }
+                                    catch { }
+                                }
+
+                                <div class="checkout-item">
+                                    @if (!string.IsNullOrWhiteSpace(item.Product?.ImagePath))
+                                    {
+                                        <img src="@item.Product.ImagePath" alt="@item.Product.Name" class="checkout-item-img" />
+                                    }
+                                    else
+                                    {
+                                        <div class="checkout-item-img-placeholder"><i class="ti ti-photo"></i></div>
+                                    }
+
+                                    <div class="checkout-item-info">
+                                        <span class="checkout-item-name">@(item.Product?.Name ?? "Product")</span>
+
+                                        @if (varDict.Any())
+                                        {
+                                            <div class="checkout-item-vars">
+                                                @foreach (var kv in varDict)
+                                                {
+                                                    <span class="variation-tag">@kv.Key: @kv.Value</span>
+                                                }
+                                            </div>
+                                        }
+
+                                        <span class="checkout-item-qty">Qty: @item.Quantity</span>
+                                    </div>
+
+                                    <div class="checkout-item-price">
+                                        RM @((item.Price * item.Quantity).ToString("0.00"))
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="seller-message-row">
+                                <label class="form-label">
+                                    <i class="ti ti-message-circle"></i>
+                                    Message to @group.Key
+                                    <span class="optional">(optional)</span>
+                                </label>
+                                <input type="text"
+                                       name="SellerMessage_@(group.Key.Replace(" ", "_"))"
+                                       class="form-input seller-msg-input"
+                                       placeholder="Leave a note for the seller…"
+                                       maxlength="200" />
+                            </div>
+                        </div>
+                    }
+                </section>
+
+                <!-- 3. Payment Method -->
+                <section class="checkout-card">
+                    <div class="card-heading">
+                        <span class="card-num">3</span>
+                        <div>
+                            <h2 class="card-title">Payment Method</h2>
+                            <p class="card-sub">Choose how you'd like to pay</p>
+                        </div>
+                    </div>
+
+                    <div class="payment-methods">
+
+                        <label class="payment-option">
+                            <input type="radio" name="PaymentMethod" value="FPX" class="sr-only pm-radio" />
+                            <div class="pm-icon-wrap"><i class="ti ti-building-bank"></i></div>
+                            <div class="pm-info">
+                                <span class="pm-name">Online Banking (FPX)</span>
+                                <span class="pm-desc">Maybank, CIMB, RHB, Public Bank &amp; more</span>
+                            </div>
+                            <div class="pm-check"><i class="ti ti-check"></i></div>
+                        </label>
+
+                        <label class="payment-option">
+                            <input type="radio" name="PaymentMethod" value="Card" class="sr-only pm-radio" />
+                            <div class="pm-icon-wrap"><i class="ti ti-credit-card"></i></div>
+                            <div class="pm-info">
+                                <span class="pm-name">Credit / Debit Card</span>
+                                <span class="pm-desc">Visa, Mastercard, American Express</span>
+                            </div>
+                            <div class="pm-check"><i class="ti ti-check"></i></div>
+                        </label>
+
+                        <!-- Card sub-form -->
+                        <div class="card-details-form" id="cardDetailsForm">
+                            <div class="form-group">
+                                <label class="form-label">Cardholder Name</label>
+                                <input type="text" name="CardName" class="form-input" placeholder="Name as on card" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Card Number</label>
+                                <div class="card-num-wrap">
+                                    <input type="text" name="CardNumber" id="cardNumberInput"
+                                           class="form-input" placeholder="0000 0000 0000 0000"
+                                           maxlength="19" inputmode="numeric" />
+                                    <span class="card-brand-icon"><i class="ti ti-credit-card" id="cardBrandIcon"></i></span>
+                                </div>
+                            </div>
+                            <div class="form-row two-col">
+                                <div class="form-group">
+                                    <label class="form-label">Expiry Date</label>
+                                    <input type="text" name="CardExpiry" id="cardExpiry"
+                                           class="form-input" placeholder="MM / YY" maxlength="7" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">CVV</label>
+                                    <input type="password" name="CardCvv"
+                                           class="form-input" placeholder="•••" maxlength="4" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="payment-option">
+                            <input type="radio" name="PaymentMethod" value="COD" class="sr-only pm-radio" />
+                            <div class="pm-icon-wrap"><i class="ti ti-cash"></i></div>
+                            <div class="pm-info">
+                                <span class="pm-name">Cash on Delivery</span>
+                                <span class="pm-desc">Pay when your order arrives</span>
+                            </div>
+                            <div class="pm-check"><i class="ti ti-check"></i></div>
+                        </label>
+
+                        <label class="payment-option">
+                            <input type="radio" name="PaymentMethod" value="EWallet" class="sr-only pm-radio" />
+                            <div class="pm-icon-wrap"><i class="ti ti-wallet"></i></div>
+                            <div class="pm-info">
+                                <span class="pm-name">E-Wallet</span>
+                                <span class="pm-desc">Touch 'n Go eWallet, GrabPay</span>
+                            </div>
+                            <div class="pm-check"><i class="ti ti-check"></i></div>
+                        </label>
+
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ══════════════════════════════
+                 RIGHT COLUMN
+            ══════════════════════════════ -->
+            <div class="checkout-right">
+
+                <!-- Voucher -->
+                <div class="summary-card promo-card">
+                    <div class="summary-card-header">
+                        <i class="ti ti-tag"></i> Voucher / Promo Code
+                    </div>
+                    <div class="promo-row">
+                        <input type="text" id="promoInput" name="PromoCode"
+                               class="form-input promo-input" placeholder="Enter promo code" />
+                        <button type="button" class="promo-btn" id="applyPromoBtn">Apply</button>
+                    </div>
+                    <p class="promo-feedback" id="promoFeedback"></p>
+                </div>
+
+                <!-- Payment details -->
+                <div class="summary-card">
+                    <div class="summary-card-header">
+                        <i class="ti ti-receipt"></i> Payment Details
+                    </div>
+
+                    <div class="summary-lines">
+                        <div class="summary-line">
+                            <span>Merchandise Subtotal</span>
+                            <span>RM <span id="sumMerchandise">@merchandiseSubtotal.ToString("0.00")</span></span>
+                        </div>
+                        <div class="summary-line">
+                            <span>Shipping Subtotal <small>(excl. SST)</small></span>
+                            <span>RM <span id="sumShippingBase">@shippingFeeBase.ToString("0.00")</span></span>
+                        </div>
+                        <div class="summary-line">
+                            <span>Shipping Fee SST (8%)</span>
+                            <span>RM <span id="sumShippingSst">@shippingSst.ToString("0.00")</span></span>
+                        </div>
+                        <div class="summary-line discount" id="lineShipDiscount" style="display:none;">
+                            <span>Shipping Discount</span>
+                            <span>− RM <span id="sumShipDiscount">0.00</span></span>
+                        </div>
+                        <div class="summary-line discount" id="lineVoucherDiscount" style="display:none;">
+                            <span>Voucher Discount</span>
+                            <span>− RM <span id="sumVoucherDiscount">0.00</span></span>
+                        </div>
+                    </div>
+
+                    <div class="summary-divider"></div>
+
+                    <div class="summary-total-row">
+                        <span>Total Payment</span>
+                        <span class="summary-total-amount">RM <span id="sumTotal">@totalPayment.ToString("0.00")</span></span>
+                    </div>
+
+                    <div class="summary-trust">
+                        <div class="trust-item"><i class="ti ti-shield-check"></i><span>Secure checkout</span></div>
+                        <div class="trust-item"><i class="ti ti-truck-delivery"></i><span>Fast delivery</span></div>
+                        <div class="trust-item"><i class="ti ti-refresh"></i><span>7-day returns</span></div>
+                    </div>
+                </div>
+
+                <!-- Hidden selected cart item ids -->
+                @foreach (var item in Model.CartItems)
+                {
+                    <input type="hidden" name="selectedItemIds" value="@item.CartItemId" />
+                }
+
+                <button type="submit" class="btn-place-order" id="placeOrderBtn" disabled>
+                    <span class="btn-place-order-inner">
+                        <i class="ti ti-lock"></i> Place Order
+                    </span>
+                    <span class="btn-place-order-total">RM <span id="btnTotal">@totalPayment.ToString("0.00")</span></span>
+                </button>
+
+                <p class="checkout-guard-msg" id="checkoutGuardMsg"></p>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    window.checkoutSource = "@ViewBag.Source";
+    window.checkoutProductId = "@ViewBag.ProductId";
+</script>
+
+<script src="~/js/customer/checkout.js" asp-append-version="true"></script>

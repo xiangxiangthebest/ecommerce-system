@@ -28,7 +28,7 @@ namespace EcommerceSystem.Observers
             _context = context;
         }
 
-        public async void Update(Order order)
+        public async Task Update(Order order)
         {
             try
             {

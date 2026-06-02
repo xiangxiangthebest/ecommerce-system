@@ -50,7 +50,8 @@
     color: white;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     position: relative;
-    overflow: hidden;
+    /* Allow absolutely-positioned dropdowns to overflow the header area */
+    overflow: visible;
 }
 
 .admin-header::before {
@@ -112,6 +113,20 @@
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Notification wrapper (header) */
+.notif-wrapper {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.notif-dropdown {
+    width: 360px;
+    max-height: 420px;
+    overflow-y: auto;
 }
 
 .logout-btn:hover {

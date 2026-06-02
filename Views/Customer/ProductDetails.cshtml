@@ -137,7 +137,7 @@
                     </div>
                 </div>
 
-                <form asp-controller="Chat" asp-action="StartConversation" method="post">
+                <form asp-controller="Chat" asp-action="CustomerStartConversation" method="post">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="sellerId" value="@Model.SellerId" />
                     <input type="hidden" name="productId" value="@Model.ProductId" />
@@ -273,7 +273,7 @@
                     </button>
                 </form>
             </div>
-
+            
             <div class="pd-trust">
                 <div class="pd-trust-item">
                     <i class="ti ti-truck-delivery"></i>
