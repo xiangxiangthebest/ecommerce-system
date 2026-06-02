@@ -326,15 +326,15 @@
                                         <i class="fas fa-eye"></i> View
                                     </button>
                                 </td>
-                                <td> <!-- 已加：独立的 Chat 按钮单元格 -->
-                                    @if (order.Customer != null)
-                                    {
-                                        <a href="@Url.Action("Home", "Seller", new { tab = "ChatRoom", customerId = order.CustomerUserId })" 
-                                           class="btn-order-chat" 
-                                           title="Chat with Customer">
-                                            <i class="fas fa-comments"></i>
-                                        </a>
-                                    }
+                                <td>
+                                   @if (order.Customer != null)
+                                        {
+                                            <a href="@Url.Action("StartConversationFromOrder", "Chat", new { customerId = order.CustomerUserId })" 
+                                            class="btn-order-chat" 
+                                            title="Chat with Customer">
+                                                <i class="fas fa-comments"></i>
+                                            </a>
+                                        }
                                     else
                                     {
                                         <span style="color:#ccc">—</span>
@@ -1026,53 +1026,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 </script>
-
-@* <script>
-    document.addEventListener("DOMContentLoaded", function () {
-    // 1. 💡 优先获取后端 C# 转发过来的关键字，如果为空则从客户端 URL 解析兜底
-    let searchKeyword = '@(ViewBag.AutoSearchKeyword ?? "")';
-    if (!searchKeyword) {
-        const urlParams = new URLSearchParams(window.location.search);
-        searchKeyword = urlParams.get('search') || '';
-    }
-
-    // 2. 🔥【核心联动核心】：如果存在搜索关键字，立即激活自动化搜索
-    if (searchKeyword) {
-        // 设置延迟执行（等 300 毫秒），防止因为局部视图异步渲染导致 DOM 节点还没生成
-        setTimeout(function() {
-            // A. 精准定位商家后台的【商品搜索框】
-            // 提示：自动兼容你们项目中可能叫 productSearchInput 或带 Product 占位符的 input 框
-            const searchInput = document.getElementById('productSearchInput')
-                             || document.querySelector('input[placeholder*="Product"]')
-                             || document.querySelector('input[placeholder*="商品"]')
-                             || document.querySelector('.search-box input');
-
-            if (searchInput) {
-                // B. 将商品 ID 强行写入搜索框
-                searchInput.value = searchKeyword.trim();
-
-                // C. 🔥【最最关键一步】：向输入框连续派发 input 和 change 事件！
-                // 只有派发了这两个原生事件，才能彻底激活你们前端框架（如 jQuery/Vue/原生JS）中绑定的实时过滤或 Ajax 刷新数据代码
-                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                // D. 兜底策略：如果你们系统的搜索需要手动点击旁边的“搜索按钮”才能生效，模拟点击它
-                const searchBtn = searchInput.closest('form')?.querySelector('button[type="submit"]')
-                               || document.getElementById('searchBtn')
-                               || searchInput.nextElementSibling;
-                if (searchBtn && typeof searchBtn.click === 'function') {
-                    searchBtn.click();
-                }
-                
-                console.log("成功为商家触发商品自动化过滤追踪: " + searchKeyword);
-            } else {
-                console.warn("未能在页面中定位到商品搜索框元素。");
-            }
-        }, 300);
-    }
-});
-</script> *@
-
 
     <!-- Approve Return Modal -->
     <div id="approveReturnBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000" onclick="closeApproveReturnModal()" class="approve-return-backdrop"></div>

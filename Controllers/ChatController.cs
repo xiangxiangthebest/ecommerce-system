@@ -445,7 +445,35 @@ public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
             return Json(new { name = "" });
         }
 
+        [Authorize(Roles = "Seller")]
+        public async Task<IActionResult> StartConversationFromOrder(int customerId)
+        {
+            // 1. 获取当前登录的卖家 ID
+            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            var seller = await _context.Seller.FirstOrDefaultAsync(x => x.Email == email);
+            if (seller == null) return RedirectToAction("Login", "Account");
+
+            // 2. 检查数据库里，该卖家和此客户是否已经存在聊天室
+            var chatRoom = await _context.ChatRoom
+                .FirstOrDefaultAsync(cr => cr.SellerId == seller.UserId && cr.CustomerId == customerId);
+
+            // 3. 如果是第一次聊天（聊天室不存在），原地自动帮他们建立一个
+            if (chatRoom == null)
+            {
+                chatRoom = new ChatRoom
+                {
+                    SellerId = seller.UserId,
+                    CustomerId = customerId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.ChatRoom.Add(chatRoom);
+                await _context.SaveChangesAsync();
+            }
+
+            // 4. 🚀 关键：拿到了 ChatRoomId (比如 1)，顺畅重定向到你原本工作完美的聊天页面！
+            return RedirectToAction("SellerConversation", "Chat", new { id = chatRoom.ChatRoomId });
+        }
+
     }
 
 }
-
