@@ -64,6 +64,11 @@ namespace EcommerceSystem.Services
         {
             return await _context.ReviewReports
                 .Include(r => r.Review)
+                    .ThenInclude(rev => rev.OrderItem)
+                        .ThenInclude(oi => oi.Order)
+                            .ThenInclude(o => o.Customer)
+                .Include(r => r.Review)
+                    .ThenInclude(rev => rev.Product)
                 .Include(r => r.Customer)
                 .FirstOrDefaultAsync(r => r.ReviewReportId == reportId);
         }
@@ -73,6 +78,11 @@ namespace EcommerceSystem.Services
             return await _context.ReviewReports
                 .Where(r => r.ReviewId == reviewId)
                 .Include(r => r.Review)
+                    .ThenInclude(rev => rev.OrderItem)
+                        .ThenInclude(oi => oi.Order)
+                            .ThenInclude(o => o.Customer)
+                .Include(r => r.Review)
+                    .ThenInclude(rev => rev.Product)
                 .Include(r => r.Customer)
                 .OrderByDescending(r => r.ReportedAt)
                 .ToListAsync();
@@ -83,6 +93,11 @@ namespace EcommerceSystem.Services
             return await _context.ReviewReports
                 .Where(r => r.CustomerId == customerId)
                 .Include(r => r.Review)
+                    .ThenInclude(rev => rev.OrderItem)
+                        .ThenInclude(oi => oi.Order)
+                            .ThenInclude(o => o.Customer)
+                .Include(r => r.Review)
+                    .ThenInclude(rev => rev.Product)
                 .Include(r => r.Customer)
                 .OrderByDescending(r => r.ReportedAt)
                 .ToListAsync();
@@ -92,6 +107,11 @@ namespace EcommerceSystem.Services
         {
             return await _context.ReviewReports
                 .Include(r => r.Review)
+                    .ThenInclude(rev => rev.OrderItem)
+                        .ThenInclude(oi => oi.Order)
+                            .ThenInclude(o => o.Customer)
+                .Include(r => r.Review)
+                    .ThenInclude(rev => rev.Product)
                 .Include(r => r.Customer)
                 .OrderByDescending(r => r.ReportedAt)
                 .ToListAsync();
