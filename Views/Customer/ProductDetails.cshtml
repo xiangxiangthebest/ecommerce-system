@@ -272,14 +272,6 @@
                         <i class="ti ti-bolt"></i> Buy Now
                     </button>
                 </form>
-
-                <button id="pdBtnReport"
-                        type="button"
-                        class="pd-btn-report"
-                        aria-haspopup="dialog"
-                        aria-expanded="false">
-                    <i class="ti ti-flag"></i> Report Product
-                </button>
             </div>
             
             <div class="pd-trust">
@@ -295,6 +287,13 @@
                     <i class="ti ti-refresh"></i>
                     <span>7-day returns</span>
                 </div>
+            </div>
+
+            <div class="pd-footer-row">
+                <button id="pdBtnReport" type="button" class="pd-btn-report-inline" aria-haspopup="dialog" aria-expanded="false">
+                    <i class="ti ti-flag"></i>
+                    Report this product
+                </button>
             </div>
 
         </div><!-- /.pd-info -->
@@ -319,7 +318,15 @@
 <div id="reportProductBackdrop" class="report-overlay" role="dialog" aria-modal="true" aria-label="Report product" hidden>
     <div class="report-modal" id="reportPanel">
         <div class="report-header">
-            <h2 class="report-title">Report This Product</h2>
+            <div class="report-header-left">
+                <div class="report-header-icon">
+                    <i class="ti ti-flag-2" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h2 class="report-title">Report this product</h2>
+                    <p class="report-subtitle">We'll review your report within 24 hours</p>
+                </div>
+            </div>
             <button class="report-close" id="reportCloseBtn" aria-label="Close report form" type="button">
                 <i class="ti ti-x" aria-hidden="true"></i>
             </button>
@@ -329,45 +336,56 @@
             @Html.AntiForgeryToken()
             <input type="hidden" name="productId" value="@Model.ProductId" />
 
+            <div class="report-notice">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                <p>Reports are anonymous. Only submit if you genuinely believe this listing violates our guidelines.</p>
+            </div>
+
             <div class="form-group">
-                <label for="reportReason">Report Reason <span class="required">*</span></label>
+                <label for="reportReason">Reason for report <span class="required">*</span></label>
                 <select id="reportReason" name="reportReason" required class="form-control">
-                    <option value="">-- Select a reason --</option>
-                    <option value="Counterfeit">Counterfeit Product</option>
-                    <option value="Damaged">Product Damaged/Defective</option>
-                    <option value="Misleading">Misleading Description</option>
-                    <option value="InappropriateContent">Inappropriate Content</option>
-                    <option value="FalseAdvertising">False Advertising</option>
+                    <option value="">Select a reason…</option>
+                    <option value="Counterfeit">Counterfeit product</option>
+                    <option value="Damaged">Product damaged / defective</option>
+                    <option value="Misleading">Misleading description</option>
+                    <option value="InappropriateContent">Inappropriate content</option>
+                    <option value="FalseAdvertising">False advertising</option>
                     <option value="Other">Other</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="reportDescription">Description <span class="required">*</span></label>
-                <textarea id="reportDescription" 
-                          name="reportDescription" 
-                          required 
-                          class="form-control" 
-                          rows="4" 
-                          placeholder="Please provide details about your report (min 20 characters)"
+                <label for="reportDescription">Additional details <span class="required">*</span></label>
+                <textarea id="reportDescription"
+                          name="reportDescription"
+                          required
+                          class="form-control"
+                          rows="4"
+                          placeholder="Describe the issue in detail (20–500 characters)…"
                           minlength="20"
-                          maxlength="500"></textarea>
-                <small class="form-text">20-500 characters</small>
+                          maxlength="500"
+                          oninput="document.getElementById('reportCharCount').textContent = this.value.length + ' / 500'"></textarea>
+                <small class="form-text" id="reportCharCount">0 / 500</small>
             </div>
 
-            <div class="form-group">
-                <label for="reportEvidence">Evidence Images</label>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="reportEvidence">
+                    Evidence images
+                    <span style="font-size:11px; color:#bbb; font-weight:400">(optional, max 4)</span>
+                </label>
                 <div class="file-upload-area" id="fileUploadArea">
-                    <input type="file" 
-                           id="reportEvidence" 
-                           name="evidenceFiles" 
-                           multiple 
-                           accept="image/*" 
+                    <input type="file"
+                           id="reportEvidence"
+                           name="evidenceFiles"
+                           multiple
+                           accept="image/*"
                            class="file-input" />
                     <div class="upload-label">
-                        <i class="ti ti-cloud-upload"></i>
-                        <p>Click to upload or drag and drop</p>
-                        <small>PNG, JPG, GIF (max 4 images, 5MB each)</small>
+                        <div class="upload-icon-circle">
+                            <i class="ti ti-cloud-upload" aria-hidden="true"></i>
+                        </div>
+                        <p>Click to upload or drag & drop</p>
+                        <small>PNG, JPG, GIF — up to 5 MB each</small>
                     </div>
                 </div>
                 <div id="filePreview" class="file-preview"></div>
@@ -375,7 +393,10 @@
 
             <div class="form-actions">
                 <button type="button" id="reportCancelBtn" class="btn-cancel">Cancel</button>
-                <button type="submit" id="reportSubmitBtn" class="btn-submit">Submit Report</button>
+                <button type="submit" id="reportSubmitBtn" class="btn-submit">
+                    <i class="ti ti-send" aria-hidden="true"></i>
+                    Submit report
+                </button>
             </div>
         </form>
     </div>
@@ -443,13 +464,11 @@
                                 <span class="rv-author-name">@(r.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
                                     <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
-                                    
-                                    <button type="button" 
-                                    class="pd-btn-report-review" 
-                                    title="Report this review"
-                                    data-review-id="@r.ReviewId"
-                                    style="background: none; border: none; color: #dc3545; text-decoration: none; cursor: pointer; padding: 2px 5px; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
-                                        <i class="ti ti-flag"></i> Report
+                                    <button type="button"
+                                            class="pd-btn-report-review"
+                                            title="Report this review"
+                                            data-review-id="@r.ReviewId">
+                                        <i class="ti ti-flag" aria-hidden="true"></i> Report
                                     </button>
                                 </div>
                             </div>
@@ -516,8 +535,17 @@
      ════════════════════════════════════════════════════ -->
 <div id="reportReviewBackdrop" class="report-overlay" role="dialog" aria-modal="true" aria-label="Report review" hidden>
     <div class="report-modal" id="reportReviewPanel">
+
         <div class="report-header">
-            <h2 class="report-title">Report This Review</h2>
+            <div class="report-header-left">
+                <div class="report-header-icon">
+                    <i class="ti ti-message-report" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h2 class="report-title">Report this review</h2>
+                    <p class="report-subtitle">We'll review your report within 24 hours</p>
+                </div>
+            </div>
             <button class="report-close" id="reportReviewCloseBtn" aria-label="Close report form" type="button">
                 <i class="ti ti-x" aria-hidden="true"></i>
             </button>
@@ -527,35 +555,44 @@
             @Html.AntiForgeryToken()
             <input type="hidden" name="reviewId" id="reportReviewId" value="" />
 
+            <div class="report-notice">
+                <i class="ti ti-info-circle" aria-hidden="true"></i>
+                <p>Reports are anonymous. Only submit if you genuinely believe this review violates our guidelines.</p>
+            </div>
+
             <div class="form-group">
-                <label for="reviewReportReason">Report Reason <span class="required">*</span></label>
+                <label for="reviewReportReason">Reason for report <span class="required">*</span></label>
                 <select id="reviewReportReason" name="reportReason" required class="form-control">
-                    <option value="">-- Select a reason --</option>
-                    <option value="InappropriateContent">Inappropriate Content</option>
+                    <option value="">Select a reason…</option>
+                    <option value="InappropriateContent">Inappropriate content</option>
                     <option value="Spam">Spam</option>
-                    <option value="Offensive">Offensive Language</option>
-                    <option value="FalseInfo">False Information</option>
-                    <option value="Harassment">Harassment/Bullying</option>
+                    <option value="Offensive">Offensive language</option>
+                    <option value="FalseInfo">False information</option>
+                    <option value="Harassment">Harassment / bullying</option>
                     <option value="Other">Other</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="reviewReportDescription">Description <span class="required">*</span></label>
-                <textarea id="reviewReportDescription" 
-                          name="reportDescription" 
-                          required 
-                          class="form-control" 
-                          rows="4" 
-                          placeholder="Please provide details about your report (min 20 characters)"
+                <label for="reviewReportDescription">Additional details <span class="required">*</span></label>
+                <textarea id="reviewReportDescription"
+                          name="reportDescription"
+                          required
+                          class="form-control"
+                          rows="4"
+                          placeholder="Describe the issue in detail (20–500 characters)…"
                           minlength="20"
-                          maxlength="500"></textarea>
-                <small class="form-text">20-500 characters</small>
+                          maxlength="500"
+                          oninput="document.getElementById('reviewReportCharCount').textContent = this.value.length + ' / 500'"></textarea>
+                <small class="form-text" id="reviewReportCharCount">0 / 500</small>
             </div>
 
             <div class="form-actions">
                 <button type="button" id="reportReviewCancelBtn" class="btn-cancel">Cancel</button>
-                <button type="submit" id="reportReviewSubmitBtn" class="btn-submit">Submit Report</button>
+                <button type="submit" id="reportReviewSubmitBtn" class="btn-submit">
+                    <i class="ti ti-send" aria-hidden="true"></i>
+                    Submit report
+                </button>
             </div>
         </form>
     </div>
