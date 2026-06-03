@@ -28,6 +28,8 @@ public class AppDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<ProductReport> ProductReports { get; set; }
     public DbSet<ReviewReport> ReviewReports { get; set; }
+    public DbSet<CustomerVoucher> CustomerVouchers { get; set; }
+    public DbSet<Voucher> Vouchers { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

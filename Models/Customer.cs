@@ -9,4 +9,5 @@ public class Customer : User
     public DateTime? Birthday { get; set; }
     public string? ProfilePicture { get; set; }
     public ICollection<DeliveryField> Addresses { get; set; } = new List<DeliveryField>();
+    public ICollection<CustomerVoucher> CustomerVouchers { get; set; } = new List<CustomerVoucher>();
 }

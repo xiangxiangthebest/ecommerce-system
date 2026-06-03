@@ -245,7 +245,8 @@ namespace EcommerceSystem.Controllers
             string source,
             int? productId,
             int? buyNowQuantity,
-            string? buyNowSelectedVariations)
+            string? buyNowSelectedVariations,
+            int? selectedVoucherId)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -260,6 +261,7 @@ namespace EcommerceSystem.Controllers
                 ProductId = productId,
                 BuyNowQuantity = buyNowQuantity,
                 BuyNowSelectedVariations = buyNowSelectedVariations ?? "{}",
+                SelectedVoucherId = selectedVoucherId,
                 SellerMessages = ExtractSellerMessagesFromForm(Request.Form)
             };
 

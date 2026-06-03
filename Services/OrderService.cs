@@ -138,6 +138,34 @@ namespace EcommerceSystem.Services
 
             if (address == null) return OperationResult.Fail("Invalid address.");
 
+            CustomerVoucher? appliedCustomerVoucher = null;
+            decimal voucherDiscount = 0m;
+
+            if (request.SelectedVoucherId.HasValue)
+            {
+                appliedCustomerVoucher = await _context.CustomerVouchers
+                    .Include(cv => cv.Voucher)
+                    .FirstOrDefaultAsync(cv => cv.CustomerVoucherId == request.SelectedVoucherId.Value && cv.CustomerId == request.CustomerId);
+
+                if (appliedCustomerVoucher == null)
+                    return OperationResult.Fail("Selected voucher is invalid.");
+
+                if (appliedCustomerVoucher.IsUsed)
+                    return OperationResult.Fail("Selected voucher has already been used.");
+
+                var voucher = appliedCustomerVoucher.Voucher;
+                if (voucher == null)
+                    return OperationResult.Fail("Selected voucher is invalid.");
+
+                if (!voucher.IsActive || voucher.StartDate > DateTime.Now || voucher.EndDate < DateTime.Now)
+                    return OperationResult.Fail("Selected voucher is not valid at this time.");
+
+                if (voucher.Quantity <= 0)
+                    return OperationResult.Fail("Selected voucher is no longer available.");
+
+                voucherDiscount = voucher.DiscountValue;
+            }
+
             List<CartItem> itemsToPurchase;
 
             if (request.Source == "product")
@@ -181,7 +209,15 @@ namespace EcommerceSystem.Services
 
             var groupedBySeller = itemsToPurchase.GroupBy(i => new { i.Product!.SellerId, i.Product.Seller!.ShopName });
 
-            // Collect placed order IDs so we can notify after the transaction commits.
+            if (appliedCustomerVoucher != null)
+            {
+                var voucher = appliedCustomerVoucher.Voucher!;
+                var totalCartAmount = groupedBySeller.Sum(group => group.Sum(i => i.Quantity * (decimal)i.Price));
+                if (voucher.MinimumSpend.HasValue && totalCartAmount < voucher.MinimumSpend.Value)
+                    return OperationResult.Fail($"This voucher requires a minimum spend of RM{voucher.MinimumSpend.Value:0.00}.");
+            }
+
+            decimal voucherDiscountRemaining = voucherDiscount;
             var placedOrderIds = new List<int>();
 
             await using var tx = await _context.Database.BeginTransactionAsync();
@@ -196,6 +232,12 @@ namespace EcommerceSystem.Services
                     request.SellerMessages.TryGetValue(messageKey, out var customerMessage);
 
                     var orderTotal = group.Sum(i => i.Quantity * (decimal)i.Price);
+                    if (voucherDiscountRemaining > 0)
+                    {
+                        var discountToApply = Math.Min(voucherDiscountRemaining, orderTotal);
+                        orderTotal -= discountToApply;
+                        voucherDiscountRemaining -= discountToApply;
+                    }
 
                     var order = new Order
                     {
@@ -258,6 +300,17 @@ namespace EcommerceSystem.Services
                     await _context.SaveChangesAsync();
 
                     placedOrderIds.Add(order.OrderId);
+                }
+
+                if (appliedCustomerVoucher != null)
+                {
+                    appliedCustomerVoucher.IsUsed = true;
+                    appliedCustomerVoucher.UsedAt = DateTime.UtcNow;
+
+                    if (appliedCustomerVoucher.Voucher != null && appliedCustomerVoucher.Voucher.Quantity > 0)
+                        appliedCustomerVoucher.Voucher.Quantity -= 1;
+
+                    await _context.SaveChangesAsync();
                 }
 
                 await tx.CommitAsync();

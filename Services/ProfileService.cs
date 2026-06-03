@@ -21,6 +21,8 @@ namespace EcommerceSystem.Services
             return await _context.Users
                 .OfType<Customer>()
                 .Include(x => x.Addresses)
+                .Include(x => x.CustomerVouchers)
+                    .ThenInclude(cv => cv.Voucher)
                 .FirstOrDefaultAsync(x => x.UserId == customerId);
         }
 
@@ -32,40 +34,86 @@ namespace EcommerceSystem.Services
 
             if (customer == null) return OperationResult<User>.Fail("Customer not found.");
 
+            var originalBirthday = customer.Birthday;
+
             // Update fields (business rules live here now)
             customer.FullName = updated.FullName;
             customer.Email = updated.Email;
-
-            // Your model has both PhoneNumber (User) and Phone (Customer) inconsistently.
-            // Keep compatibility by updating both if present.
             customer.PhoneNumber = updated.PhoneNumber;
-
-            try
-            {
-                // if Customer.Phone exists in your model, copy it too
-                var phoneProp = customer.GetType().GetProperty("Phone");
-                if (phoneProp != null)
-                    phoneProp.SetValue(customer, updated.GetType().GetProperty("Phone")?.GetValue(updated));
-            }
-            catch { /* ignore reflection issues */ }
-
-            var genderProp = customer.GetType().GetProperty("Gender");
-            if (genderProp != null)
-                genderProp.SetValue(customer, updated.GetType().GetProperty("Gender")?.GetValue(updated));
-
-            var birthdayProp = customer.GetType().GetProperty("Birthday");
-            if (birthdayProp != null)
-                birthdayProp.SetValue(customer, updated.GetType().GetProperty("Birthday")?.GetValue(updated));
+            customer.Phone = updated.Phone;
+            customer.Gender = updated.Gender;
+            customer.Birthday = updated.Birthday;
 
             if (profileImage != null && profileImage.Length > 0)
             {
                 var path = await _imageStorage.SaveProfileImageAsync(profileImage);
-                var picProp = customer.GetType().GetProperty("ProfilePicture");
-                if (picProp != null) picProp.SetValue(customer, path);
+                customer.ProfilePicture = path;
             }
 
             await _context.SaveChangesAsync();
+
+            if (originalBirthday != customer.Birthday && customer.Birthday.HasValue)
+            {
+                await AssignBirthdayVoucherAsync(customer);
+            }
+
             return OperationResult<User>.Ok(customer);
+        }
+
+        private async Task AssignBirthdayVoucherAsync(Customer customer)
+        {
+            if (!customer.Birthday.HasValue)
+                return;
+
+            var birthday = customer.Birthday.Value;
+            var now = DateTime.Now;
+            var voucherYear = now.Year;
+
+            if (birthday.Month < now.Month)
+            {
+                voucherYear = now.Year + 1;
+            }
+
+            var startOfMonth = new DateTime(voucherYear, birthday.Month, 1);
+            var endOfMonth = startOfMonth.AddMonths(1).AddTicks(-1);
+
+            var existing = await _context.CustomerVouchers
+                .Include(cv => cv.Voucher)
+                .Where(cv => cv.CustomerId == customer.UserId)
+                .Where(cv => cv.Voucher.Type == "Birthday")
+                .Where(cv => cv.Voucher.StartDate.Month == startOfMonth.Month && cv.Voucher.StartDate.Year == startOfMonth.Year)
+                .Where(cv => !cv.IsUsed)
+                .FirstOrDefaultAsync();
+
+            if (existing != null)
+                return;
+
+            var code = $"BIRTHDAY-{customer.UserId}-{birthday.Month:D2}{voucherYear}";
+            var voucher = new Voucher
+            {
+                Code = code,
+                Name = "Birthday voucher",
+                Type = "Birthday",
+                DiscountValue = 15m,
+                MinimumSpend = 0m,
+                StartDate = startOfMonth,
+                EndDate = endOfMonth,
+                Quantity = 1,
+                IsActive = true
+            };
+
+            _context.Vouchers.Add(voucher);
+            await _context.SaveChangesAsync();
+
+            _context.CustomerVouchers.Add(new CustomerVoucher
+            {
+                CustomerId = customer.UserId,
+                VoucherId = voucher.VoucherId,
+                AssignedAt = DateTime.UtcNow,
+                IsUsed = false
+            });
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<OperationResult> AddAddressAsync(int customerId, DeliveryField address)

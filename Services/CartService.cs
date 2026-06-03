@@ -118,11 +118,18 @@ namespace EcommerceSystem.Services
 
             if (!items.Any()) return OperationResult<Checkout>.Fail("Your cart is empty.");
 
+            var availableVouchers = await _context.CustomerVouchers
+                .Include(cv => cv.Voucher)
+                .Where(cv => cv.CustomerId == customerId && !cv.IsUsed)
+                .Where(cv => cv.Voucher.IsActive && cv.Voucher.StartDate <= DateTime.Now && cv.Voucher.EndDate >= DateTime.Now)
+                .ToListAsync();
+
             var checkout = new Checkout
             {
                 Customer = customer,
                 CartItems = items,
-                Addresses = addresses
+                Addresses = addresses,
+                AvailableVouchers = availableVouchers
             };
 
             return OperationResult<Checkout>.Ok(checkout);
@@ -159,11 +166,18 @@ namespace EcommerceSystem.Services
                 .Where(a => a.UserId == customerId)
                 .ToListAsync();
 
+            var availableVouchers = await _context.CustomerVouchers
+                .Include(cv => cv.Voucher)
+                .Where(cv => cv.CustomerId == customerId && !cv.IsUsed)
+                .Where(cv => cv.Voucher.IsActive && cv.Voucher.StartDate <= DateTime.Now && cv.Voucher.EndDate >= DateTime.Now)
+                .ToListAsync();
+
             var checkout = new Checkout
             {
                 Customer = customer,
                 CartItems = new List<CartItem> { buyNowItem },
-                Addresses = addresses
+                Addresses = addresses,
+                AvailableVouchers = availableVouchers
             };
 
             return OperationResult<Checkout>.Ok(checkout);
