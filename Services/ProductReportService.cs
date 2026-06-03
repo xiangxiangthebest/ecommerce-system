@@ -103,5 +103,26 @@ namespace EcommerceSystem.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<bool> UpdateReportStatusAsync(int reportId, string newStatus)
+        {
+            var report = await _context.ProductReports
+                .Include(r => r.Product)
+                .FirstOrDefaultAsync(r => r.ReportId == reportId);
+            if (report == null)
+                return false;
+
+            // Validate status is one of the allowed values
+            var validStatuses = new[] { "Pending", "Approved", "Rejected" };
+            if (!validStatuses.Contains(newStatus))
+                throw new ArgumentException($"Invalid status. Must be one of: {string.Join(", ", validStatuses)}");
+
+            // Just update the report status - soft delete approach
+            report.Status = newStatus;
+            report.ResolvedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

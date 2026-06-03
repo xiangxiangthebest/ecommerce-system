@@ -11,6 +11,7 @@ namespace EcommerceSystem.Interfaces
         Task<List<ReviewReport>> GetReportsByReviewIdAsync(int reviewId);
         Task<List<ReviewReport>> GetReportsByCustomerIdAsync(int customerId);
         Task<List<ReviewReport>> GetAllReportsAsync();
+        Task<bool> UpdateReportStatusAsync(int reportId, string newStatus);
         Task<bool> DeleteReportAsync(int reportId);
     }
 }

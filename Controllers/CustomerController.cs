@@ -635,5 +635,66 @@ namespace EcommerceSystem.Controllers
             return View("ReviewReports", reports);
         }
 
+        // =========================
+        // UPDATE REPORT STATUS
+        // =========================
+        [HttpPost]
+        public async Task<IActionResult> UpdateReportStatus([FromBody] UpdateReportStatusRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.NewStatus))
+                    return Json(new { success = false, message = "Status cannot be empty." });
+
+                var customer = await _customerContext.GetCurrentCustomerAsync(User);
+                if (customer == null)
+                    return Json(new { success = false, message = "Unauthorized" });
+
+                if (request.ReportType == "product")
+                {
+                    var productReport = await _productReportService.GetReportByIdAsync(request.ReportId);
+                    
+                    if (productReport == null)
+                        return Json(new { success = false, message = "Product report not found." });
+
+                    // Customer can only view their own reports (not required for update, but good for security)
+                    if (productReport.CustomerId != customer.UserId)
+                        return Json(new { success = false, message = "You don't have permission to update this report." });
+
+                    var result = await _productReportService.UpdateReportStatusAsync(request.ReportId, request.NewStatus);
+                    if (result)
+                        return Json(new { success = true, message = $"Report status updated to {request.NewStatus}." });
+                    else
+                        return Json(new { success = false, message = "Failed to update report status." });
+                }
+                else if (request.ReportType == "review")
+                {
+                    var reviewReport = await _reviewReportService.GetReportByIdAsync(request.ReportId);
+                    
+                    if (reviewReport == null)
+                        return Json(new { success = false, message = "Review report not found." });
+
+                    // Customer can only view their own reports (not required for update, but good for security)
+                    if (reviewReport.CustomerId != customer.UserId)
+                        return Json(new { success = false, message = "You don't have permission to update this report." });
+
+                    var result = await _reviewReportService.UpdateReportStatusAsync(request.ReportId, request.NewStatus);
+                    if (result)
+                        return Json(new { success = true, message = $"Report status updated to {request.NewStatus}." });
+                    else
+                        return Json(new { success = false, message = "Failed to update report status." });
+                }
+
+                return Json(new { success = false, message = "Invalid report type." });
+            }
+            catch (ArgumentException ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "An error occurred: " + ex.Message });
+            }
+        }
     }
 }

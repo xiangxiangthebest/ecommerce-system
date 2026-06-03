@@ -53,7 +53,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ProductReport>().HasOne(p => p.Product).WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProductReport>().HasOne(p => p.Customer).WithMany().HasForeignKey(p => p.CustomerId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ReviewReport>().ToTable("ReviewReport").HasKey(r => r.ReviewReportId);
-        modelBuilder.Entity<ReviewReport>().HasOne(r => r.Review).WithMany().HasForeignKey(r => r.ReviewId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ReviewReport>().HasOne(r => r.Review).WithMany().HasForeignKey(r => r.ReviewId).OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ReviewReport>().HasOne(r => r.Customer).WithMany().HasForeignKey(r => r.CustomerId).OnDelete(DeleteBehavior.Cascade);
     }
 }

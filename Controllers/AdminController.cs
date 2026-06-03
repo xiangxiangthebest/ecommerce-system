@@ -13,10 +13,14 @@ namespace EcommerceSystem.Controllers
     public class AdminController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly IProductReportService _productReportService;
+        private readonly IReviewReportService _reviewReportService;
 
-        public AdminController(AppDbContext context)
+        public AdminController(AppDbContext context, IProductReportService productReportService, IReviewReportService reviewReportService)
         {
             _context = context;
+            _productReportService = productReportService;
+            _reviewReportService = reviewReportService;
         }
 
         // Main Dashboard View
@@ -500,5 +504,165 @@ namespace EcommerceSystem.Controllers
 
             return RedirectToAction("VoucherManagement", "Admin");
         }
+        // View Customer Reports
+        public async Task<IActionResult> ViewCustomerReports(string? reportType = "all", string? status = "all", string? searchTerm = "")
+        {
+            IQueryable<object>? query = null;
+            
+            if (reportType == "product" || reportType == "all")
+            {
+                var productReports = _context.ProductReports
+                    .Include(r => r.Product)
+                    .Include(r => r.Customer)
+                    .AsQueryable();
+
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    productReports = productReports.Where(r => 
+                        (r.Product != null && r.Product.Name.Contains(searchTerm)) || 
+                        (r.Customer != null && r.Customer.FullName.Contains(searchTerm)) ||
+                        r.ReportReason.Contains(searchTerm));
+                }
+
+                if (status != "all")
+                {
+                    productReports = productReports.Where(r => r.Status.ToLower() == status!.ToLower());
+                }
+
+                query = productReports.Cast<object>();
+            }
+
+            if (reportType == "review" || reportType == "all")
+            {
+                var reviewReports = _context.ReviewReports
+                    .Include(r => r.Review)
+                        .ThenInclude(rev => rev.OrderItem)
+                            .ThenInclude(oi => oi.Order)
+                                .ThenInclude(o => o.Customer)
+                    .Include(r => r.Review)
+                        .ThenInclude(rev => rev.Product)
+                    .Include(r => r.Customer)
+                    .AsQueryable();
+
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    reviewReports = reviewReports.Where(r => 
+                        (r.Review != null && r.Review.Product != null && r.Review.Product.Name.Contains(searchTerm)) || 
+                        (r.Review != null && r.Review.OrderItem != null && r.Review.OrderItem.Order != null && r.Review.OrderItem.Order.Customer != null && r.Review.OrderItem.Order.Customer.FullName.Contains(searchTerm)) ||
+                        r.ReportReason.Contains(searchTerm));
+                }
+
+                if (status != "all")
+                {
+                    reviewReports = reviewReports.Where(r => r.Status.ToLower() == status!.ToLower());
+                }
+
+                query = reviewReports.Cast<object>();
+            }
+
+            ViewBag.ReportType = reportType;
+            ViewBag.Status = status;
+            ViewBag.SearchTerm = searchTerm;
+
+            var reportQuery = query ?? _context.ProductReports.Cast<object>().AsQueryable();
+            var reports = await reportQuery.ToListAsync();
+            return View(reports);
+        }
+
+        // Resolve Report - Update status only (soft delete for reports, hard delete for reviews)
+        [HttpPost]
+        public async Task<IActionResult> ResolveReport([FromBody] ReportResolutionRequest request)
+        {
+            try
+            {
+                if (request.ReportType == "product")
+                {
+                    var report = await _context.ProductReports
+                        .Include(r => r.Product)
+                        .FirstOrDefaultAsync(r => r.ReportId == request.ReportId);
+
+                    if (report == null)
+                        return Json(new { success = false, message = "Product report not found." });
+
+                    // Soft delete the product
+                    if (report.Product != null)
+                    {
+                        report.Product.IsDeleted = true;
+                        report.Product.DeletedAt = DateTime.Now;
+                        _context.Products.Update(report.Product);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    // Then update report status
+                    var result = await _productReportService.UpdateReportStatusAsync(request.ReportId, "Approved");
+
+                    if (result)
+                        return Json(new { success = true, message = "Product report approved and product deleted." });
+                    else
+                        return Json(new { success = false, message = "Failed to update report status." });
+                }
+                return Json(new { success = false, message = "Invalid report type." });
+            }
+            catch (ArgumentException ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "An error occurred: " + ex.Message });
+            }
+        }
+        // Update Report Status
+        [HttpPost]
+        public async Task<IActionResult> UpdateReportStatus([FromBody] UpdateReportStatusRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.NewStatus))
+                    return Json(new { success = false, message = "Status cannot be empty." });
+
+                if (request.ReportType == "product")
+                {
+                    var result = await _productReportService.UpdateReportStatusAsync(request.ReportId, request.NewStatus);
+                    if (result)
+                        return Json(new { success = true, message = $"Report status updated to {request.NewStatus}." });
+                    else
+                        return Json(new { success = false, message = "Product report not found." });
+                }
+                else if (request.ReportType == "review")
+                {
+                    var result = await _reviewReportService.UpdateReportStatusAsync(request.ReportId, request.NewStatus);
+                    if (result)
+                        return Json(new { success = true, message = $"Report status updated to {request.NewStatus}." });
+                    else
+                        return Json(new { success = false, message = "Review report not found." });
+                }
+
+                return Json(new { success = false, message = "Invalid report type." });
+            }
+            catch (ArgumentException ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "An error occurred: " + ex.Message });
+            }
+        }
+    }
+
+    // Request Models for Report Resolution
+    public class ReportResolutionRequest
+    {
+        public int ReportId { get; set; }
+        public string? ReportType { get; set; } // "product" or "review"
+        public bool DeleteItem { get; set; }
+    }
+
+    public class UpdateReportStatusRequest
+    {
+        public int ReportId { get; set; }
+        public string? ReportType { get; set; } // "product" or "review"
+        public string? NewStatus { get; set; }
     }
 }

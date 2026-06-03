@@ -1,0 +1,243 @@
+@model List<object>
+@using System.Globalization
+@using System.Text.Json
+@using EcommerceSystem.Models
+
+@{
+    ViewData["Title"] = "Customer Reports";
+    Layout = "~/Views/Admin/Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin/manage-users.css" />
+<link rel="stylesheet" href="~/css/admin/view-customer-reports.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="reports-container">
+    <div class="reports-header">
+        <div>
+            <h1><i class="fas fa-flag" style="margin-right: 10px;"></i>Customer Reports</h1>
+            <p style="color: #999; margin: 8px 0 0; font-size: 14px;">Review all product and review reports submitted by customers</p>
+        </div>
+        <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="filters-section">
+        <div class="filter-group">
+            <label for="reportType">Report Type</label>
+            <select id="reportType" name="reportType">
+                <option value="all" selected>All Types</option>
+                <option value="product" selected="@(ViewBag.ReportType == "product")">Product Reports</option>
+                <option value="review" selected="@(ViewBag.ReportType == "review")">Review Reports</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="all" selected>All Status</option>
+                <option value="pending" selected="@(ViewBag.Status == "pending")">Pending</option>
+                <option value="approved" selected="@(ViewBag.Status == "approved")">Approved</option>
+                <option value="rejected" selected="@(ViewBag.Status == "rejected")">Rejected</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="searchTerm">Search</label>
+            <input type="text" id="searchTerm" name="searchTerm" placeholder="Product, customer, or reason..." value="@ViewBag.SearchTerm">
+        </div>
+
+        <button type="submit" class="filter-btn">
+            <i class="fas fa-search me-2"></i> Filter
+        </button>
+    </form>
+
+    <!-- Reports List -->
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="empty-state">
+            <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+            <h3>No Reports Found</h3>
+            <p>There are no reports matching your current filters.</p>
+        </div>
+    }
+    else
+    {
+        <div class="reports-list">
+            @foreach (var item in Model)
+            {
+                @if (item is ProductReport productReport)
+                {
+                    <div class="report-card">
+                        <div class="report-header">
+                            <div class="report-title">
+                                <p class="report-title-text">
+                                    <i class="fas fa-cube" style="margin-right: 8px; color: #3b82f6;"></i>
+                                    @(productReport.Product?.Name ?? "Product Deleted")
+                                </p>
+                                <p class="report-type-badge product">
+                                    <i class="fas fa-box"></i> Product Report
+                                </p>
+                            </div>
+                            <span class="report-status @(productReport.Status?.ToLower().Replace(" ", "-") ?? "pending")">
+                                <i class="fas fa-circle-dot"></i> @(productReport.Status ?? "Pending")
+                            </span>
+                        </div>
+                        <div class="report-body">
+                            <div class="report-row">
+                                <label>Customer</label>
+                                <span>@(productReport.Customer?.FullName ?? "Unknown Customer")</span>
+                            </div>
+                            <div class="report-row">
+                                <label>Reported On</label>
+                                <span>@productReport.ReportedAt.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture)</span>
+                            </div>
+                            <div class="report-row">
+                                <label>Reason</label>
+                                <span>@productReport.ReportReason</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(productReport.ReportDescription))
+                            {
+                                <div class="report-row" style="grid-column: 1 / -1;">
+                                    <label>Description</label>
+                                    <p>@productReport.ReportDescription</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="report-actions">
+                            @if (productReport.Status?.ToLower() == "pending")
+                            {
+                                <button class="btn-action primary" onclick="updateReportStatus(@productReport.ReportId, 'product', 'Approved')">
+                                    <i class="fas fa-check"></i> Approve Report
+                                </button>
+                                <button class="btn-action secondary" onclick="updateReportStatus(@productReport.ReportId, 'product', 'Rejected')">
+                                    <i class="fas fa-times"></i> Reject Report
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="status-info">Status: <strong>@productReport.Status</strong></span>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (item is ReviewReport reviewReport)
+                {
+                    // Use saved snapshot data if review is deleted, otherwise use live data
+                    int rating = reviewReport.Review?.Rating ?? reviewReport.SavedRating;
+                    string productName = reviewReport.Review?.Product?.Name ?? reviewReport.SavedProductName ?? "Unknown Product";
+                    string reviewerName = reviewReport.Review?.OrderItem?.Order?.Customer?.FullName ?? reviewReport.SavedReviewerName ?? "Customer";
+                    string reviewText = reviewReport.Review?.ReviewText ?? reviewReport.SavedReviewText ?? "";
+                    
+                    <div class="report-card">
+                        <div class="report-header">
+                            <div class="report-title">
+                                <p class="report-title-text">
+                                    <i class="fas fa-star" style="margin-right: 8px; color: #f59e0b;"></i>
+                                    Reviewed by @reviewerName
+                                </p>
+                                <p class="report-type-badge review">
+                                    <i class="fas fa-comment"></i> Review Report
+                                </p>
+                            </div>
+                            <span class="report-status @(reviewReport.Status?.ToLower().Replace(" ", "-") ?? "pending")">
+                                <i class="fas fa-circle-dot"></i> @(reviewReport.Status ?? "Pending")
+                            </span>
+                        </div>
+                        <div class="report-body">
+                            <div class="report-row">
+                                <label>Product</label>
+                                <span>@productName</span>
+                            </div>
+                            <div class="report-row">
+                                <label>Review Rating</label>
+                                <span>
+                                    @for (int i = 0; i < rating; i++)
+                                    {
+                                        <i class="fas fa-star" style="color: #fbbf24;"></i>
+                                    }
+                                    @for (int i = 0; i < (5 - rating); i++)
+                                    {
+                                        <i class="fas fa-star" style="color: #e5e7eb;"></i>
+                                    }
+                                </span>
+                            </div>
+                            <div class="report-row">
+                                <label>Reported On</label>
+                                <span>@reviewReport.ReportedAt.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture)</span>
+                            </div>
+                            <div class="report-row">
+                                <label>Reason</label>
+                                <span>@reviewReport.ReportReason</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(reviewReport.ReportDescription))
+                            {
+                                <div class="report-row" style="grid-column: 1 / -1;">
+                                    <label>Description</label>
+                                    <p>@reviewReport.ReportDescription</p>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(reviewText))
+                            {
+                                <div class="report-row" style="grid-column: 1 / -1;">
+                                    <label>Review Text</label>
+                                    <p>"@reviewText"</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="report-actions">
+                            @if (reviewReport.Status?.ToLower() == "pending")
+                            {
+                                <button class="btn-action primary" onclick="updateReportStatus(@reviewReport.ReviewReportId, 'review', 'Approved')">
+                                    <i class="fas fa-check"></i> Approve Report
+                                </button>
+                                <button class="btn-action secondary" onclick="updateReportStatus(@reviewReport.ReviewReportId, 'review', 'Rejected')">
+                                    <i class="fas fa-times"></i> Reject Report
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="status-info">Status: <strong>@reviewReport.Status</strong></span>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+<script>
+function updateReportStatus(reportId, reportType, newStatus) {
+    if (!confirm(`Are you sure you want to ${newStatus} this report?`)) {
+        return;
+    }
+    
+    fetch(`/Admin/UpdateReportStatus`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            reportId: reportId,
+            reportType: reportType,
+            newStatus: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating the report status.');
+    });
+}
+</script>
