@@ -105,12 +105,14 @@ public class Order : OrderStatusSubject
     public static readonly Dictionary<OrderStatus, List<OrderStatus>> CustomerAllowedTransitions = new()
     {
         { OrderStatus.PENDING,       new() { OrderStatus.CANCELED } },
-        { OrderStatus.PREPARING,     new() { } },
+        { OrderStatus.PREPARING,     new() { OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { } },
         { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
         { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
         { OrderStatus.RETURN_REFUND, new() { } },
         { OrderStatus.CANCELED,      new() { } },
+        { OrderStatus.CANCEL_REQUESTED,      new() { } },
+
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -120,12 +122,13 @@ public class Order : OrderStatusSubject
     private static readonly Dictionary<OrderStatus, List<OrderStatus>> AllAllowedTransitions = new()
     {
         { OrderStatus.PENDING,       new() { OrderStatus.PREPARING, OrderStatus.CANCELED } },
-        { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED } },
+        { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
         { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
         { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
         { OrderStatus.RETURN_REFUND, new() { } },
         { OrderStatus.CANCELED,      new() { } },
+        { OrderStatus.CANCEL_REQUESTED, new() { OrderStatus.CANCELED} },
     };
 
     /// <summary>

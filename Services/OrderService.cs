@@ -425,7 +425,7 @@ namespace EcommerceSystem.Services
                     .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                        && o.CustomerUserId == customerId
-                                       && o.CurrentStatus == OrderStatus.PENDING);
+                                       && o.CurrentStatus == OrderStatus.PENDING || o.CurrentStatus == OrderStatus.PREPARING);
 
             if (order == null)
                 return OperationResult.Fail("Order cannot be canceled.");
@@ -462,6 +462,31 @@ namespace EcommerceSystem.Services
 
             await _context.SaveChangesAsync();
 
+            return OperationResult.Ok();
+        }
+
+        public async Task<OperationResult> RequestCancelOrderAsync(int customerId, int orderId, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return OperationResult.Fail("Please provide a cancellation reason.");
+
+            var order = await _context.Order
+                .Include(o => o.Customer)
+                .Include(o => o.Seller)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId
+                                    && o.CustomerUserId == customerId
+                                    && o.CurrentStatus == OrderStatus.PREPARING);
+
+            if (order == null)
+                return OperationResult.Fail("Order cannot be requested for cancellation or order not found.");
+
+            order.CancelReason = reason.Trim();
+            
+            AttachObservers(order);
+            await order.SetStatusAsync(OrderStatus.CANCEL_REQUESTED);
+
+            await _context.SaveChangesAsync();
+            
             return OperationResult.Ok();
         }
 

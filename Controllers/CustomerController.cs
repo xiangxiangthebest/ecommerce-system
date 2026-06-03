@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Data;
+
 
 namespace EcommerceSystem.Controllers
 {
@@ -24,6 +26,7 @@ namespace EcommerceSystem.Controllers
         private readonly INotificationService _notificationService;
         private readonly IProductReportService _productReportService;
         private readonly IReviewReportService _reviewReportService;
+        private readonly AppDbContext _context;
 
 
         public CustomerController(
@@ -36,7 +39,8 @@ namespace EcommerceSystem.Controllers
             IReturnImageStorage returnImageStorage,
             INotificationService notificationService,
             IProductReportService productReportService,
-            IReviewReportService reviewReportService)
+            IReviewReportService reviewReportService,
+            AppDbContext context)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -48,6 +52,7 @@ namespace EcommerceSystem.Controllers
             _notificationService = notificationService;
             _productReportService = productReportService;
             _reviewReportService = reviewReportService;
+            _context = context;
         }
         
         // =========================
@@ -308,13 +313,37 @@ namespace EcommerceSystem.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason)
+        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason, bool request)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
+            var orderCheck = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                _context.Order,
+                o => o.OrderId == orderId && o.CustomerUserId == customer.UserId
+            );
+
+            if (orderCheck == null)
+            {
+                return Json(new { success = false, message = "Order not found." });
+            }
+
+            OperationResult result;
+
+            if (request || orderCheck.CurrentStatus == OrderStatus.PREPARING)
+            {
+                // 走申请取消流程 -> 状态变为 CANCEL_REQUESTED (状态机完全允许，绝不报错)
+                result = await _orderService.RequestCancelOrderAsync(customer.UserId, orderId, cancelReason);
+            }
+            else
+            {
+                // 走直接取消流程 -> 状态变为 CANCELED 
+                result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
+            }
+
+            // 3. 返回安全数据
             return Json(new { success = result.Success, message = result.Error });
+    
         }
 
         // =========================
