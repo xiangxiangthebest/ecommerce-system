@@ -11,5 +11,6 @@ namespace EcommerceSystem.Interfaces
         Task<List<ChatBoxListMV>> GetSellerInboxListAsync(int sellerId);
         Task<List<ChatBoxListMV>> GetCustomerInboxListAsync(int customerId);
         Task<ChatRoom?> GetChatRoomByIdAsync(int chatRoomId);
+        Task MarkMessagesAsReadAsync(int chatRoomId, int userId);
     }
 }

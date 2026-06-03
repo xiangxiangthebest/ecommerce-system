@@ -192,6 +192,12 @@ namespace EcommerceSystem.Controllers
                     return NotFound("真实的聊天室不存在");
                 }
 
+                var customer = await _customerContext.GetCurrentCustomerAsync(User);
+                if (customer != null)
+                {
+                    await _chatService.MarkMessagesAsReadAsync(id, customer.UserId);
+                }
+
                 if (chatRoom.Seller == null && chatRoom.SellerId > 0)
                 {
                     var productWithSeller = await _context.Products
@@ -290,61 +296,61 @@ namespace EcommerceSystem.Controllers
         }
 
         [HttpGet]
-public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
-{
-    // 1. 获取当前登录的商家用户
-    var seller = await _sellerContext.GetCurrentSellerAsync(User);
-    if (seller == null)
-    {
-        return Unauthorized(new { message = "登录状态已过期，请重新登录" });
-    }
-    var currentUserId = seller.UserId; // 商家在主用户表中的 ID
-
-    // 2. 💡【核心筛选】：精准过滤出【买家是当前聊天的客户】且【订单属于当前登录商家】的所有订单
-    // 提示：根据您真实的数据库关联，我们直接从 Order 订单总表或明细表出发检索均可。
-    // 这里保持您原汁原味的 OrderItems 链路，但彻底纠正条件映射：
-    var matchedOrderData = await _context.OrderItems
-        .Include(oi => oi.Order)
-        .Include(oi => oi.Product)
-        .Where(oi => oi.Order != null && oi.Product != null
-                  && oi.Order.CustomerUserId == customerId              // A. 必须是这个买家下的单
-                  && (oi.Order.SellerUserId == currentUserId || oi.Product.SellerId == currentUserId)) // B. 订单或者商品必须属于当前登录商家
-        .Select(oi => new
+        public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
         {
-            OrderId = oi.OrderId,
-            TotalAmount = oi.Order!.TotalAmount,                     // 订单总金额                      // 先拿原始 DateTime 对象，后续进行内存化处理或转 String
-            Status = oi.Order!.CurrentStatus,                  // 订单状态 (如 Pending/Shipped)
-            
-            // 💡【安全防错】：优先做 ?.Null 保护，再清除可能破坏前端 JS 拼接的特殊字符
-            ProductName = oi.Product != null && oi.Product.Name != null
-                ? oi.Product.Name.Replace("'", "").Replace("\"", "").Replace("\r", "").Replace("\n", "")
-                : "商品",
-                
-            ProductImage = oi.Product != null ? oi.Product.ImagePath : "/images/default-product.jpg", // 商品图保底
-            Quantity = oi.Quantity,
-            Price = oi.Price
-        })
-        .ToListAsync();
+            // 1. 获取当前登录的商家用户
+            var seller = await _sellerContext.GetCurrentSellerAsync(User);
+            if (seller == null)
+            {
+                return Unauthorized(new { message = "登录状态已过期，请重新登录" });
+            }
+            var currentUserId = seller.UserId; // 商家在主用户表中的 ID
 
-    // 3. 把明细按照 OrderId 进行分组聚合，这样一个订单就算买了当前店铺多个商品也能漂亮地合并显示
-    var orders = matchedOrderData
-        .GroupBy(x => x.OrderId)
-        .Select(g => new
-        {
-            OrderId = g.Key,
-            TotalAmount = g.First().TotalAmount,
-            // 后端格式化好标准时间字符串传回给前端直接显
-            Status = g.First().Status,
-            // 顺便把买的第一个商品的图文提出来当做卡片封面
-            CoverImage = g.First().ProductImage,
-            CoverName = g.First().ProductName,
-            ItemCount = g.Count() // 买了该店多少件商品
-        })
-        .ToList();
+            // 2. 💡【核心筛选】：精准过滤出【买家是当前聊天的客户】且【订单属于当前登录商家】的所有订单
+            // 提示：根据您真实的数据库关联，我们直接从 Order 订单总表或明细表出发检索均可。
+            // 这里保持您原汁原味的 OrderItems 链路，但彻底纠正条件映射：
+            var matchedOrderData = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .Include(oi => oi.Product)
+                .Where(oi => oi.Order != null && oi.Product != null
+                        && oi.Order.CustomerUserId == customerId              // A. 必须是这个买家下的单
+                        && (oi.Order.SellerUserId == currentUserId || oi.Product.SellerId == currentUserId)) // B. 订单或者商品必须属于当前登录商家
+                .Select(oi => new
+                {
+                    OrderId = oi.OrderId,
+                    TotalAmount = oi.Order!.TotalAmount,                     // 订单总金额                      // 先拿原始 DateTime 对象，后续进行内存化处理或转 String
+                    Status = oi.Order!.CurrentStatus,                  // 订单状态 (如 Pending/Shipped)
+                    
+                    // 💡【安全防错】：优先做 ?.Null 保护，再清除可能破坏前端 JS 拼接的特殊字符
+                    ProductName = oi.Product != null && oi.Product.Name != null
+                        ? oi.Product.Name.Replace("'", "").Replace("\"", "").Replace("\r", "").Replace("\n", "")
+                        : "商品",
+                        
+                    ProductImage = oi.Product != null ? oi.Product.ImagePath : "/images/default-product.jpg", // 商品图保底
+                    Quantity = oi.Quantity,
+                    Price = oi.Price
+                })
+                .ToListAsync();
 
-    // 4. 返回干净透彻的 JSON 数组供前端动态 Ajax 捞取渲染
-    return Json(orders);
-}
+            // 3. 把明细按照 OrderId 进行分组聚合，这样一个订单就算买了当前店铺多个商品也能漂亮地合并显示
+            var orders = matchedOrderData
+                .GroupBy(x => x.OrderId)
+                .Select(g => new
+                {
+                    OrderId = g.Key,
+                    TotalAmount = g.First().TotalAmount,
+                    // 后端格式化好标准时间字符串传回给前端直接显
+                    Status = g.First().Status,
+                    // 顺便把买的第一个商品的图文提出来当做卡片封面
+                    CoverImage = g.First().ProductImage,
+                    CoverName = g.First().ProductName,
+                    ItemCount = g.Count() // 买了该店多少件商品
+                })
+                .ToList();
+
+            // 4. 返回干净透彻的 JSON 数组供前端动态 Ajax 捞取渲染
+            return Json(orders);
+        }
 
         // 1. 卖家从订单页点击 Chat 图标触发的中转 Action
         [HttpPost]
@@ -367,7 +373,7 @@ public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
             return RedirectToAction("SellerConversation", new { id = chatRoom.ChatRoomId, orderId = orderId });
         }
 
-// 2. 🌟 卖家端专属聊天会话 Action (独立出来，避免和买家端页面揉在一起报错)
+        // 2. 🌟 卖家端专属聊天会话 Action (独立出来，避免和买家端页面揉在一起报错)
         [HttpGet]
         public async Task<IActionResult> SellerConversation(int id, int? customerId, int? orderId)
         {
@@ -403,6 +409,8 @@ public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
                     .FirstOrDefaultAsync(r => r.ChatRoomId == id);
 
                 if (chatRoom == null) return NotFound("该聊天室不存在");
+                
+                await _chatService.MarkMessagesAsReadAsync(id, currentUserId);
             }
 
             // ======= 提取订单信息（如果存在）传给前端展示预载小框 =======

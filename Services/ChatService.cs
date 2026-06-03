@@ -118,5 +118,23 @@ namespace EcommerceSystem.Services
                 .Include(c => c.Messages)
                 .FirstOrDefaultAsync(c => c.ChatRoomId == chatRoomId);
         }
+
+        public async Task MarkMessagesAsReadAsync(int chatRoomId, int userId)
+        {
+            if (chatRoomId == 0) return;
+            
+            var unreadMessages = await _context.ChatMessages
+                .Where(m => m.ChatRoomId == chatRoomId
+                        && m.SenderId != userId
+                        && !m.IsRead)
+                .ToListAsync();
+
+            foreach (var msg in unreadMessages)
+            {
+                msg.IsRead = true;
+            }
+
+            await _context.SaveChangesAsync();
+        }
     }
 }
