@@ -380,4 +380,87 @@
         });
         });
     }
+
+    /* ══════════════════════════════════════════════════
+        REPORT REVIEW MODAL FUNCTIONALITY
+    ══════════════════════════════════════════════════ */
+    var reportReviewBackdrop = qs("#reportReviewBackdrop");
+    var reportReviewForm = qs("#reportReviewForm");
+    var reportReviewIdInput = qs("#reportReviewId");
+    var reportReviewCloseBtn = qs("#reportReviewCloseBtn");
+    var reportReviewCancelBtn = qs("#reportReviewCancelBtn");
+
+    // Close Modal Handler
+    function closeReportReviewModal() {
+        if (!reportReviewBackdrop) return;
+        reportReviewBackdrop.hidden = true;
+        
+        // Only restore document scroll if parent customer review modal isn't open
+        var rvBackdrop = qs("#rvBackdrop");
+        if (!rvBackdrop || rvBackdrop.hidden) {
+            document.body.style.overflow = "auto";
+        }
+        if (reportReviewForm) reportReviewForm.reset();
+    }
+
+    // Attach event listeners to all dynamic dynamically-rendered Review report buttons
+    document.addEventListener("click", function (e) {
+        var reportBtn = e.target.closest(".pd-btn-report-review");
+        if (reportBtn) {
+            var reviewId = reportBtn.getAttribute("data-review-id");
+            if (reportReviewIdInput) reportReviewIdInput.value = reviewId;
+            
+            if (reportReviewBackdrop) {
+                reportReviewBackdrop.hidden = false;
+                document.body.style.overflow = "hidden";
+            }
+        }
+    });
+
+    if (reportReviewCloseBtn) reportReviewCloseBtn.addEventListener("click", closeReportReviewModal);
+    if (reportReviewCancelBtn) reportReviewCancelBtn.addEventListener("click", closeReportReviewModal);
+    if (reportReviewBackdrop) {
+        reportReviewBackdrop.addEventListener("click", function (e) {
+            if (e.target === reportReviewBackdrop) closeReportReviewModal();
+        });
+    }
+
+    // Form Submission AJAX
+    if (reportReviewForm) {
+        reportReviewForm.addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            var formData = new FormData(reportReviewForm);
+            var submitBtn = qs("#reportReviewSubmitBtn");
+            
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="ti ti-loader-2"></i> Submitting...';
+            }
+
+            try {
+                // Adjust route path endpoint to match your controller handler action
+                var response = await fetch('/Customer/ReportReview', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                var result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message || "Report submitted successfully!", "success");
+                    closeReportReviewModal();
+                } else {
+                    showToast("Error: " + (result.message || "Failed to submit report"), "error");
+                }
+            } catch (error) {
+                showToast("Error: " + error.message, "error");
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Submit Report';
+                }
+            }
+        });
+    }
 })();

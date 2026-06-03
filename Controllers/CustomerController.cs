@@ -23,6 +23,7 @@ namespace EcommerceSystem.Controllers
         private readonly IReturnImageStorage _returnImageStorage;
         private readonly INotificationService _notificationService;
         private readonly IProductReportService _productReportService;
+        private readonly IReviewReportService _reviewReportService;
 
 
         public CustomerController(
@@ -34,7 +35,8 @@ namespace EcommerceSystem.Controllers
             IProfileService profileService,
             IReturnImageStorage returnImageStorage,
             INotificationService notificationService,
-            IProductReportService productReportService)
+            IProductReportService productReportService,
+            IReviewReportService reviewReportService)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -45,6 +47,7 @@ namespace EcommerceSystem.Controllers
             _returnImageStorage = returnImageStorage;
             _notificationService = notificationService;
             _productReportService = productReportService;
+            _reviewReportService = reviewReportService;
         }
         
         // =========================
@@ -562,8 +565,72 @@ namespace EcommerceSystem.Controllers
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var reports = await _productReportService.GetReportsByCustomerIdAsync(customer.UserId);
-            return View("Reports", reports);
+            var productReports = await _productReportService.GetReportsByCustomerIdAsync(customer.UserId);
+            var reviewReports = await _reviewReportService.GetReportsByCustomerIdAsync(customer.UserId);
+
+            var vm = new MyReportsViewModel
+            {
+                ProductReports = productReports,
+                ReviewReports = reviewReports
+            };
+
+            return View("Reports", vm);
+        }
+
+        // =========================
+        // REPORT REVIEW
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReportReview(int reviewId, string reportReason, string reportDescription, List<IFormFile> evidenceFiles)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            try
+            {
+                var dto = new CreateReviewReportDto
+                {
+                    ReviewId = reviewId,
+                    ReportReason = reportReason,
+                    ReportDescription = reportDescription
+                };
+
+                var report = await _reviewReportService.CreateReviewReportAsync(customer.UserId, dto, evidenceFiles ?? new List<IFormFile>());
+
+                return Json(new { success = true, message = "Report submitted successfully. Thank you for helping us maintain review quality.", reportId = report.ReviewReportId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // Log the actual exception for debugging
+                string errorMsg = ex.Message;
+                if (ex.InnerException != null)
+                    errorMsg += " | Inner: " + ex.InnerException.Message;
+                
+                Console.WriteLine($"Error in ReportReview: {ex.GetType().Name} - {errorMsg}");
+                Console.WriteLine($"Stack: {ex.StackTrace}");
+                
+                return Json(new { success = false, message = errorMsg });
+            }
+        }
+
+        // =========================
+        // GET CUSTOMER'S REVIEW REPORTS
+        // =========================
+        [HttpGet]
+        public async Task<IActionResult> MyReviewReports()
+        {
+            await LoadNavbarAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var reports = await _reviewReportService.GetReportsByCustomerIdAsync(customer.UserId);
+            return View("ReviewReports", reports);
         }
 
     }

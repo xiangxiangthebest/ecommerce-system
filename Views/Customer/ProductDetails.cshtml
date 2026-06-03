@@ -439,9 +439,19 @@
                     <div class="rv-card" data-rating="@r.Rating">
                         <div class="rv-card-author">
                             <div class="rv-avatar">@(r.OrderItem?.Order?.Customer?.FullName?.Substring(0, 1).ToUpper() ?? "C")</div>
-                            <div class="rv-author-info">
+                            <div class="rv-author-info" style="width: 100%;">
                                 <span class="rv-author-name">@(r.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
-                                <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                    <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
+                                    
+                                    <button type="button" 
+                                    class="pd-btn-report-review" 
+                                    title="Report this review"
+                                    data-review-id="@r.ReviewId"
+                                    style="background: none; border: none; color: #dc3545; text-decoration: none; cursor: pointer; padding: 2px 5px; font-size: 0.85rem; display: flex; align-items: center; gap: 4px;">
+                                        <i class="ti ti-flag"></i> Report
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -501,11 +511,76 @@
     <img id="rvLightboxImg" src="" alt="Review image" onclick="event.stopPropagation()" />
 </div>
 
+<!-- ════════════════════════════════════════════════════
+     REPORT REVIEW MODAL
+     ════════════════════════════════════════════════════ -->
+<div id="reportReviewBackdrop" class="report-overlay" role="dialog" aria-modal="true" aria-label="Report review" hidden>
+    <div class="report-modal" id="reportReviewPanel">
+        <div class="report-header">
+            <h2 class="report-title">Report This Review</h2>
+            <button class="report-close" id="reportReviewCloseBtn" aria-label="Close report form" type="button">
+                <i class="ti ti-x" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <form id="reportReviewForm" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="reviewId" id="reportReviewId" value="" />
+
+            <div class="form-group">
+                <label for="reviewReportReason">Report Reason <span class="required">*</span></label>
+                <select id="reviewReportReason" name="reportReason" required class="form-control">
+                    <option value="">-- Select a reason --</option>
+                    <option value="InappropriateContent">Inappropriate Content</option>
+                    <option value="Spam">Spam</option>
+                    <option value="Offensive">Offensive Language</option>
+                    <option value="FalseInfo">False Information</option>
+                    <option value="Harassment">Harassment/Bullying</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="reviewReportDescription">Description <span class="required">*</span></label>
+                <textarea id="reviewReportDescription" 
+                          name="reportDescription" 
+                          required 
+                          class="form-control" 
+                          rows="4" 
+                          placeholder="Please provide details about your report (min 20 characters)"
+                          minlength="20"
+                          maxlength="500"></textarea>
+                <small class="form-text">20-500 characters</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" id="reportReviewCancelBtn" class="btn-cancel">Cancel</button>
+                <button type="submit" id="reportReviewSubmitBtn" class="btn-submit">Submit Report</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
   window.__PD = {
     allCombos: @Html.Raw(Model.VariationCombosJson ?? "[]"),
     groupNames: @Html.Raw(variationGroupNamesJson)
   };
+
+  // Review Report Modal Functions
+  function openReviewReportModal(reviewId) {
+    console.log('openReviewReportModal called with reviewId:', reviewId, 'type:', typeof reviewId);
+    const reviewIdInput = document.getElementById('reportReviewId');
+    console.log('Hidden input element:', reviewIdInput);
+    reviewIdInput.value = reviewId;
+    console.log('Hidden input value after setting:', reviewIdInput.value);
+    document.getElementById('reportReviewBackdrop').hidden = false;
+  }
+
+  function closeReviewReportModal() {
+    document.getElementById('reportReviewBackdrop').hidden = true;
+    document.getElementById('reportReviewForm').reset();
+  }
 
   // Report Product Modal Functionality
   document.addEventListener('DOMContentLoaded', function() {
@@ -612,6 +687,43 @@
         submitBtn.innerHTML = 'Submit Report';
       }
     });
+
+    // Review Report Modal Event Listeners - Setup in DOMContentLoaded
+    const reportReviewBackdrop = document.getElementById('reportReviewBackdrop');
+    const reportReviewCloseBtn = document.getElementById('reportReviewCloseBtn');
+    const reportReviewCancelBtn = document.getElementById('reportReviewCancelBtn');
+    const reportReviewForm = document.getElementById('reportReviewForm');
+    const reportReviewButtons = document.querySelectorAll('.pd-btn-report-review');
+
+    console.log('Setting up review report buttons. Found:', reportReviewButtons.length);
+
+    // Add click listeners to all report buttons
+    reportReviewButtons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const reviewId = btn.getAttribute('data-review-id');
+        console.log('Report button clicked with data-review-id:', reviewId);
+        openReviewReportModal(parseInt(reviewId, 10));
+      });
+    });
+
+    // Only proceed if review report modal exists
+    if (reportReviewBackdrop && reportReviewForm) {
+      // Close buttons
+      if (reportReviewCloseBtn) reportReviewCloseBtn.addEventListener('click', closeReviewReportModal);
+      if (reportReviewCancelBtn) reportReviewCancelBtn.addEventListener('click', closeReviewReportModal);
+
+      // Close on backdrop click
+      reportReviewBackdrop.addEventListener('click', (e) => {
+        if (e.target === reportReviewBackdrop) {
+          closeReviewReportModal();
+        }
+      });
+
+      // Form submission is handled by product-details.js
+    } else {
+      console.warn('Review report modal not found in page');
+    }
   });
 </script>
 

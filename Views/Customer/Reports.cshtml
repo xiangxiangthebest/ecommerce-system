@@ -1,120 +1,248 @@
-@model List<EcommerceSystem.Models.ProductReport>
+@model EcommerceSystem.Models.ViewModels.MyReportsViewModel
 @using System.Text.Json
 @using System.Globalization
 
 <link rel="stylesheet" href="~/css/customer/reports.css" asp-append-version="true" />
 
 @{
-    ViewData["Title"] = "My Product Reports";
+    ViewData["Title"] = "My Reports";
 }
 
 <div class="reports-page">
     <div class="reports-container">
         <!-- Header -->
         <div class="reports-header">
-            <h1 class="reports-title">My Product Reports</h1>
-            <p class="reports-subtitle">Track all your product reports and their status</p>
+            <h1 class="reports-title">My Reports</h1>
+            <p class="reports-subtitle">Track all your product and review reports and their status</p>
         </div>
 
-        <!-- No Reports Message -->
-        @if (Model == null || Model.Count == 0)
-        {
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="ti ti-flag-off"></i>
-                </div>
-                <h3>No reports yet</h3>
-                <p>You haven't submitted any product reports. If you encounter any issues with products, please report them.</p>
-                <a href="@Url.Action("Home", "Customer")" class="btn-browse">
-                    <i class="ti ti-arrow-left"></i> Browse Products
-                </a>
-            </div>
-        }
-        else
-        {
-            <!-- Reports Table/List -->
-            <div class="reports-list">
-                @foreach (var report in Model)
-                {
-                    var reportDate = report.ReportedAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
-                    var statusClass = report.Status?.ToLower() ?? "pending";
-                    var evidenceImages = new List<string>();
-                    
-                    try
-                    {
-                        if (!string.IsNullOrEmpty(report.EvidenceImagePathsJson))
-                        {
-                            evidenceImages = JsonSerializer.Deserialize<List<string>>(report.EvidenceImagePathsJson) ?? new List<string>();
-                        }
-                    }
-                    catch { }
+        <!-- Tabs -->
+        <div class="reports-tabs">
+            <button class="tab-btn active" id="productReportsTab" onclick="switchTab('productReports')">
+                <i class="ti ti-flag"></i> Product Reports
+                <span class="tab-count">@Model.ProductReports.Count</span>
+            </button>
+            <button class="tab-btn" id="reviewReportsTab" onclick="switchTab('reviewReports')">
+                <i class="ti ti-alert-circle"></i> Review Reports
+                <span class="tab-count">@Model.ReviewReports.Count</span>
+            </button>
+        </div>
 
-                    <div class="report-card">
-                        <div class="report-card-header">
-                            <div class="report-info">
-                                <h3 class="report-product-name">@(report.Product?.Name ?? "Product")</h3>
-                                <p class="report-product-id">Product ID: @report.ProductId</p>
-                            </div>
-                            <span class="report-status status-@statusClass">
-                                <i class="ti ti-circle-filled"></i>
-                                @report.Status
-                            </span>
-                        </div>
-
-                        <div class="report-card-body">
-                            <div class="report-row">
-                                <label>Report Reason:</label>
-                                <span>@report.ReportReason</span>
-                            </div>
-
-                            <div class="report-row">
-                                <label>Description:</label>
-                                <p class="report-description">@report.ReportDescription</p>
-                            </div>
-
-                            @if (evidenceImages.Count > 0)
-                            {
-                                <div class="report-row">
-                                    <label>Evidence Images:</label>
-                                    <div class="evidence-gallery">
-                                        @foreach (var imagePath in evidenceImages)
-                                        {
-                                            <div class="evidence-item">
-                                                <img src="@imagePath" alt="Evidence" onclick="openImageLightbox(this.src)" />
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            }
-
-                            <div class="report-row">
-                                <label>Reported On:</label>
-                                <span>@reportDate</span>
-                            </div>
-
-                            @if (!string.IsNullOrEmpty(report.AdminNotes))
-                            {
-                                <div class="report-row admin-section">
-                                    <label>Admin Notes:</label>
-                                    <div class="admin-notes">
-                                        <i class="ti ti-message-circle"></i>
-                                        <p>@report.AdminNotes</p>
-                                    </div>
-                                </div>
-                            }
-
-                            @if (report.Status?.ToLower() == "resolved")
-                            {
-                                <div class="report-row">
-                                    <label>Resolved On:</label>
-                                    <span>@(report.ResolvedAt?.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture) ?? "N/A")</span>
-                                </div>
-                            }
-                        </div>
+        <!-- ═════════════════════════════════
+             PRODUCT REPORTS TAB
+             ═════════════════════════════════ -->
+        <div id="productReports" class="tab-content active">
+            @if (Model.ProductReports == null || Model.ProductReports.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="ti ti-flag-off"></i>
                     </div>
-                }
-            </div>
-        }
+                    <h3>No product reports yet</h3>
+                    <p>You haven't submitted any product reports. If you encounter any issues with products, please report them.</p>
+                    <a href="@Url.Action("Home", "Customer")" class="btn-browse">
+                        <i class="ti ti-arrow-left"></i> Browse Products
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="reports-list">
+                    @foreach (var report in Model.ProductReports)
+                    {
+                        var reportDate = report.ReportedAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
+                        var statusClass = report.Status?.ToLower() ?? "pending";
+                        var evidenceImages = new List<string>();
+                        
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(report.EvidenceImagePathsJson))
+                            {
+                                evidenceImages = JsonSerializer.Deserialize<List<string>>(report.EvidenceImagePathsJson) ?? new List<string>();
+                            }
+                        }
+                        catch { }
+
+                        <div class="report-card">
+                            <div class="report-card-header">
+                                <div class="report-info">
+                                    <h3 class="report-product-name">@(report.Product?.Name ?? "Product")</h3>
+                                    <p class="report-product-id">Product ID: @report.ProductId</p>
+                                </div>
+                                <span class="report-status status-@statusClass">
+                                    <i class="ti ti-circle-filled"></i>
+                                    @report.Status
+                                </span>
+                            </div>
+
+                            <div class="report-card-body">
+                                <div class="report-row">
+                                    <label>Report Reason:</label>
+                                    <span>@report.ReportReason</span>
+                                </div>
+
+                                <div class="report-row">
+                                    <label>Description:</label>
+                                    <p class="report-description">@report.ReportDescription</p>
+                                </div>
+
+                                @if (evidenceImages.Count > 0)
+                                {
+                                    <div class="report-row">
+                                        <label>Evidence Images:</label>
+                                        <div class="evidence-gallery">
+                                            @foreach (var imagePath in evidenceImages)
+                                            {
+                                                <div class="evidence-item">
+                                                    <img src="@imagePath" alt="Evidence" onclick="openImageLightbox(this.src)" />
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="report-row">
+                                    <label>Reported On:</label>
+                                    <span>@reportDate</span>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(report.AdminNotes))
+                                {
+                                    <div class="report-row admin-section">
+                                        <label>Admin Notes:</label>
+                                        <div class="admin-notes">
+                                            <i class="ti ti-message-circle"></i>
+                                            <p>@report.AdminNotes</p>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (report.Status?.ToLower() == "resolved")
+                                {
+                                    <div class="report-row">
+                                        <label>Resolved On:</label>
+                                        <span>@(report.ResolvedAt?.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture) ?? "N/A")</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- ═════════════════════════════════
+             REVIEW REPORTS TAB
+             ═════════════════════════════════ -->
+        <div id="reviewReports" class="tab-content">
+            @if (Model.ReviewReports == null || Model.ReviewReports.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="ti ti-alert-circle-off"></i>
+                    </div>
+                    <h3>No review reports yet</h3>
+                    <p>You haven't submitted any review reports. If you see inappropriate reviews, please report them.</p>
+                    <a href="@Url.Action("Home", "Customer")" class="btn-browse">
+                        <i class="ti ti-arrow-left"></i> Browse Products
+                    </a>
+                </div>
+            }
+            else
+            {
+                <div class="reports-list">
+                    @foreach (var report in Model.ReviewReports)
+                    {
+                        var reportDate = report.ReportedAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
+                        var statusClass = report.Status?.ToLower() ?? "pending";
+
+                        <div class="report-card">
+                            <div class="report-card-header">
+                                <div class="report-info">
+                                    <h3 class="report-product-name">
+                                        Review by @(report.Review?.OrderItem?.Order?.Customer?.FullName ?? "Customer")
+                                    </h3>
+                                    <p class="report-product-id">
+                                        Product: @(report.Review?.Product?.Name ?? "Unknown Product")
+                                    </p>
+                                </div>
+                                <span class="report-status status-@statusClass">
+                                    <i class="ti ti-circle-filled"></i>
+                                    @report.Status
+                                </span>
+                            </div>
+
+                            <div class="report-card-body">
+                                <!-- Review Rating -->
+                                <div class="report-row">
+                                    <label>Review Rating:</label>
+                                    <span class="review-stars">
+                                        @for (int i = 0; i < (report.Review?.Rating ?? 0); i++)
+                                        {
+                                            <i class="ti ti-star-filled"></i>
+                                        }
+                                        @for (int i = 0; i < (5 - (report.Review?.Rating ?? 0)); i++)
+                                        {
+                                            <i class="ti ti-star"></i>
+                                        }
+                                    </span>
+                                </div>
+
+                                <!-- Review Text -->
+                                @if (!string.IsNullOrEmpty(report.Review?.ReviewText))
+                                {
+                                    <div class="report-row">
+                                        <label>Review Text:</label>
+                                        <p class="review-text" style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-style: italic;">
+                                            "@report.Review.ReviewText"
+                                        </p>
+                                    </div>
+                                }
+
+                                <!-- Report Reason -->
+                                <div class="report-row">
+                                    <label>Report Reason:</label>
+                                    <span>@report.ReportReason</span>
+                                </div>
+
+                                <!-- Report Description -->
+                                <div class="report-row">
+                                    <label>Description:</label>
+                                    <p class="report-description">@report.ReportDescription</p>
+                                </div>
+
+                                <!-- Reported Date -->
+                                <div class="report-row">
+                                    <label>Reported On:</label>
+                                    <span>@reportDate</span>
+                                </div>
+
+                                <!-- Resolved Date (if applicable) -->
+                                @if (report.ResolvedAt.HasValue)
+                                {
+                                    <div class="report-row">
+                                        <label>Resolved On:</label>
+                                        <span>@report.ResolvedAt.Value.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture)</span>
+                                    </div>
+                                }
+
+                                <!-- Admin Notes (if available) -->
+                                @if (!string.IsNullOrEmpty(report.AdminNotes))
+                                {
+                                    <div class="report-row admin-section">
+                                        <label>Admin Notes:</label>
+                                        <div class="admin-notes">
+                                            <i class="ti ti-message-circle"></i>
+                                            @report.AdminNotes
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
     </div>
 </div>
 
@@ -126,7 +254,89 @@
     <img id="lightboxImage" src="" alt="Evidence image" />
 </div>
 
+<style>
+    .reports-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #e5e5e5;
+    }
+
+    .tab-btn {
+        padding: 12px 20px;
+        background: none;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tab-btn:hover {
+        color: #333;
+    }
+
+    .tab-btn.active {
+        color: #007bff;
+        border-bottom-color: #007bff;
+    }
+
+    .tab-count {
+        background: #f0f0f0;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .tab-btn.active .tab-count {
+        background: #e3f2fd;
+        color: #007bff;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .review-stars {
+        display: flex;
+        gap: 4px;
+        color: #ffc107;
+    }
+</style>
+
 <script>
+    function switchTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show selected tab
+        document.getElementById(tabName).classList.add('active');
+        
+        // Add active class to clicked button
+        if (tabName === 'productReports') {
+            document.getElementById('productReportsTab').classList.add('active');
+        } else if (tabName === 'reviewReports') {
+            document.getElementById('reviewReportsTab').classList.add('active');
+        }
+    }
+
     function openImageLightbox(src) {
         const lightbox = document.getElementById('imageLightbox');
         const image = document.getElementById('lightboxImage');
