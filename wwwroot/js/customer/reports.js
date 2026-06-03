@@ -35,6 +35,38 @@ function closeImageLightbox() {
     }, { once: true });
 }
 
+// ─── Update Report Status ──────────────────────────────
+function updateReportStatus(reportId, reportType, newStatus) {
+    if (!confirm(`Are you sure you want to change this report status to ${newStatus}?`)) {
+        return;
+    }
+
+    fetch(`/Customer/UpdateReportStatus`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            reportId: reportId,
+            reportType: reportType,
+            newStatus: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating the report status.');
+    });
+}
+
 // ─── DOM ready ────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
     const lightbox = document.getElementById('imageLightbox');

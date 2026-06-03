@@ -35,22 +35,32 @@ public class AutoReceiveOrdersJob : BackgroundService
     {
         _logger.LogInformation("AutoReceiveOrdersJob started.");
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await RunAsync(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "AutoReceiveOrdersJob encountered an error.");
-            }
+                try
+                {
+                    await RunAsync(stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "AutoReceiveOrdersJob encountered an error during execution.");
+                }
 
-            // Wait before next check
-            await Task.Delay(CheckInterval, stoppingToken);
+                // This delay is now safely guarded against application shutdown exceptions
+                await Task.Delay(CheckInterval, stoppingToken);
+            }
         }
-
-        _logger.LogInformation("AutoReceiveOrdersJob stopped.");
+        catch (OperationCanceledException)
+        {
+            // This catches the TaskCanceledException gracefully when the app stops.
+            // It prevents the debugger from breaking and throwing a crash screen.
+        }
+        finally
+        {
+            _logger.LogInformation("AutoReceiveOrdersJob stopped.");
+        }
     }
 
     private async Task RunAsync(CancellationToken ct)
