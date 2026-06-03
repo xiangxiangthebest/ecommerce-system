@@ -605,6 +605,7 @@
     outline: none;
     background: transparent;
     -moz-appearance: textfield;
+    appearance: textfield;
 }
 .pd-qty-input::-webkit-inner-spin-button,
 .pd-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }

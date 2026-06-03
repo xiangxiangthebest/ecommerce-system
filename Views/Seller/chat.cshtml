@@ -129,10 +129,12 @@
                 @if (ViewBag.IsOrderInitiated == true && ViewBag.InitiatedOrder != null)
                 {
                     var initOrder = ViewBag.InitiatedOrder as EcommerceSystem.Models.Order;
-                    var orderCoverImg = initOrder.OrderItems?.FirstOrDefault()?.Product?.ImagePath ?? "/images/default-order.png";
+                    if (initOrder != null)
+                    {
+                        var orderCoverImg = initOrder.OrderItems?.FirstOrDefault()?.Product?.ImagePath ?? "/images/default-order.png";
 
-                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded border"
-                         style="background:#fff8e1; border-color:#ffe082;" id="orderInitiateBox">
+                        <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded border"
+                             style="background:#fff8e1; border-color:#ffe082;" id="orderInitiateBox">
 
                         <div class="d-flex align-items-center">
                             <img src="@orderCoverImg" class="rounded me-2 border"
@@ -158,6 +160,7 @@
                                     onclick="document.getElementById('orderInitiateBox').remove()"></button>
                         </div>
                     </div>
+                }
                 }
 
                 <form id="chatForm"

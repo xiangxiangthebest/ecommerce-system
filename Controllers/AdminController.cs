@@ -255,12 +255,7 @@ namespace EcommerceSystem.Controllers
                 query = query.Where(p =>
                     p.Name.Contains(searchTerm) ||
                     p.SKU.Contains(searchTerm) ||
-                    p.Seller.ShopName.Contains(searchTerm));
-            }
-
-            // 2. Deleted Filter (Active, Deleted, or All)
-            if (!string.IsNullOrEmpty(deleteFilter))
-            {
+                        (p.Seller != null && p.Seller.ShopName.Contains(searchTerm)));
                 query = deleteFilter switch
                 {
                     "Active" => query.Where(p => !p.IsDeleted),

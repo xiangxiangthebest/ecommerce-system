@@ -1,7 +1,6 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace EcommerceSystem.Services
@@ -103,7 +102,8 @@ namespace EcommerceSystem.Services
         public async Task<OperationResult> EditAddressAsync(int customerId, DeliveryField updated)
         {
             var address = await _context.DeliveryField
-                .Include(x => x.Customer)!.ThenInclude(x => x.Addresses)
+                .Include(x => x.Customer!)
+                    .ThenInclude(x => x.Addresses)
                 .FirstOrDefaultAsync(x => x.AddressId == updated.AddressId && x.UserId == customerId);
 
             if (address == null) return OperationResult.Fail("Address not found.");
