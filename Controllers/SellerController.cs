@@ -120,10 +120,8 @@ namespace EcommerceSystem.Controllers
             ViewBag.ShopName = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
 
-            if (tab == "Profile")
-            {
-                ViewBag.ProfileSeller = seller;
-            }
+            var notifications = await _notificationService.GetForUserAsync(seller.UserId);
+            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
 
             if (seller.IsApproved)
             {
@@ -131,8 +129,63 @@ namespace EcommerceSystem.Controllers
                     .Include(p => p.Category)
                     .Where(p => p.SellerId == seller.UserId)
                     .ToListAsync();
-                ViewBag.Products = products;
 
+                ViewBag.Products = products;
+                ViewBag.BannedProductCount = products.Count(p => p.IsDeleted);
+
+                // ── Active products for revenue potential ──
+                var activeProducts = products.Where(p => !p.IsDeleted && !p.IsDraft).ToList();
+                ViewBag.ActiveProductCount = activeProducts.Count;
+
+                // ── Revenue Potential = remaining stock × selling price ──
+                ViewBag.TotalRevenuePotential = activeProducts
+                    .Sum(p => p.Price * p.StockQuantity);
+
+                // ── Actual Profit = delivered orders (profit margin per unit sold) ──
+                //    minus refunded amounts (approved returns only)
+                var deliveredOrders = await _context.Order
+                    .Include(o => o.OrderItems)
+                    .Where(o => o.SellerUserId == seller.UserId
+                            && (o.CurrentStatus == OrderStatus.DELIVERED
+                            || o.CurrentStatus == OrderStatus.RECEIVED
+                            || o.CurrentStatus == OrderStatus.RETURN_REFUND))
+                    .ToListAsync();
+
+                double actualProfit = 0;
+
+                foreach (var order in deliveredOrders)
+                {
+                    foreach (var item in order.OrderItems)
+                    {
+                        // Find the original cost price of this product
+                        var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                        var costPrice = product != null && product.OriginalPrice > 0
+                            ? product.OriginalPrice
+                            : (double)item.Price; // fallback: no margin known
+
+                        var margin = (double)item.Price - costPrice;
+                        if (margin > 0)
+                            actualProfit += margin * item.Quantity;
+                    }
+
+                    // Subtract refunded profit if return was approved
+                    if (order.ReturnApprovedAt.HasValue)
+                    {
+                        foreach (var item in order.OrderItems)
+                        {
+                            var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                            var costPrice = product != null && product.OriginalPrice > 0
+                                ? product.OriginalPrice
+                                : (double)item.Price;
+
+                            var margin = (double)item.Price - costPrice;
+                            if (margin > 0)
+                                actualProfit -= margin * item.Quantity;
+                        }
+                    }
+                }
+
+                ViewBag.TotalProfit = (decimal)actualProfit;
                 if (tab == "Order")
                 {
                     var orders = await _context.Order
@@ -142,10 +195,14 @@ namespace EcommerceSystem.Controllers
                         .Where(o => o.SellerUserId == seller.UserId)
                         .OrderByDescending(o => o.OrderTime)
                         .ToListAsync();
-                    ViewBag.Orders = orders;
+                    ViewBag.Orders = orders;                                   
                 }
+                if (tab == "Profile")
+                    {
+                        ViewBag.ProfileSeller = seller;
+                    }            
 
-                            if (tab == "Chat")
+                if (tab == "Chat")
                 {
                     // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
                     var chatList = await _context.ChatRoom
@@ -153,9 +210,9 @@ namespace EcommerceSystem.Controllers
                         .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
                         {
                             ChatRoomId = r.ChatRoomId,
-                            CustomerName = r.Customer.FullName, // 注意检查你模型里的名称是 Username 还是 UserName
-                            LastMessage = r.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault().MessageText,
-                            LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).FirstOrDefault().SentAt,
+                            CustomerName = r.Customer != null ? r.Customer.FullName : "Unknown Customer",
+                            LastMessage = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.MessageText).FirstOrDefault() ?? "",
+                            LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.SentAt).FirstOrDefault(),
                             UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
                         })
                         .OrderByDescending(x => x.LastMessageTime)
@@ -165,7 +222,6 @@ namespace EcommerceSystem.Controllers
                     return View("Home", chatList); 
                 }
             }
-
             return View();
         }
 
@@ -323,7 +379,7 @@ namespace EcommerceSystem.Controllers
             await _context.SaveChangesAsync();
 
             TempData["Success"] = isDraft ? "Product saved as draft." : "Product published successfully.";
-            return RedirectToAction("Home", new { tab = "Product" });
+            return RedirectToAction("Home", new { tab = "Product", subtab = isDraft ? "draft" : "active" });
         }
 
         [HttpGet]
@@ -343,6 +399,12 @@ namespace EcommerceSystem.Controllers
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
             if (product == null) return NotFound();
+
+            if (product.IsDeleted)
+            {
+                TempData["Error"] = "This product has been removed by admin and cannot be edited.";
+                return RedirectToAction("Home", new { tab = "Product", subtab = "banned" });
+            }
 
             ViewBag.ShopName = seller.ShopName;
             return View(product);
@@ -433,7 +495,7 @@ namespace EcommerceSystem.Controllers
 
             TempData["Success"] = existing.IsDraft ? "Product saved as draft." : "Product updated successfully.";
             await _context.SaveChangesAsync();
-            return RedirectToAction("Home", new { tab = "Product" });
+            return RedirectToAction("Home", new { tab = "Product", subtab = existing.IsDraft ? "draft" : "active" });
         }
 
         // ── ProcessVariationImagesAsync ───────────────────────────────────────
@@ -587,27 +649,12 @@ namespace EcommerceSystem.Controllers
             var product = await _context.Products.FindAsync(id);
             if (product != null)
             {
-                var allPaths = new List<string>();
-                if (!string.IsNullOrEmpty(product.ImagePathsJson))
-                {
-                    try { allPaths = JsonSerializer.Deserialize<List<string>>(product.ImagePathsJson) ?? new List<string>(); }
-                    catch { }
-                }
-                if (allPaths.Count == 0 && !string.IsNullOrEmpty(product.ImagePath))
-                    allPaths.Add(product.ImagePath);
-
-                foreach (var imgPath in allPaths)
-                {
-                    if (string.IsNullOrEmpty(imgPath) || imgPath == "/images/placeholder.png") continue;
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imgPath.TrimStart('/'));
-                    if (System.IO.File.Exists(filePath))
-                        System.IO.File.Delete(filePath);
-                }
-
-                _context.Products.Remove(product);
+                // Soft delete — keeps the record visible in Banned tab
+                product.IsDeleted = true;
+                product.DeletedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }
-            return RedirectToAction("Home", new { tab = "Product" });
+            return RedirectToAction("Home", new { tab = "Product", subtab = "active" });
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -675,13 +722,13 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 
-            // Attach observers — they are called inside SetStatus()
+            // Attach observers — they are called inside SetStatusAsync()
             order.Attach(new CustomerDashboardObserver(_notificationService));
             order.Attach(new SellerDashboardObserver(_notificationService));
             order.Attach(new AdminPanelObserver(_notificationService, _context));
 
-            // SetStatus does the final validation, stamps timestamps, notifies observers
-            order.SetStatus(newStatus);
+            // SetStatusAsync does the final validation, stamps timestamps, notifies observers
+            await order.SetStatusAsync(newStatus);
 
             await _context.SaveChangesAsync();
 
@@ -851,7 +898,4 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("SellerInbox", "Chat");
         }
     }
-
-
 }
-

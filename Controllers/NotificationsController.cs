@@ -31,12 +31,15 @@ public class NotificationsController : Controller
     public async Task<IActionResult> GetDropdown()
     {
         var userId = await GetCurrentUserIdAsync();
+        Console.WriteLine($"[NotificationsController.GetDropdown] Fetching notifications for UserId={userId}");
         var notifications = await _notificationService.GetForUserAsync(userId);
         var unread = notifications.Count(n => !n.IsRead);
+        Console.WriteLine($"[NotificationsController.GetDropdown] Found {notifications.Count} total notifications, {unread} unread");
 
         return Json(new {
             unreadCount = unread,
-            items = notifications.Take(10).Select(n => new {
+            // Return all notifications so the dropdown can show the full history.
+            items = notifications.Select(n => new {
                 n.NotificationId,
                 n.Title,
                 n.Message,

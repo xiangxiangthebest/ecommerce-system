@@ -112,19 +112,22 @@ namespace EcommerceSystem.Controllers
 
             var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            string? redirectUrl = returnUrl;
+            if (string.IsNullOrWhiteSpace(redirectUrl) || !Url.IsLocalUrl(redirectUrl))
             {
-                returnUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
+                redirectUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
             }
+
+            redirectUrl ??= "/";
 
             if (!result.Success)
             {
                 TempData["CartError"] = result.Error;
-                return Redirect(returnUrl);
+                return Redirect(redirectUrl);
             }
 
             TempData["CartSuccess"] = "Product added to cart";
-            return Redirect(returnUrl);
+            return Redirect(redirectUrl);
         }
 
         // =========================

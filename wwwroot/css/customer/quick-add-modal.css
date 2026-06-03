@@ -317,6 +317,7 @@
     margin: 0 0 18px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -480,6 +481,7 @@
     outline: none;
     background: transparent;
     -moz-appearance: textfield;
+    appearance: textfield;
 }
 .qa-qty-input::-webkit-inner-spin-button,
 .qa-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }

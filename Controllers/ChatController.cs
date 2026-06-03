@@ -3,12 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using EcommerceSystem.Models;
-using System.Threading.Tasks;
 using EcommerceSystem.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using System.IO;
 
 namespace EcommerceSystem.Controllers
 {
@@ -71,6 +67,8 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> CustomerStartConversation(int sellerId, int? productId, string? variationJson)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Forbid();
+
             var chatRoom = await _chatService.GetChatRoomAsync(sellerId, customer.UserId, productId);
             if (chatRoom.ChatRoomId == 0)
             {
@@ -89,6 +87,7 @@ namespace EcommerceSystem.Controllers
             }
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Forbid();
             var currentUserId = customer.UserId;
 
             if (chatRoomId == 0)
@@ -116,6 +115,7 @@ namespace EcommerceSystem.Controllers
             }
 
             var seller = await _sellerContext.GetCurrentSellerAsync(User);
+            if (seller == null) return Forbid();
             var currentUserId = seller.UserId;
 
             if (chatRoomId == 0)
@@ -141,8 +141,9 @@ namespace EcommerceSystem.Controllers
             await LoadNavbarAsync();
 
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            var inboxList = await _chatService.GetCustomerInboxListAsync(customer.UserId);
+            if (customer == null) return Forbid();
 
+            var inboxList = await _chatService.GetCustomerInboxListAsync(customer.UserId);
             return View("~/Views/Customer/ChatList.cshtml", inboxList);
         }
 
@@ -151,12 +152,13 @@ namespace EcommerceSystem.Controllers
         {
             await LoadNavbarAsync();
             
-            ChatRoom chatRoom;
+            ChatRoom? chatRoom;
 
             // 1. 如果 id 是 0，说明是尚未创建的虚拟临时聊天室（从商品页初次进来）
             if (id == 0)
             {
                 var customer = await _customerContext.GetCurrentCustomerAsync(User);
+                if (customer == null) return Forbid();
 
                 Seller? dbSeller = null;
                 if (sellerId.HasValue)
@@ -239,6 +241,11 @@ namespace EcommerceSystem.Controllers
         {
             // 1. 获取当前登录的买家用户
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null)
+            {
+                return Unauthorized(new { message = "登录状态已过期，请重新登录" });
+            }
+
             var currentUserId = customer.UserId;
 
             // 2. 💡 核心筛选：从订单明细表开始查，精准过滤出【属于该买家】且【商品属于该商家】的所有订单明细
@@ -246,20 +253,19 @@ namespace EcommerceSystem.Controllers
             var matchedOrderData = await _context.OrderItems
                 .Include(oi => oi.Order)
                 .Include(oi => oi.Product)
-                .Where(oi => oi.Order.CustomerUserId == currentUserId && oi.Product.SellerId == sellerId)
-                .OrderByDescending(oi => oi.Order.OrderTime)
+                .Where(oi => oi.Order != null && oi.Product != null && oi.Order.CustomerUserId == currentUserId && oi.Product.SellerId == sellerId)
+                .OrderByDescending(oi => oi.Order!.OrderTime)
                 .Select(oi => new
                 {
                     OrderId = oi.OrderId,
-                    TotalAmount = oi.Order.TotalAmount, // 订单总金额
-                    OrderDate = oi.Order.OrderTime.ToString("yyyy-MM-dd HH:mm"),
-                    // 💡【核心防错修复】：强行清除商品名中的单双引号和换行符，防止破坏前端 JS 拼接
-                    ProductName = oi.Product.Name
+                    TotalAmount = oi.Order!.TotalAmount, // 订单总金额
+                    OrderDate = oi.Order!.OrderTime.ToString("yyyy-MM-dd HH:mm"),
+                    ProductName = oi.Product!.Name
                         .Replace("'", "")
                         .Replace("\"", "")
                         .Replace("\r", "")
-                        .Replace("\n", "") ?? "商品",      // 该明细的商品名
-                    ProductImage = oi.Product.ImagePath, // 该明细的商品图
+                        .Replace("\n", ""),
+                    ProductImage = oi.Product!.ImagePath, // 该明细的商品图
                     Quantity = oi.Quantity,
                     Price = oi.Price
                 })
@@ -300,13 +306,14 @@ public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
     var matchedOrderData = await _context.OrderItems
         .Include(oi => oi.Order)
         .Include(oi => oi.Product)
-        .Where(oi => oi.Order.CustomerUserId == customerId              // A. 必须是这个买家下的单
+        .Where(oi => oi.Order != null && oi.Product != null
+                  && oi.Order.CustomerUserId == customerId              // A. 必须是这个买家下的单
                   && (oi.Order.SellerUserId == currentUserId || oi.Product.SellerId == currentUserId)) // B. 订单或者商品必须属于当前登录商家
         .Select(oi => new
         {
             OrderId = oi.OrderId,
-            TotalAmount = oi.Order.TotalAmount,                     // 订单总金额                      // 先拿原始 DateTime 对象，后续进行内存化处理或转 String
-            Status = oi.Order.CurrentStatus,                  // 订单状态 (如 Pending/Shipped)
+            TotalAmount = oi.Order!.TotalAmount,                     // 订单总金额                      // 先拿原始 DateTime 对象，后续进行内存化处理或转 String
+            Status = oi.Order!.CurrentStatus,                  // 订单状态 (如 Pending/Shipped)
             
             // 💡【安全防错】：优先做 ?.Null 保护，再清除可能破坏前端 JS 拼接的特殊字符
             ProductName = oi.Product != null && oi.Product.Name != null
@@ -364,7 +371,7 @@ public async Task<IActionResult> SellerGetTheCustomerOrders(int customerId)
         [HttpGet]
         public async Task<IActionResult> SellerConversation(int id, int? customerId, int? orderId)
         {
-            ChatRoom chatRoom;
+            ChatRoom? chatRoom;
             var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
             // ======= 情况 A: 虚拟聊天室（初次点进来，还未正式创建记录） =======

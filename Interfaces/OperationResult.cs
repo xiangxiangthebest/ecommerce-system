@@ -12,6 +12,7 @@ namespace EcommerceSystem.Interfaces
     {
         public T? Value { get; init; }
         public static OperationResult<T> Ok(T value) => new() { Success = true, Value = value };
-        public static OperationResult<T> Fail(string error) => new() { Success = false, Error = error };
+        // Hides OperationResult.Fail(string) to return a typed OperationResult<T>
+        public new static OperationResult<T> Fail(string error) => new() { Success = false, Error = error };
     }
 }

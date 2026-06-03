@@ -17,6 +17,7 @@ public class NotificationService : INotificationService
     public async Task CreateAsync(int userId, string title, string message,
                                   string type = "OrderStatus", int? orderId = null)
     {
+        Console.WriteLine($"[NotificationService.CreateAsync] Creating notification: UserId={userId}, Title={title}, OrderId={orderId}");
         var notification = new Notification
         {
             UserId    = userId,
@@ -29,6 +30,7 @@ public class NotificationService : INotificationService
         };
         _context.Notifications.Add(notification);
         await _context.SaveChangesAsync();
+        Console.WriteLine($"[NotificationService.CreateAsync] Notification saved to database with ID={notification.NotificationId}");
     }
 
     public async Task<List<Notification>> GetForUserAsync(int userId) =>

@@ -172,7 +172,7 @@ namespace EcommerceSystem.Services
         public async Task<int> GetCartItemCountAsync(int customerId)
         {
             return await _context.CartItem
-                .Where(ci => ci.Cart.UserId == customerId)
+                .Where(ci => ci.Cart != null && ci.Cart.UserId == customerId)
                 .SumAsync(ci => ci.Quantity);
         }
     }

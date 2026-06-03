@@ -38,13 +38,16 @@
 
         @if (source == "product")
         {
-            var item = Model.CartItems.First();
-            <input type="hidden" name="buyNowQuantity" value="@item.Quantity" />
-            <input type="hidden" name="buyNowSelectedVariations" value="@item.SelectedVariations" />
+            var item = Model.CartItems?.FirstOrDefault();
+            if (item != null)
+            {
+                <input type="hidden" name="buyNowQuantity" value="@item.Quantity" />
+                <input type="hidden" name="buyNowSelectedVariations" value="@item.SelectedVariations" />
+            }
         }
         else
         {
-            @foreach (var item in Model.CartItems)
+            @foreach (var item in Model.CartItems ?? Enumerable.Empty<EcommerceSystem.Models.CartItem>())
             {
                 <input type="hidden" name="selectedItemIds" value="@item.CartItemId" />
             }
@@ -367,7 +370,7 @@
                 </div>
 
                 <!-- Hidden selected cart item ids -->
-                @foreach (var item in Model.CartItems)
+                @foreach (var item in Model.CartItems ?? Enumerable.Empty<EcommerceSystem.Models.CartItem>())
                 {
                     <input type="hidden" name="selectedItemIds" value="@item.CartItemId" />
                 }
