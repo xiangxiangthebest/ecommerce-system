@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<ChatRoom> ChatRoom { get; set; }
     public DbSet<ChatMessage> ChatMessages { get; set; }
+    public DbSet<ProductReport> ProductReports { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -45,5 +46,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Product>().ToTable("Product");
         modelBuilder.Entity<Category>().ToTable("Category");
         modelBuilder.Entity<Review>().ToTable("Review");
+        modelBuilder.Entity<ProductReport>().ToTable("ProductReport").HasKey(p => p.ReportId);
+        modelBuilder.Entity<ProductReport>().HasOne(p => p.Product).WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProductReport>().HasOne(p => p.Customer).WithMany().HasForeignKey(p => p.CustomerId).OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -1,0 +1,154 @@
+@model List<EcommerceSystem.Models.ProductReport>
+@using System.Text.Json
+@using System.Globalization
+
+<link rel="stylesheet" href="~/css/customer/reports.css" asp-append-version="true" />
+
+@{
+    ViewData["Title"] = "My Product Reports";
+}
+
+<div class="reports-page">
+    <div class="reports-container">
+        <!-- Header -->
+        <div class="reports-header">
+            <h1 class="reports-title">My Product Reports</h1>
+            <p class="reports-subtitle">Track all your product reports and their status</p>
+        </div>
+
+        <!-- No Reports Message -->
+        @if (Model == null || Model.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="ti ti-flag-off"></i>
+                </div>
+                <h3>No reports yet</h3>
+                <p>You haven't submitted any product reports. If you encounter any issues with products, please report them.</p>
+                <a href="@Url.Action("Home", "Customer")" class="btn-browse">
+                    <i class="ti ti-arrow-left"></i> Browse Products
+                </a>
+            </div>
+        }
+        else
+        {
+            <!-- Reports Table/List -->
+            <div class="reports-list">
+                @foreach (var report in Model)
+                {
+                    var reportDate = report.ReportedAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
+                    var statusClass = report.Status?.ToLower() ?? "pending";
+                    var evidenceImages = new List<string>();
+                    
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(report.EvidenceImagePathsJson))
+                        {
+                            evidenceImages = JsonSerializer.Deserialize<List<string>>(report.EvidenceImagePathsJson) ?? new List<string>();
+                        }
+                    }
+                    catch { }
+
+                    <div class="report-card">
+                        <div class="report-card-header">
+                            <div class="report-info">
+                                <h3 class="report-product-name">@(report.Product?.Name ?? "Product")</h3>
+                                <p class="report-product-id">Product ID: @report.ProductId</p>
+                            </div>
+                            <span class="report-status status-@statusClass">
+                                <i class="ti ti-circle-filled"></i>
+                                @report.Status
+                            </span>
+                        </div>
+
+                        <div class="report-card-body">
+                            <div class="report-row">
+                                <label>Report Reason:</label>
+                                <span>@report.ReportReason</span>
+                            </div>
+
+                            <div class="report-row">
+                                <label>Description:</label>
+                                <p class="report-description">@report.ReportDescription</p>
+                            </div>
+
+                            @if (evidenceImages.Count > 0)
+                            {
+                                <div class="report-row">
+                                    <label>Evidence Images:</label>
+                                    <div class="evidence-gallery">
+                                        @foreach (var imagePath in evidenceImages)
+                                        {
+                                            <div class="evidence-item">
+                                                <img src="@imagePath" alt="Evidence" onclick="openImageLightbox(this.src)" />
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="report-row">
+                                <label>Reported On:</label>
+                                <span>@reportDate</span>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(report.AdminNotes))
+                            {
+                                <div class="report-row admin-section">
+                                    <label>Admin Notes:</label>
+                                    <div class="admin-notes">
+                                        <i class="ti ti-message-circle"></i>
+                                        <p>@report.AdminNotes</p>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (report.Status?.ToLower() == "resolved")
+                            {
+                                <div class="report-row">
+                                    <label>Resolved On:</label>
+                                    <span>@(report.ResolvedAt?.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture) ?? "N/A")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Image Lightbox -->
+<div id="imageLightbox" class="image-lightbox" hidden>
+    <button class="lightbox-close" id="lightboxClose" aria-label="Close image">
+        <i class="ti ti-x"></i>
+    </button>
+    <img id="lightboxImage" src="" alt="Evidence image" />
+</div>
+
+<script>
+    function openImageLightbox(src) {
+        const lightbox = document.getElementById('imageLightbox');
+        const image = document.getElementById('lightboxImage');
+        image.src = src;
+        lightbox.hidden = false;
+        document.body.style.overflow = 'hidden';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const lightbox = document.getElementById('imageLightbox');
+        const closeBtn = document.getElementById('lightboxClose');
+
+        closeBtn.addEventListener('click', () => {
+            lightbox.hidden = true;
+            document.body.style.overflow = 'auto';
+        });
+
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) {
+                lightbox.hidden = true;
+                document.body.style.overflow = 'auto';
+            }
+        });
+    });
+</script>

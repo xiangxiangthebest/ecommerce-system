@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EcommerceSystem.DTOs;
 using EcommerceSystem.Enums;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
@@ -21,6 +22,7 @@ namespace EcommerceSystem.Controllers
         private readonly IProfileService _profileService;
         private readonly IReturnImageStorage _returnImageStorage;
         private readonly INotificationService _notificationService;
+        private readonly IProductReportService _productReportService;
 
 
         public CustomerController(
@@ -31,7 +33,8 @@ namespace EcommerceSystem.Controllers
             IReviewService reviewService,
             IProfileService profileService,
             IReturnImageStorage returnImageStorage,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IProductReportService productReportService)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -40,9 +43,10 @@ namespace EcommerceSystem.Controllers
             _reviewService = reviewService;
             _profileService = profileService;
             _returnImageStorage = returnImageStorage;
-            _notificationService = notificationService; 
+            _notificationService = notificationService;
+            _productReportService = productReportService;
         }
-
+        
         // =========================
         // NAVBAR HELPERS
         // =========================
@@ -120,11 +124,11 @@ namespace EcommerceSystem.Controllers
             if (!result.Success)
             {
                 TempData["CartError"] = result.Error;
-                return Redirect(returnUrl);
+                return Redirect(returnUrl!);
             }
 
             TempData["CartSuccess"] = "Product added to cart";
-            return Redirect(returnUrl);
+            return Redirect(returnUrl!);
         }
 
         // =========================
@@ -512,6 +516,54 @@ namespace EcommerceSystem.Controllers
             var notifications = await _notificationService.GetForUserAsync(customer.UserId)
                                 ?? new List<EcommerceSystem.Models.Notification>();
             return View(notifications);
+        }
+
+        // =========================
+        // REPORT PRODUCT (PRODUCT DETAILS PAGE)
+        // =========================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReportProduct(int productId, string reportReason, string reportDescription, List<IFormFile> evidenceFiles)
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            try
+            {
+                var dto = new CreateProductReportDto
+                {
+                    ProductId = productId,
+                    ReportReason = reportReason,
+                    ReportDescription = reportDescription
+                };
+
+                var report = await _productReportService.CreateProductReportAsync(customer.UserId, dto, evidenceFiles ?? new List<IFormFile>());
+
+                return Json(new { success = true, message = "Report submitted successfully. Thank you for helping us maintain product quality.", reportId = report.ReportId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+            catch
+            {
+                return Json(new { success = false, message = "An error occurred while submitting the report." });
+            }
+        }
+
+        // =========================
+        // GET CUSTOMER'S REPORTS
+        // =========================
+        [HttpGet]
+        public async Task<IActionResult> MyReports()
+        {
+            await LoadNavbarAsync();
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return Unauthorized();
+
+            var reports = await _productReportService.GetReportsByCustomerIdAsync(customer.UserId);
+            return View("Reports", reports);
         }
 
     }

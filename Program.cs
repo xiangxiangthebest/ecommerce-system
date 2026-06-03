@@ -32,6 +32,8 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IProfileImageStorage, LocalProfileImageStorage>();
 builder.Services.AddScoped<IReturnImageStorage, LocalReturnImageStorage>();
 builder.Services.AddScoped<IReviewImageStorage, LocalReviewImageStorage>();
+builder.Services.AddScoped<IReportImageStorage, LocalReportImageStorage>();
+builder.Services.AddScoped<IProductReportService, ProductReportService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<OrderStatusNotifierFactory>();
 builder.Services.AddScoped<OrderService>();
