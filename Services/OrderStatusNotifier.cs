@@ -26,10 +26,10 @@ public class OrderStatusNotifier : OrderStatusSubject
         _observers.Remove(observer);
     }
 
-    public void NotifyObservers()
+    public async Task NotifyObserversAsync()
     {
         foreach (var observer in _observers)
-            observer.Update(_order);
+            await observer.Update(_order);
     }
 
     // ── Public trigger ───────────────────────────────────────────────────────
@@ -38,9 +38,9 @@ public class OrderStatusNotifier : OrderStatusSubject
     /// Call this after the order's CurrentStatus has been persisted.
     /// It stores the order and fans out to every attached observer.
     /// </summary>
-    public void SetOrderAndNotify(Order order)
+    public async Task SetOrderAndNotifyAsync(Order order)
     {
         _order = order;
-        NotifyObservers();
+        await NotifyObserversAsync();
     }
 }

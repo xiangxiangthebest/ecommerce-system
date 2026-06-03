@@ -92,8 +92,8 @@ namespace EcommerceSystem.Services
             var reviews = await _context.Reviews
                 .Where(r => r.ProductId == productId)
                 .Include(r => r.OrderItem)
-                    .ThenInclude(oi => oi.Order)
-                        .ThenInclude(o => o.Customer)
+                    .ThenInclude(oi => oi!.Order)
+                        .ThenInclude(o => o!.Customer)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 

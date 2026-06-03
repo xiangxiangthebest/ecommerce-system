@@ -24,7 +24,7 @@ namespace EcommerceSystem.Observers
             _notificationService = notificationService;
         }
 
-        public async void Update(Order order)
+        public async Task Update(Order order)
         {
             try
             {
@@ -130,7 +130,7 @@ namespace EcommerceSystem.Observers
                 .Where(oi => oi.Product != null)
                 .Select(oi =>
                 {
-                    var name = oi.Product.Name;
+                    var name = oi.Product?.Name ?? "Unknown product";
                     var variationSuffix = BuildVariationSuffix(oi.SelectedVariation);
                     return string.IsNullOrEmpty(variationSuffix)
                         ? name

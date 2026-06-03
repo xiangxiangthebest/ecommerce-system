@@ -4,6 +4,6 @@ public interface OrderStatusSubject
 {
     void Attach(OrderStatusObserver observer);
     void Detach(OrderStatusObserver observer);
-    void NotifyObservers();
+    Task NotifyObserversAsync();
 }
 

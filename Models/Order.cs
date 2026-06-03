@@ -66,10 +66,10 @@ public class Order : OrderStatusSubject
     public void Attach(OrderStatusObserver observer) => _observers.Add(observer);
     public void Detach(OrderStatusObserver observer) => _observers.Remove(observer);
 
-    public void NotifyObservers()
+    public async Task NotifyObserversAsync()
     {
         foreach (var o in _observers)
-            o.Update(this);
+            await o.Update(this);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -141,10 +141,10 @@ public class Order : OrderStatusSubject
 
     /// <summary>
     /// Validates the transition, updates the status, stamps timestamps,
-    /// then notifies all attached observers.
+    /// then notifies all attached observers asynchronously.
     /// Throws InvalidOperationException if the transition is not allowed.
     /// </summary>
-    public void SetStatus(OrderStatus newStatus)
+    public async Task SetStatusAsync(OrderStatus newStatus)
     {
         if (!CanTransitionTo(newStatus))
             throw new InvalidOperationException(
@@ -168,6 +168,6 @@ public class Order : OrderStatusSubject
                 break;
         }
 
-        NotifyObservers();
+        await NotifyObserversAsync();
     }
 }

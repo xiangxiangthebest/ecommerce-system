@@ -24,94 +24,109 @@ namespace EcommerceSystem.Observers
             _notificationService = notificationService;
         }
 
-        public async void Update(Order order)
+        public async Task Update(Order order)
         {
-            if (order.Seller == null) return;
-
-            var sellerId    = order.Seller.UserId;
-            var orderId     = order.OrderId;
-            var customerId  = order.Customer?.UserId.ToString()   ?? "N/A";
-            var customerName= order.Customer?.FullName             ?? "Unknown Customer";
-            var shopName    = order.Seller.ShopName;
-            var total       = order.TotalAmount;
-
-            // Build a comma-separated product list from the order items (if loaded).
-            var productList = BuildProductList(order);
-
-            string title;
-            string message;
-
-            switch (order.CurrentStatus)
+            try
             {
-                // ── New order incoming ─────────────────────────────────────────
-                case OrderStatus.PENDING:
-                    title = "🛒 New Order Alert";
-                    message =
-                        $"Order #{orderId}\n" +
-                        $"Customer ID: {customerId}\n" +
-                        $"Customer Name: {customerName}\n" +
-                        $"Product(s) Ordered: {productList}\n" +
-                        $"Total: RM{total:F2}";
-                    break;
-
-                // ── Seller accepted / is now preparing ────────────────────────
-                case OrderStatus.PREPARING:
-                    title = "Processing Order";
-                    message =
-                        $"Order #{orderId} is being processed.";
-                    break;
-
-                // ── Seller handed to courier ───────────────────────────────────
-                case OrderStatus.SHIPPED:
-                    title = "Order Shipped";
-                    message =
-                        $"Order #{orderId} is being shipped.";
-                    break;
-
-                // ── Delivered to address ───────────────────────────────────────
-                case OrderStatus.DELIVERED:
-                    title = "Order Delivered";
-                    message =
-                        $"Order #{orderId} has been delivered to " +
-                        $"Customer #{customerId} ({customerName}).";
-                    break;
-
-                // ── Customer confirmed receipt ─────────────────────────────────
-                case OrderStatus.RECEIVED:
-                    title = "Order Received";
-                    message =
-                        $"Customer #{customerId} ({customerName}) has confirmed receipt " +
-                        $"of Order #{orderId}. Transaction complete.";
-                    break;
-
-                // ── Customer cancelled ─────────────────────────────────────────
-                case OrderStatus.CANCELED:
-                    title = "Order Cancelled";
-                    message =
-                        $"Order #{orderId}\n" +
-                        $"Shop: {shopName}\n" +
-                        $"Product(s): {productList}\n" +
-                        $"Total: RM{total:F2}\n" +
-                        $"has been cancelled.";
-                    break;
-
-                // ── Return / refund requested ──────────────────────────────────
-                case OrderStatus.RETURN_REFUND:
-                    title = "Return & Refund Requested";
-                    message =
-                        $"Customer #{customerId} ({customerName}) has requested a " +
-                        $"return/refund for Order #{orderId}. Awaiting for Customer Service's response.";
-                    break;
-
-                default:
+                Console.WriteLine($"[SellerDashboardObserver] Update called for Order #{order.OrderId}, Status: {order.CurrentStatus}");
+                if (order.Seller == null)
+                {
+                    Console.WriteLine($"[SellerDashboardObserver] Seller is NULL for Order #{order.OrderId}");
                     return;
-            }
+                }
+                Console.WriteLine($"[SellerDashboardObserver] Seller found: UserId={order.Seller.UserId}, ShopName={order.Seller.ShopName}");
 
-            await _notificationService.CreateAsync(
-                userId:  sellerId,
-                title:   title,
-                message: message
-            );
+                var sellerId    = order.Seller.UserId;
+                var orderId     = order.OrderId;
+                var customerId  = order.Customer?.UserId.ToString()   ?? "N/A";
+                var customerName= order.Customer?.FullName             ?? "Unknown Customer";
+                var shopName    = order.Seller.ShopName;
+                var total       = order.TotalAmount;
+
+                // Build a comma-separated product list from the order items (if loaded).
+                var productList = BuildProductList(order);
+
+                string title;
+                string message;
+
+                switch (order.CurrentStatus)
+                {
+                    // ── New order incoming ─────────────────────────────────────────
+                    case OrderStatus.PENDING:
+                        title = "🛒 New Order Alert";
+                        message =
+                            $"Order #{orderId}\n" +
+                            $"Customer ID: {customerId}\n" +
+                            $"Customer Name: {customerName}\n" +
+                            $"Product(s) Ordered: {productList}\n" +
+                            $"Total: RM{total:F2}";
+                        break;
+
+                    // ── Seller accepted / is now preparing ────────────────────────
+                    case OrderStatus.PREPARING:
+                        title = "Processing Order";
+                        message =
+                            $"Order #{orderId} is being processed.";
+                        break;
+
+                    // ── Seller handed to courier ───────────────────────────────────
+                    case OrderStatus.SHIPPED:
+                        title = "Order Shipped";
+                        message =
+                            $"Order #{orderId} is being shipped.";
+                        break;
+
+                    // ── Delivered to address ───────────────────────────────────────
+                    case OrderStatus.DELIVERED:
+                        title = "Order Delivered";
+                        message =
+                            $"Order #{orderId} has been delivered to " +
+                            $"Customer #{customerId} ({customerName}).";
+                        break;
+
+                    // ── Customer confirmed receipt ─────────────────────────────────
+                    case OrderStatus.RECEIVED:
+                        title = "Order Received";
+                        message =
+                            $"Customer #{customerId} ({customerName}) has confirmed receipt " +
+                            $"of Order #{orderId}. Transaction complete.";
+                        break;
+
+                    // ── Customer cancelled ─────────────────────────────────────────
+                    case OrderStatus.CANCELED:
+                        title = "Order Cancelled";
+                        message =
+                            $"Order #{orderId}\n" +
+                            $"Shop: {shopName}\n" +
+                            $"Product(s): {productList}\n" +
+                            $"Total: RM{total:F2}\n" +
+                            $"has been cancelled.";
+                        break;
+
+                    // ── Return / refund requested ──────────────────────────────────
+                    case OrderStatus.RETURN_REFUND:
+                        title = "Return & Refund Requested";
+                        message =
+                            $"Customer #{customerId} ({customerName}) has requested a " +
+                            $"return/refund for Order #{orderId}. Awaiting for Customer Service's response.";
+                        break;
+
+                    default:
+                        return;
+                }
+
+                Console.WriteLine($"[SellerDashboardObserver] Creating notification for UserId={sellerId}, Title={title}");
+                await _notificationService.CreateAsync(
+                    userId:  sellerId,
+                    title:   title,
+                    message: message
+                );
+                Console.WriteLine($"[SellerDashboardObserver] Notification created successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SellerDashboardObserver] Notification failed: {ex.Message}");
+            }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -127,7 +142,7 @@ namespace EcommerceSystem.Observers
                 .Where(oi => oi.Product != null)
                 .Select(oi =>
                 {
-                    var name = oi.Product.Name;
+                    var name = oi.Product?.Name ?? "Unknown product";
                     var variationSuffix = BuildVariationSuffix(oi.SelectedVariation);
                     return string.IsNullOrEmpty(variationSuffix)
                         ? name

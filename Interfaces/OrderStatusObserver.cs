@@ -4,6 +4,6 @@ namespace EcommerceSystem.Interfaces;
 
 public interface OrderStatusObserver
 {
-    void Update(Order order);
+    Task Update(Order order);
 }
 

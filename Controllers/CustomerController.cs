@@ -116,19 +116,22 @@ namespace EcommerceSystem.Controllers
 
             var result = await _cartService.AddToCartAsync(customer.UserId, productId, quantity, selectedVariations);
 
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            string? redirectUrl = returnUrl;
+            if (string.IsNullOrWhiteSpace(redirectUrl) || !Url.IsLocalUrl(redirectUrl))
             {
-                returnUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
+                redirectUrl = Url.Action("ProductDetails", "Customer", new { id = productId });
             }
+
+            redirectUrl ??= "/";
 
             if (!result.Success)
             {
                 TempData["CartError"] = result.Error;
-                return Redirect(returnUrl!);
+                return Redirect(redirectUrl);
             }
 
             TempData["CartSuccess"] = "Product added to cart";
-            return Redirect(returnUrl!);
+            return Redirect(redirectUrl);
         }
 
         // =========================
@@ -497,7 +500,6 @@ namespace EcommerceSystem.Controllers
         // =========================
         public IActionResult Chat()
         {
-            // 顾客点击导航栏的“聊天”或者进入 /Customer/Chat 时，后端自动重定向到 Chat 控制器的 CustomerInbox 方法
             return RedirectToAction("CustomerInbox", "Chat");
         }
 
@@ -511,8 +513,6 @@ namespace EcommerceSystem.Controllers
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
             
-            // Pass the full list to the view so it can render server-side,
-            // AND the JS dropdown still works via /Notifications/GetDropdown
             var notifications = await _notificationService.GetForUserAsync(customer.UserId)
                                 ?? new List<EcommerceSystem.Models.Notification>();
             return View(notifications);

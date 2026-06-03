@@ -7,13 +7,13 @@
 
 <div class="auth-container">
 
-    @* ── Error modal ── *@
-    @if (ViewBag.Error != null)
+    @* -- Error modal (server-side duplicate checks) -- *@
+    @if (TempData["RegisterError"] != null)
     {
-        <div id="errorBackdrop" class="modal-backdrop">
-            <div class="modal-window">
-                <h2>Registration error</h2>
-                <p>@Html.Raw(ViewBag.Error)</p>
+        <div id="errorBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:9999;">
+            <div style="background:#c8c8f0;border-radius:18px;padding:28px 32px;max-width:340px;width:90%;box-shadow:0 8px 32px rgba(80,70,180,0.18);">
+                <h2 style="margin:0 0 10px;font-size:18px;font-weight:700;color:#1e1b4b;">Registration Error</h2>
+                <p style="margin:0;font-size:15px;color:#2d2b55;line-height:1.5;">@Html.Raw(TempData["RegisterError"])</p>
             </div>
         </div>
     }
@@ -67,16 +67,12 @@
             </div>
         </div>
 
-        @if (ViewBag.Error != null)
-        {
-            <div class="error-message">
-                <svg class="error-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                @ViewBag.Error
-            </div>
-        }
+        @* Server-side errors are shown via the modal above *@
 
         <form asp-controller="Auth" asp-action="RegisterSeller" method="post" id="seller-form">
             @Html.AntiForgeryToken()
+            @* Tells JS which step to restore after a server-side validation error *@
+            <input type="hidden" id="startAtStep" value="@(ViewBag.StartAtStep ?? 1)" />
 
             @* ══════════════════════ *@
             @* STEP 1 — Seller Info  *@
@@ -332,13 +328,28 @@ document.getElementById('seller-form').addEventListener('submit', function (e) {
 
 (function () {
     document.addEventListener('DOMContentLoaded', function () {
+        // Auto-jump to the correct step after a server-side error
+        var startStep = parseInt(document.getElementById('startAtStep').value, 10);
+        if (startStep === 2) {
+            // Advance stepper visually without re-validating Step 1
+            document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+            document.getElementById('form-step-2').classList.add('active');
+            document.getElementById('step-indicator-1').classList.add('active', 'completed');
+            document.getElementById('step-indicator-2').classList.add('active');
+            document.getElementById('connector').classList.add('completed');
+        }
+
         var backdrop = document.getElementById('errorBackdrop');
         if (backdrop) {
             setTimeout(function () {
                 backdrop.style.transition = 'opacity 0.4s ease';
                 backdrop.style.opacity = '0';
-                setTimeout(() => backdrop.remove(), 400);
-            }, 3000);
+                setTimeout(function () {
+                    backdrop.remove();
+                    goToStep(1);
+                }, 400);
+            }, 4000);
         }
 
         var tin = document.getElementById('tinInput');

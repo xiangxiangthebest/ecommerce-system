@@ -165,6 +165,12 @@
             const currentQty =
                 parseInt(qtyInput.value, 10) || 1;
 
+            const stock = getRowStock(row);
+
+            if (isPlus && currentQty >= stock) {
+                return;
+            }
+
             const newQty = isPlus
                 ? currentQty + 1
                 : Math.max(1, currentQty - 1);
@@ -193,6 +199,8 @@
                     (price * newQty).toFixed(2);
             }
 
+            updateQuantityButtonStates(row);
+
             recalc();
 
             try {
@@ -204,6 +212,85 @@
                 console.error('Failed to update quantity', e);
             }
         });
+    });
+
+    // Helper function to update button states based on stock
+    function updateQuantityButtonStates(row) {
+        const qtyInput = row.querySelector('.qty-value');
+        const plusBtn = row.querySelector('.qty-plus');
+        const minusBtn = row.querySelector('.qty-minus');
+        const currentQty = parseInt(qtyInput.value, 10) || 1;
+        const stock = getRowStock(row);
+
+        if (plusBtn) {
+            if (currentQty >= stock) {
+                plusBtn.classList.add('disabled');
+                plusBtn.style.pointerEvents = 'none';
+                plusBtn.style.opacity = '0.5';
+                plusBtn.style.cursor = 'not-allowed';
+            } else {
+                plusBtn.classList.remove('disabled');
+                plusBtn.style.pointerEvents = 'auto';
+                plusBtn.style.opacity = '1';
+                plusBtn.style.cursor = 'pointer';
+            }
+        }
+
+        if (minusBtn) {
+            if (currentQty <= 1) {
+                minusBtn.classList.add('disabled');
+                minusBtn.style.pointerEvents = 'none';
+                minusBtn.style.opacity = '0.5';
+                minusBtn.style.cursor = 'not-allowed';
+            } else {
+                minusBtn.classList.remove('disabled');
+                minusBtn.style.pointerEvents = 'auto';
+                minusBtn.style.opacity = '1';
+                minusBtn.style.cursor = 'pointer';
+            }
+        }
+    }
+
+    // Helper to read/compute stock for a cart row (prefers variation combos + selected variations)
+    function getRowStock(row) {
+        let stock = parseInt(row.dataset.stock, 10) || 0;
+
+        try {
+            const combosJson = row.dataset.variationCombos || row.getAttribute('data-variation-combos');
+            const selectedJson = row.dataset.selectedVariations || row.getAttribute('data-selected-variations');
+
+            if (combosJson && combosJson !== '[]' && selectedJson && selectedJson !== '{}' ) {
+                const selectedObj = JSON.parse(selectedJson);
+                const selectedValues = Object.values(selectedObj || {})
+                    .filter(v => v != null)
+                    .map(v => String(v).trim().toLowerCase());
+
+                const combos = JSON.parse(combosJson);
+                if (Array.isArray(combos)) {
+                    for (const c of combos) {
+                        const keys = Array.isArray(c.keys) ? c.keys : [];
+                        if (keys.length > 0) {
+                            const allMatch = keys.every(k => selectedValues.includes(String(k || '').trim().toLowerCase()));
+                            if (allMatch) {
+                                const s = c.stock;
+                                const parsed = parseInt(s, 10);
+                                if (!isNaN(parsed)) stock = parsed;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // ignore and fallback to server-provided stock
+        }
+
+        return stock;
+    }
+
+    // Initialize button states on page load
+    document.querySelectorAll('.cart-item').forEach(row => {
+        updateQuantityButtonStates(row);
     });
 
     // Remove item

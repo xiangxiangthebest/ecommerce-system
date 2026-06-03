@@ -65,7 +65,33 @@
                         } catch { }
                     }
 
-                    <div class="cart-item" data-item-id="@item.CartItemId" data-price="@item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                    // Get stock for selected variation
+                    int itemStock = product?.StockQuantity ?? 0;
+                    if (!string.IsNullOrWhiteSpace(product?.VariationCombosJson)
+                        && product.VariationCombosJson != "[]"
+                        && varDict.Any())
+                    {
+                        try
+                        {
+                            var combos = JsonSerializer.Deserialize<List<EcommerceSystem.Models.Product.VariationCombo>>(product.VariationCombosJson) ?? new();
+
+                            var selectedValues = new HashSet<string>(varDict.Values
+                                .Where(v => v != null)
+                                .Select(v => v.Trim()), StringComparer.OrdinalIgnoreCase);
+
+                            var matchingCombo = combos.FirstOrDefault(c =>
+                                c.Keys != null && c.Keys.Count > 0 &&
+                                c.Keys.All(k => selectedValues.Contains((k ?? "").Trim())));
+
+                            if (matchingCombo != null)
+                            {
+                                itemStock = matchingCombo.Stock;
+                            }
+                        }
+                        catch { }
+                    }
+
+                    <div class="cart-item" data-item-id="@item.CartItemId" data-price="@item.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" data-stock="@itemStock" data-selected-variations="@item.SelectedVariations" data-variation-combos="@product?.VariationCombosJson">
 
                         <!-- Checkbox -->
                         <div class="cart-item-check">

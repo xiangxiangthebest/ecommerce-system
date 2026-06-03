@@ -1,180 +1,273 @@
-document.addEventListener("DOMContentLoaded", function () {
-    var messageBody = document.getElementById("messageBody");
-    if (messageBody) { messageBody.scrollTop = messageBody.scrollHeight; }
+document.addEventListener('DOMContentLoaded', function () {
 
-    // 从全局配置读取安全变量
-    var sellerId = window.chatConfig.sellerId;
-    var chatRoomId = window.chatConfig.chatRoomId;
+    /* 1 ─ Auto-scroll to bottom ─────────────────────── */
+    const chatBody = document.getElementById('chatBody');
+    if (chatBody) chatBody.scrollTop = chatBody.scrollHeight;
 
-    // 1. 动态获取匹配商家的产品列表
-    var sellerProductsModal = document.getElementById('sellerProductsModal');
+    const cfg      = window.ChatConfig || {};
+    const sellerId = cfg.sellerId  || 0;
+    const isSeller = cfg.isSeller  || false;
+
+    /* 2 ─ Legacy garbled-title cleanup ──────────────── */
+    document.querySelectorAll('.msg-product-card').forEach(function (bubble) {
+        const titleEl = bubble.querySelector('.msg-card-title');
+        if (!titleEl) return;
+        let txt = titleEl.innerText.trim();
+        if (txt.includes('search=') || txt.includes('%') || txt.includes('Home?')) {
+            try {
+                while (txt.includes('%')) {
+                    const old = txt;
+                    txt = decodeURIComponent(txt);
+                    if (old === txt) break;
+                }
+                if (txt.includes('search=')) txt = txt.split('search=')[1];
+                const pts = txt.split('/');
+                let final = pts[pts.length - 1] || 'Item';
+                if (final.includes('?')) final = final.split('?')[0];
+                titleEl.innerText = final.trim();
+            } catch (e) { console.warn('Title cleanup:', e); }
+        }
+    });
+
+    /* 3 ─ Attach panel toggle ────────────────────────── */
+    const attachToggleBtn = document.getElementById('attachToggleBtn');
+    const attachPanel     = document.getElementById('attachPanel');
+    if (attachToggleBtn && attachPanel) {
+        attachToggleBtn.addEventListener('click', function () {
+            attachPanel.classList.toggle('open');
+        });
+    }
+
+    /* 4 ─ Seller products modal ─────────────────────── */
+    const sellerProductsModal = document.getElementById('sellerProductsModal');
     if (sellerProductsModal) {
         sellerProductsModal.addEventListener('show.bs.modal', function () {
-            var container = document.getElementById("sellerProductsContainer");
-            fetch(`/Chat/GetSellerProducts?sellerId=${sellerId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if(data.length === 0){
-                        container.innerHTML = '<div class="text-center py-3 text-muted">该商家暂未上架其他商品</div>';
+            const container = document.getElementById('sellerProductsContainer');
+            container.innerHTML = '<div class="modal-state"><i class="ti ti-loader"></i>Loading products…</div>';
+
+            fetch('/Chat/GetSellerProducts?sellerId=' + sellerId)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.length) {
+                        container.innerHTML = '<div class="modal-state"><i class="ti ti-shopping-bag"></i>No products found.</div>';
                         return;
                     }
-                    let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
-                    
-                    data.forEach(p => {
-                        html += `
-                            <div class="list-group-item d-flex align-items-center justify-content-between p-2 cursor-pointer border-bottom" onclick="sendCustomCard('PRODUCT','${encodeURIComponent(p.name)}','${p.productId}','${p.price}','${p.imagePath}')">
-                                <div class="d-flex align-items-center text-truncate me-2">
-                                    <img src="${p.imagePath}" class="rounded border me-2" style="width:40px;height:40px;object-fit:cover;"/>
-                                    <div class="text-truncate" style="font-size:13px;">
-                                        <b class="d-block text-dark text-truncate" style="max-width:240px;">${p.name}</b>
-                                        <span class="text-danger">RM ${p.price}</span>
-                                    </div>
-                                </div>
-                                <button class="btn btn-primary btn-sm rounded-pill px-3" style="font-size:11px;">发送</button>
-                            </div>`;
-                    });
-                    html += '</div>';
-                    container.innerHTML = html;
-                }).catch(() => {
-                    container.innerHTML = '<div class="text-center py-3 text-danger">产品加载失败</div>';
+                    container.innerHTML = data.map(function (p) {
+                        var safe = p.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
+                        return '<div class="modal-list-item" onclick="sendCustomCard(\'PRODUCT\',\'' +
+                            encodeURIComponent(safe) + '\',\'' + p.productId + '\',\'' +
+                            p.price + '\',\'' + p.imagePath + '\')">' +
+                            '<img src="' + p.imagePath + '" class="modal-list-thumb" onerror="this.src=\'/images/default-product.jpg\'" />' +
+                            '<div class="modal-list-info">' +
+                            '<p class="modal-list-name">' + p.name + '</p>' +
+                            '<p class="modal-list-price">RM ' + p.price + '</p>' +
+                            '</div>' +
+                            '<button class="modal-send-btn" type="button"><i class="ti ti-send"></i> Send</button>' +
+                            '</div>';
+                    }).join('');
+                })
+                .catch(function () {
+                    container.innerHTML = '<div class="modal-state error"><i class="ti ti-alert-circle"></i>Failed to load. Please try again.</div>';
                 });
         });
     }
 
-    // 2. 动态获取匹配商家的历史订单列表
-    var customerOrdersModal = document.getElementById('customerOrdersModal');
+    /* 5 ─ Customer orders modal ──────────────────────── */
+    const customerOrdersModal = document.getElementById('customerOrdersModal');
     if (customerOrdersModal) {
         customerOrdersModal.addEventListener('show.bs.modal', function () {
-            var container = document.getElementById("customerOrdersContainer");
-            fetch(`/Chat/GetCustomerOrders?sellerId=${sellerId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if(data.length === 0){
-                        container.innerHTML = '<div class="text-center py-3 text-muted">暂无与该商家相关的订单记录</div>';
+            const container = document.getElementById('customerOrdersContainer');
+            container.innerHTML = '<div class="modal-state"><i class="ti ti-loader"></i>Loading orders…</div>';
+
+            fetch('/Chat/GetCustomerOrders?sellerId=' + sellerId)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.length) {
+                        container.innerHTML = '<div class="modal-state"><i class="ti ti-receipt"></i>No orders with this seller yet.</div>';
                         return;
                     }
-                    let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
-                    
-                    data.forEach(o => {
-                        html += `
-                        <div class="list-group-item d-flex align-items-center justify-content-between p-2 border-bottom">
-                                <div class="d-flex align-items-center text-truncate me-2" style="flex-grow:1;">
-                                    <img src="${o.coverImage || '/images/default-order.png'}" class="rounded border me-2" style="width:45px;height:45px;object-fit:cover;"/>
-                                    <div class="text-truncate" style="font-size:12px; line-height:1.3;">
-                                        <b class="text-dark d-block">订单号: #${o.orderId}</b>
-                                        <span class="text-muted d-block text-truncate" style="max-width:200px;">${o.coverName}</span>
-                                        <span class="text-danger fw-bold">RM ${o.totalAmount}</span>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-info text-white btn-sm rounded-pill py-1 px-3" style="font-size:11px;" 
-                                        onclick="sendCustomCard('ORDER', '', '${o.orderId}', '${o.totalAmount}', '${o.coverImage || ''}')">
-                                    发送
-                                </button>
-                            </div>`;
-                    });
-                    html += '</div>';
-                    container.innerHTML = html;
-                }).catch(() => {
-                    container.innerHTML = '<div class="text-center py-3 text-danger">订单加载失败</div>';
+                    container.innerHTML = data.map(function (o) {
+                        var safe = (o.coverName || 'Ordered Item').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                        var img  = o.coverImage || '/images/default-order.png';
+                        return '<div class="modal-list-item">' +
+                            '<img src="' + img + '" class="modal-list-thumb" onerror="this.src=\'/images/default-order.png\'" />' +
+                            '<div class="modal-list-info">' +
+                            '<p class="modal-list-name">Order #' + o.orderId + '</p>' +
+                            '<p class="modal-list-sub">' + (o.coverName || 'Ordered Item') + '</p>' +
+                            '<p class="modal-list-price">RM ' + o.totalAmount + '</p>' +
+                            '</div>' +
+                            '<button class="modal-send-btn" type="button" ' +
+                            'onclick="sendCustomCard(\'ORDER\',\'' + encodeURIComponent(safe) + '\',\'' +
+                            o.orderId + '\',\'' + o.totalAmount + '\',\'' + img + '\')">' +
+                            '<i class="ti ti-send"></i> Send</button>' +
+                            '</div>';
+                    }).join('');
+                })
+                .catch(function () {
+                    container.innerHTML = '<div class="modal-state error"><i class="ti ti-alert-circle"></i>Failed to load. Please try again.</div>';
                 });
         });
     }
 
-    // 3. 快捷商品栏发送
-    var sendProductBtn = document.getElementById("sendProductLinkBtn");
-    if (sendProductBtn && window.chatConfig.hasChatProduct) {
-        sendProductBtn.addEventListener("click", function () {
+    /* 6 ─ Product preview bar "Send" ────────────────── */
+    const sendProductBtn = document.getElementById('sendProductLinkBtn');
+    if (sendProductBtn) {
+        sendProductBtn.addEventListener('click', function () {
+            var c = window.ChatConfig || {};
             sendCustomCard(
-                'PRODUCT', 
-                window.chatConfig.chatProductName,
-                window.chatConfig.chatProductId, 
-                window.chatConfig.chatProductPrice,
-                window.chatConfig.chatProductImagePath
+                'PRODUCT',
+                encodeURIComponent(c.chatProductName  || ''),
+                c.chatProductId    || '',
+                c.chatProductPrice || '',
+                c.chatProductImage || ''
             );
         });
     }
 
-    // 4. 发照片逻辑
-    var attachPhotoBtn = document.getElementById("attachPhotoBtn");
-    var photoFileInput = document.getElementById("photoFileInput");
+    /* 7 ─ Photo attachment ───────────────────────────── */
+    const attachPhotoBtn = document.getElementById('attachPhotoBtn');
+    const photoFileInput = document.getElementById('photoFileInput');
     if (attachPhotoBtn && photoFileInput) {
-        attachPhotoBtn.addEventListener("click", function () {
-            photoFileInput.click();
-        });
-        photoFileInput.addEventListener("change", function () {
+        attachPhotoBtn.addEventListener('click', function () { photoFileInput.click(); });
+        photoFileInput.addEventListener('change', function () {
             var file = this.files[0];
             if (!file) return;
-            if (!file.type.startsWith("image/")) {
-                alert("请选择有效的图片文件！");
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) {
-                alert("图片太大了，请上传 5MB 以内的图片");
-                return;
-            }
+            if (!file.type.startsWith('image/')) { alert('Please select a valid image file.'); return; }
+            if (file.size > 5 * 1024 * 1024)    { alert('Image must be under 5 MB.'); return; }
+
             var reader = new FileReader();
             reader.onload = function (e) {
-                var base64Data = e.target.result;
-                var input = document.getElementById("messageInput");
-                var form = document.getElementById("chatForm");
+                var input = document.getElementById('messageInput');
+                var form  = document.getElementById('chatForm');
                 if (input && form) {
-                    input.value = "[IMAGE_CARD]<div class='p-1 bg-white rounded shadow-sm border text-center' style='max-width: 200px;'>\n" +
-                        "  <img src='" + base64Data + "' class='img-fluid rounded' style='max-height: 200px; object-fit: contain;' />\n" +
-                        "</div>";
-                    input.removeAttribute("required");
+                    input.value = '[IMAGE_CARD]<div class="msg-image-bubble">' +
+                        '<img src="' + e.target.result + '" alt="image" /></div>';
+                    input.removeAttribute('required');
                     form.submit();
                 }
             };
             reader.readAsDataURL(file);
         });
     }
-});
 
-// 5. 底层发卡片函数（保持全局作用域，确保 HTML onclick 能够正常调用）
+    /* 8 ─ Seller-side card click interception ────────── */
+    if (isSeller) {
+        document.addEventListener('click', function (e) {
+
+            /* Product card → Seller product search */
+            var productBubble = e.target.closest('.msg-product-card');
+            if (productBubble && !e.target.closest('.msg-order-card')) {
+                var anchor = productBubble.querySelector('a');
+                if (anchor) {
+                    e.preventDefault();
+                    var titleEl = productBubble.querySelector('.msg-card-title');
+                    var keyword = titleEl ? titleEl.innerText.trim() : '';
+                    if (!keyword || keyword.includes('%') || keyword.includes('Home?')) {
+                        var href = anchor.getAttribute('href') || '';
+                        try { while (href.includes('%')) href = decodeURIComponent(href); } catch (_) {}
+                        if (href.includes('search=')) href = href.split('search=')[1];
+                        var pts = href.split('/');
+                        keyword = pts[pts.length - 1] || '';
+                        if (keyword.includes('?')) keyword = keyword.split('?')[0];
+                    }
+                    if (keyword) {
+                        window.location.href = window.location.origin + '/Seller/Home?tab=Product&search=' + encodeURIComponent(keyword.trim());
+                    }
+                }
+            }
+
+            /* Order card → Seller order search */
+            var orderBubble = e.target.closest('.msg-order-card');
+            if (orderBubble) {
+                var anchor2 = orderBubble.querySelector('a');
+                if (anchor2) {
+                    e.preventDefault();
+                    var orderId = (orderBubble.getAttribute('data-order-id') || '0').trim();
+                    if (orderId === '0') {
+                        var parts = (anchor2.getAttribute('href') || '').split('=');
+                        orderId = parts[parts.length - 1] || '0';
+                    }
+                    if (orderId && orderId !== '0') {
+                        window.location.href = window.location.origin + '/Seller/Home?tab=Order&search=' + encodeURIComponent(orderId);
+                    }
+                }
+            }
+        });
+    }
+
+}); /* end DOMContentLoaded */
+
+
+/* ══════════════════════════════════════════════════════
+   Global helpers – called from Razor inline or modals
+   ══════════════════════════════════════════════════════ */
+
+/**
+ * Build and submit a rich card message.
+ * @param {'PRODUCT'|'ORDER'} type
+ * @param {string} title   URL-encoded name
+ * @param {string|number} id
+ * @param {string|number} price
+ * @param {string} img
+ */
 function sendCustomCard(type, title, id, price, img) {
-    var input = document.getElementById("messageInput");
-    var form = document.getElementById("chatForm");
-    
-    if(type === 'PRODUCT') {
-        input.value = "[PRODUCT_CARD]" +
-            "<div class='product-card-bubble'>" +
-            "<a href='/Customer/ProductDetails/" + id + "' " +
-            "class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-info-subtle' " +
-            "style='max-width:260px; transition:0.2s;'>" +
-            "<div class='p-1'>" +
-            "<div class='text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between' style='font-size:11px;'>\n" +
-            "<span>Products</span><span class='text-primary fw-bold'>Click to view details</span>" +
-            "</div>" +
-            "<div class='d-flex align-items-center mb-2'>" +
-            "<img src='" + img + "' class='rounded border me-2' style='width:55px;height:55px;object-fit:cover;' />" +
-            "<div class='text-truncate' style='line-height:1.2;'>" +
-            "<span class='d-block fw-bold text-dark text-truncate' style='font-size:12px;'>" + title + "</span>" +
-            "<small class='text-muted d-block text-truncate' style='font-size:11px;'>Go to product page</small>" +
-            "</div>" +
-            "</div>" +
-            "<div class='text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1' style='font-size:12px;'>" +
-            "<span>Price: <b class='text-danger'>RM " + price + "</b></span>" +
-            "<span class='text-primary' style='font-size:11px;'>View <i class='bi bi-chevron-right'></i></span>" +
-            "</div>" +
-            "</div>" +
-            "</a>" +
-            "</div>";
+    var input = document.getElementById('messageInput');
+    var form  = document.getElementById('chatForm');
+    if (!input || !form) return;
+
+    var cleanTitle = title;
+    try { cleanTitle = decodeURIComponent(title); } catch (_) {}
+    cleanTitle = cleanTitle.replace(/'/g, '').replace(/"/g, '').trim();
+
+    if (type === 'PRODUCT') {
+        var url = '/Customer/ProductDetails/' + id;
+        input.value =
+            '[PRODUCT_CARD]' +
+            '<a href="' + url + '" class="msg-card-link">' +
+            '<div class="msg-card-chip">' +
+            '<span class="chip-label"><i class="ti ti-shopping-bag" style="font-size:12px"></i> Product</span>' +
+            '<span class="chip-action">View details →</span>' +
+            '</div>' +
+            '<div class="msg-card-body">' +
+            '<img src="' + img + '" class="msg-card-thumb" onerror="this.src=\'/images/default-product.jpg\'" />' +
+            '<div class="msg-card-info">' +
+            '<p class="msg-card-title js-product-title">' + cleanTitle + '</p>' +
+            '<p class="msg-card-sub">Tap to view product page</p>' +
+            '</div>' +
+            '</div>' +
+            '<div class="msg-card-footer">' +
+            '<span class="msg-card-price">RM ' + price + '</span>' +
+            '<span class="msg-card-view"><i class="ti ti-chevron-right" style="font-size:13px"></i></span>' +
+            '</div>' +
+            '</a>';
+    } else if (type === 'ORDER') {
+        input.value = '[ORDER_TAG]|' + id + '|' + price + '|' + img + '|' + cleanTitle;
     }
-    else if(type === 'ORDER') {
-        input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img;
-    }
-    
-    input.removeAttribute("required");
+
+    input.removeAttribute('required');
+
+    /* Close open modals */
+    document.querySelectorAll('.modal.show').forEach(function (m) {
+        var inst = bootstrap.Modal.getInstance(m);
+        if (inst) inst.hide();
+    });
+
+    /* Close attach panel */
+    var panel = document.getElementById('attachPanel');
+    if (panel) panel.classList.remove('open');
+
     form.submit();
 }
 
-// 6. 图片大图预览
+/**
+ * Full-screen image preview.
+ * @param {HTMLElement} element  the .msg-image-bubble wrapper
+ */
 function previewChatImage(element) {
     var img = element.querySelector('img');
-    if (img) {
-        var src = img.getAttribute('src');
-        document.getElementById('previewModalImage').src = src;
-        var myModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
-        myModal.show();
-    }
+    if (!img) return;
+    var preview = document.getElementById('previewModalImage');
+    if (preview) preview.src = img.getAttribute('src');
+    var modalEl = document.getElementById('imagePreviewModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
 }
