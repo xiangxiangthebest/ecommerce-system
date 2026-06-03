@@ -493,7 +493,6 @@ namespace EcommerceSystem.Controllers
         // =========================
         public IActionResult Chat()
         {
-            // 顾客点击导航栏的“聊天”或者进入 /Customer/Chat 时，后端自动重定向到 Chat 控制器的 CustomerInbox 方法
             return RedirectToAction("CustomerInbox", "Chat");
         }
 
@@ -507,8 +506,6 @@ namespace EcommerceSystem.Controllers
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
             
-            // Pass the full list to the view so it can render server-side,
-            // AND the JS dropdown still works via /Notifications/GetDropdown
             var notifications = await _notificationService.GetForUserAsync(customer.UserId)
                                 ?? new List<EcommerceSystem.Models.Notification>();
             return View(notifications);

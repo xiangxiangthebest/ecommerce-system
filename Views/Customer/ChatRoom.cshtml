@@ -1,182 +1,224 @@
 @model EcommerceSystem.Models.ChatRoom
 @using System.Security.Claims
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
 @{
+    ViewData["Title"] = "Chat";
+    Layout = "~/Views/Customer/_CustomerLayout.cshtml";
+
     var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+    var sellerName    = Model.Seller?.ShopName ?? "Seller";
+    var sellerInitial = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
+    var isSeller      = User.HasClaim(c => c.Type == "SellerId") || User.IsInRole("Seller");
+    var chatProduct   = ViewBag.ChatProduct as EcommerceSystem.Models.Product;
 }
 
-<div class="container mt-3">
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white border-bottom p-3 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center">
-                <a asp-controller="Chat" asp-action="CustomerInbox" class="btn btn-link text-dark p-0 me-3">
-                    <i class="bi bi-arrow-left fs-4"></i>
-                </a>
-                
-                @{
-                    var sellerName = Model.Seller?.ShopName ?? "Seller"; 
-                    var firstChar = !string.IsNullOrEmpty(sellerName) ? sellerName[0].ToString().ToUpper() : "S";
-                }
+<link rel="stylesheet" href="~/css/customer/chat-room.css" asp-append-version="true" />
 
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
-                    <span class="fw-bold">@firstChar</span>
-                </div>
+@* Inject runtime config for chat-room.js *@
+<script>
+    window.ChatConfig = {
+        sellerId:          @Model.SellerId,
+        chatRoomId:        @Model.ChatRoomId,
+        isSeller:          @(isSeller ? "true" : "false"),
+        chatProductId:     '@(chatProduct?.ProductId.ToString() ?? "")',
+        chatProductName:   '@Html.Raw(chatProduct?.Name?.Replace("'", "\\'").Replace("\"", "\\\"") ?? "")',
+        chatProductPrice:  '@(chatProduct?.Price.ToString() ?? "")',
+        chatProductImage:  '@(chatProduct?.ImagePath ?? "")'
+    };
+</script>
 
-                <div class="text-truncate">
-                    <h6 class="mb-0 fw-bold text-dark">@sellerName</h6>
-                </div>
+<div class="chat-room-page">
+    <div class="chat-card">
+
+        <!-- ═══ HEADER ═══ -->
+        <div class="chat-header">
+            <a asp-controller="Chat" asp-action="CustomerInbox" class="chat-header-back">
+                <i class="ti ti-arrow-left"></i>
+            </a>
+
+            <div class="chat-header-avatar">@sellerInitial</div>
+
+            <div class="chat-header-info">
+                <h6 class="chat-header-name">@sellerName</h6>
+                <p class="chat-header-sub">
+                    <span class="online-dot"></span> Online
+                </p>
             </div>
         </div>
 
-        <div class="card-body bg-light" id="messageBody" style="height: 500px; overflow-y: auto; padding: 20px;">
-            @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
+        <!-- ═══ MESSAGE BODY ═══ -->
+        <div class="chat-body" id="chatBody">
+
+            @if (!Model.Messages.Any())
             {
-                var isMyMessage = msg.SenderId == currentUserId;
-                <div class="d-flex @(isMyMessage ? "justify-content-end" : "justify-content-start") mb-3">
-                    <div class="max-w-75">
-                        
+                <div class="chat-empty">
+                    <i class="ti ti-message-circle"></i>
+                    <p>Say hello to <strong>@sellerName</strong>!</p>
+                    @if (chatProduct != null)
+                    {
+                        <p style="font-size:12px; color:#ccc; margin:0;">Ask about the product below ↓</p>
+                    }
+                </div>
+            }
+            else
+            {
+                @foreach (var msg in Model.Messages.OrderBy(m => m.SentAt))
+                {
+                    var isMyMessage = msg.SenderId == currentUserId;
+                    var rowClass    = isMyMessage ? "sent" : "received";
+
+                    <div class="msg-row @rowClass">
+
+                        @* Tiny avatar on received messages *@
+                        @if (!isMyMessage)
+                        {
+                            <div class="msg-tiny-avatar">@sellerInitial</div>
+                        }
+
+                        @* ── Product card ── *@
                         @if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
                         {
-                            var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
-                            <div class="product-card-bubble js-custom-card">
-                                @Html.Raw(cleanHtml)
+                            <div class="msg-product-card">
+                                @Html.Raw(msg.MessageText.Replace("[PRODUCT_CARD]", ""))
                             </div>
                         }
+
+                        @* ── Order card ── *@
                         else if (msg.MessageText != null && msg.MessageText.StartsWith("[ORDER_TAG]"))
                         {
-                            var parts = msg.MessageText.Split('|');
-                            var orderId = parts.Length > 1 ? parts[1] : "0";
-                            var totalPrice = parts.Length > 2 ? parts[2] : "0.00";
-                            var orderImg = parts.Length > 3 ? parts[3] : "/images/default-order.png";
+                            var parts     = msg.MessageText.Split('|');
+                            var orderId   = parts.Length > 1 ? parts[1] : "0";
+                            var totalAmt  = parts.Length > 2 ? parts[2] : "0.00";
+                            var orderImg  = parts.Length > 3 ? parts[3] : "/images/default-order.png";
                             var coverName = parts.Length > 4 ? parts[4] : "Ordered Item";
 
-                            @* 💡 为订单卡片追加绑定专属 `js-order-card` 标记类与 data-order-id 属性 *@
-                            <div class="product-card-bubble my-2 js-order-card" data-order-id="@orderId">
-                                <a href="/Customer/PurchaseHistory?searchString=@orderId" class="d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-warning-subtle" style="max-width: 260px; transition: transform 0.2s;">
-                                    <div class="p-1">
-                                        <div class="text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between" style="font-size:11px;">
-                                            <span>📋 Order</span>
-                                            <span class="text-success fw-bold">Click to Track Order</span>
+                            <div class="msg-order-card" data-order-id="@orderId">
+                                <a href="/Customer/PurchaseHistory?searchString=@orderId" class="msg-card-link">
+                                    <div class="msg-card-chip">
+                                        <span class="chip-label">
+                                            <i class="ti ti-receipt" style="font-size:12px"></i> Order
+                                        </span>
+                                        <span class="chip-action">Track order →</span>
+                                    </div>
+                                    <div class="msg-card-body">
+                                        <img src="@orderImg" class="msg-card-thumb"
+                                             onerror="this.src='/images/default-order.png'" />
+                                        <div class="msg-card-info">
+                                            <p class="msg-card-title">Order #@orderId</p>
+                                            <p class="msg-card-sub">@coverName</p>
                                         </div>
-                                        <div class="d-flex align-items-center mb-2">
-                                            <img src="@orderImg" class="rounded border me-2" style="width: 40px; height: 40px; object-fit: cover;" onerror="this.src='/images/default-order.png'" />
-                                            <div class="text-truncate" style="line-height: 1.2;">
-                                                <span class="d-block fw-bold text-dark" style="font-size:12px;">Order Number: #@orderId</span>
-                                                <small class="text-muted d-block text-truncate" style="font-size:11px;">@coverName</small>
-                                            </div>
-                                        </div>
-                                        <div class="text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1" style="font-size:12px;">
-                                            <span>Amount Paid: <b class="text-danger">RM @totalPrice</b></span>
-                                            <span class="text-primary" style="font-size: 11px;">View <i class="bi bi-chevron-right"></i></span>
-                                        </div>
+                                    </div>
+                                    <div class="msg-card-footer">
+                                        <span class="msg-card-price">RM @totalAmt</span>
+                                        <span class="msg-card-view">
+                                            View <i class="ti ti-chevron-right" style="font-size:13px"></i>
+                                        </span>
                                     </div>
                                 </a>
                             </div>
                         }
+
+                        @* ── Image card ── *@
                         else if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
                         {
-                            var cleanImgHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
-                            <div class="image-bubble cursor-pointer" onclick="previewChatImage(this)">
-                                @Html.Raw(cleanImgHtml)
+                            <div class="msg-image-bubble" onclick="previewChatImage(this)">
+                                @Html.Raw(msg.MessageText.Replace("[IMAGE_CARD]", ""))
                             </div>
                         }
-                        else if (msg.MessageText != null && !msg.MessageText.StartsWith("[PRODUCT_CARD]") && !msg.MessageText.StartsWith("[ORDER_TAG]"))
+
+                        @* ── Plain text ── *@
+                        else if (msg.MessageText != null)
                         {
-                            <div class="p-3 rounded-3 shadow-sm @(isMyMessage ? "bg-primary text-white" : "bg-white text-dark")" style="word-break: break-all;">
-                                @msg.MessageText
-                            </div>
+                            <div class="msg-bubble">@msg.MessageText</div>
                         }
-                        
-                        <small class="text-muted d-block mt-1 @(isMyMessage ? "text-end" : "text-start")" style="font-size: 11px;">
-                            @msg.SentAt.ToLocalTime().ToString("HH:mm")
-                        </small>
+
+                        <span class="msg-time">@msg.SentAt.ToLocalTime().ToString("HH:mm")</span>
+
                     </div>
-                </div>
+                }
             }
         </div>
 
-        <div class="card-footer bg-white border-top p-3">
-            @if (ViewBag.ChatProduct != null)
+        <!-- ═══ FOOTER ═══ -->
+        <div class="chat-footer">
+
+            @* Product preview bar – shown when entering from a product page *@
+            @if (chatProduct != null)
             {
-                var prod = ViewBag.ChatProduct as EcommerceSystem.Models.Product;
-                <div class="product-mini-card d-flex align-items-center justify-content-between p-2 mb-3 bg-light rounded border border-info-subtle shadow-sm">
-                    <div class="d-flex align-items-center text-truncate me-2">
-                        <img src="@prod.ImagePath" alt="product" class="rounded me-2 border bg-white" style="width: 50px; height: 50px; object-fit: cover;" />
-                        <div class="text-truncate">
-                            <span class="d-block text-dark fw-bold small text-truncate" style="max-width: 250px;">@prod.Name</span>
-                            <span class="text-danger fw-bold small">RM @prod.Price</span>
-                        </div>
+                <div class="product-preview-bar">
+                    <img src="@chatProduct.ImagePath" class="pp-thumb" alt="product"
+                         onerror="this.src='/images/default-product.jpg'" />
+                    <div class="pp-info">
+                        <p class="pp-name">@chatProduct.Name</p>
+                        <p class="pp-price">RM @chatProduct.Price</p>
                     </div>
-                    <div>
-                        <button type="button" class="btn btn-info btn-sm text-white px-3 rounded-pill fw-bold" id="sendProductLinkBtn">
-                            Send
-                        </button>
-                    </div>
+                    <button class="pp-send-btn" type="button" id="sendProductLinkBtn">
+                        <i class="ti ti-send"></i> Send
+                    </button>
                 </div>
             }
 
-            <div class="d-flex align-items-center gap-2">
-                @* 💡 更多功能提示翻译为 More 功能 *@
-                <button class="btn btn-light border px-3 text-primary d-flex align-items-center justify-content-center" type="button" 
-                        onclick="var p = document.getElementById('myAttachPanel'); if(p) p.classList.toggle('d-none');"
-                        style="height: 38px; width: 45px; border-radius: 6px; font-weight: bold; font-size: 20px;" title="More">
-                    ＋
+            @* Input row *@
+            <div class="chat-input-row">
+                <button class="chat-attach-btn" type="button" id="attachToggleBtn" title="Attachments">
+                    <i class="ti ti-plus"></i>
                 </button>
 
-                <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group m-0 flex-grow-1">
+                <form asp-action="SendMessage" asp-controller="Chat" method="post"
+                      id="chatForm" style="display:contents;">
+                    @Html.AntiForgeryToken()
                     <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
-                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
-                    
-                    <input type="text" name="message" id="messageInput" autocomplete="off" 
-                           class="form-control bg-light" placeholder="Type your message..." required style="height: 38px;" />
-                           
-                    <button class="btn btn-primary px-4" type="submit" id="sendBtn">
-                        <i class="bi bi-send-fill"></i> Send
+                    <input type="hidden" name="sellerId"   value="@Model.SellerId" />
+                    <input type="text"   name="message"    id="messageInput"
+                           class="chat-text-input"
+                           placeholder="Type a message…"
+                           autocomplete="off"
+                           required />
+                    <button type="submit" class="chat-send-btn" title="Send">
+                        <i class="ti ti-send"></i>
                     </button>
                 </form>
             </div>
 
-            <div class="attach-panel d-none mt-3 p-3 bg-light rounded border border-light-subtle shadow-inner" id="myAttachPanel">
-                <div class="row g-3 text-center">
-                    <div class="col-4">
-                        <div class="attach-item p-3 bg-white rounded border cursor-pointer" id="attachPhotoBtn">
-                            <i class="bi bi-image fs-2 text-success"></i>
-                            <span class="d-block small text-muted mt-1">Send image</span>
-                        </div>
-                        <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
+            @* Attach panel *@
+            <div class="attach-panel" id="attachPanel">
+                <div class="attach-grid">
+                    <div class="attach-item" id="attachPhotoBtn">
+                        <i class="ti ti-photo" style="color:#1D9E75"></i>
+                        <span>Image</span>
                     </div>
-                    
-                    <div class="col-4">
-                        <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#sellerProductsModal">
-                            <i class="bi bi-bag-heart fs-2 text-warning"></i>
-                            <span class="d-block small text-muted mt-1">Send Product</span>
-                        </div>
+                    <div class="attach-item"
+                         data-bs-toggle="modal" data-bs-target="#sellerProductsModal">
+                        <i class="ti ti-shopping-bag" style="color:#BA7517"></i>
+                        <span>Product</span>
                     </div>
-                    
-                    <div class="col-4">
-                        <div class="attach-item p-3 bg-white rounded border cursor-pointer" data-bs-toggle="modal" data-bs-target="#customerOrdersModal">
-                            <i class="bi bi-receipt fs-2 text-info"></i>
-                            <span class="d-block small text-muted mt-1">Send Order</span>
-                        </div>
+                    <div class="attach-item"
+                         data-bs-toggle="modal" data-bs-target="#customerOrdersModal">
+                        <i class="ti ti-receipt" style="color:#185FA5"></i>
+                        <span>Order</span>
                     </div>
                 </div>
+                <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
             </div>
+
         </div>
+
     </div>
 </div>
+
+<!-- ═══ MODALS ═══ -->
 
 <div class="modal fade" id="sellerProductsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title fw-bold"><i class="bi bi-bag"></i>Store recommendations</h6>
+                <h6 class="modal-title">
+                    <i class="ti ti-shopping-bag"></i> Send a Product
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-2" id="sellerProductsContainer">
-                <div class="text-center py-4 text-muted small">Loading store products...</div>
+            <div class="modal-body" id="sellerProductsContainer">
+                <div class="modal-state"><i class="ti ti-loader"></i>Loading products…</div>
             </div>
         </div>
     </div>
@@ -186,11 +228,13 @@
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h6 class="modal-title fw-bold"><i class="bi bi-receipt"></i>Select related order</h6>
+                <h6 class="modal-title">
+                    <i class="ti ti-receipt"></i> Send an Order
+                </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-2" id="customerOrdersContainer">
-                <div class="text-center py-4 text-muted small">Loading your order history...</div>
+            <div class="modal-body" id="customerOrdersContainer">
+                <div class="modal-state"><i class="ti ti-loader"></i>Loading orders…</div>
             </div>
         </div>
     </div>
@@ -200,304 +244,15 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-transparent border-0">
             <div class="modal-body p-0 text-center position-relative">
-                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
-                <img id="previewModalImage" src="" class="img-fluid rounded shadow" style="max-height: 85vh; object-fit: contain;" />
+                <button type="button" class="preview-close-btn" data-bs-dismiss="modal">
+                    <i class="ti ti-x"></i>
+                </button>
+                <img id="previewModalImage" src="" class="img-fluid" />
             </div>
         </div>
     </div>
 </div>
 
-<style>
-    .max-w-75 { max-width: 75%; }
-    #messageBody::-webkit-scrollbar { width: 6px; }
-    #messageBody::-webkit-scrollbar-track { background: transparent; }
-    #messageBody::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
-    
-    .product-card-bubble a:hover {
-        transform: scale(1.02);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-        border-color: #0dcaf0 !important;
-    }
-
-    .attach-item { transition: all 0.2s ease-in-out; cursor: pointer; }
-    .attach-item:hover { background-color: #f8f9fa !important; border-color: #0d6efd !important; transform: translateY(-2px); }
-    .cursor-pointer { cursor: pointer; }
-    .image-bubble img { max-width: 100%; height: auto; display: block; }
-</style>
-
 @section Scripts {
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            var messageBody = document.getElementById("messageBody");
-            if (messageBody) { messageBody.scrollTop = messageBody.scrollHeight; }
-
-            var sellerId = "@Model.SellerId";
-            var chatRoomId = "@Model.ChatRoomId";
-
-            // 1. 🔍【历史防乱码清洗引擎已对齐】
-            document.querySelectorAll(".product-card-bubble, .js-custom-card").forEach(function (bubble) {
-                const titleSpan = bubble.querySelector(".js-product-title") 
-                               || bubble.querySelector("span.fw-bold.text-dark") 
-                               || bubble.querySelector(".text-dark.fw-bold");
-                if (titleSpan) {
-                    let txt = titleSpan.innerText.trim();
-                    if (txt.includes("search=") || txt.includes("%") || txt.includes("Home?")) {
-                        try {
-                            while (txt.includes("%")) {
-                                let old = txt;
-                                txt = decodeURIComponent(txt);
-                                if (old === txt) break;
-                            }
-                            if (txt.includes("search=")) {
-                                txt = txt.split("search=")[1];
-                            }
-                            const pts = txt.split('/');
-                            let finalName = pts[pts.length - 1] || "Item";
-                            if (finalName.includes("?")) {
-                                finalName = finalName.split("?")[0];
-                            }
-                            titleSpan.innerText = finalName.trim();
-                        } catch (e) { console.error(e); }
-                    }
-                }
-            });
-
-            // 2. 🛍️【修复并还原】：动态获取匹配商家的产品推荐列表 Ajax 处理
-            var sellerProductsModal = document.getElementById('sellerProductsModal');
-            if (sellerProductsModal) {
-                sellerProductsModal.addEventListener('show.bs.modal', function () {
-                    var container = document.getElementById("sellerProductsContainer");
-                    fetch(`/Chat/GetSellerProducts?sellerId=${sellerId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.length === 0) {
-                                container.innerHTML = '<div class="text-center py-3 text-muted">No other products available.</div>';
-                                return;
-                            }
-                            let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
-                            data.forEach(p => {
-                                let titleClean = p.name.replace(/'/g, "\\'").replace(/"/g, '\\"');
-                                html += `
-                                    <div class="list-group-item d-flex align-items-center justify-content-between p-2 cursor-pointer border-bottom" onclick="sendCustomCard('PRODUCT','${encodeURIComponent(titleClean)}','${p.productId}','${p.price}','${p.imagePath}')">
-                                        <div class="d-flex align-items-center text-truncate me-2">
-                                            <img src="${p.imagePath}" class="rounded border me-2" style="width:40px;height:40px;object-fit:cover;"/>
-                                            <div class="text-truncate" style="font-size:13px;">
-                                                <b class="d-block text-dark text-truncate" style="max-width:240px;">${p.name}</b>
-                                                <span class="text-danger">RM ${p.price}</span>
-                                            </div>
-                                        </div>
-                                        <button class="btn btn-primary btn-sm rounded-pill px-3" style="font-size:11px;">Send</button>
-                                    </div>`;
-                            });
-                            html += '</div>';
-                            container.innerHTML = html;
-                        }).catch(() => {
-                            container.innerHTML = '<div class="text-center py-3 text-danger">Failed to load products.</div>';
-                        });
-                });
-            }
-
-            // 3. 📋【修复并还原】：动态获取匹配商家的历史订单列表 Ajax 处理
-            var customerOrdersModal = document.getElementById('customerOrdersModal');
-            if (customerOrdersModal) {
-                customerOrdersModal.addEventListener('show.bs.modal', function () {
-                    var container = document.getElementById("customerOrdersContainer");
-                    fetch(`/Chat/GetCustomerOrders?sellerId=${sellerId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.length === 0) {
-                                container.innerHTML = '<div class="text-center py-3 text-muted">No related order history.</div>';
-                                return;
-                            }
-                            let html = '<div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">';
-                            data.forEach(o => {
-                                let nameClean = (o.coverName || "Ordered Item").replace(/'/g, "\\'").replace(/"/g, '\\"');
-                                html += `
-                                    <div class="list-group-item d-flex align-items-center justify-content-between p-2 border-bottom">
-                                        <div class="d-flex align-items-center text-truncate me-2" style="flex-grow:1;">
-                                            <img src="${o.coverImage || '/images/default-order.png'}" class="rounded border me-2" style="width:45px;height:45px;object-fit:cover;"/>
-                                            <div class="text-truncate" style="font-size:12px; line-height:1.3;">
-                                                <b class="text-dark d-block">Order ID: #${o.orderId}</b>
-                                                <span class="text-muted d-block text-truncate" style="max-width:200px;">${o.coverName || 'Ordered Item'}</span>
-                                                <span class="text-danger fw-bold">RM ${o.totalAmount}</span>
-                                            </div>
-                                        </div>
-                                        <button type="button" class="btn btn-info text-white btn-sm rounded-pill py-1 px-3" style="font-size:11px;" 
-                                                onclick="sendCustomCard('ORDER', '${encodeURIComponent(nameClean)}', '${o.orderId}', '${o.totalAmount}', '${o.coverImage || ''}')">
-                                            Send
-                                        </button>
-                                    </div>`;
-                            });
-                            html += '</div>';
-                            container.innerHTML = html;
-                        }).catch(() => {
-                            container.innerHTML = '<div class="text-center py-3 text-danger">Failed to load orders.</div>';
-                        });
-                });
-            }
-
-            // 4. 🛍️【修复并还原】：顶部快捷商品栏发送按钮
-            var sendProductBtn = document.getElementById("sendProductLinkBtn");
-            if (sendProductBtn) {
-                sendProductBtn.addEventListener("click", function () {
-                    let prodName = `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`;
-                    sendCustomCard('PRODUCT', 
-                        encodeURIComponent(prodName),
-                        `@ViewBag.ChatProduct?.ProductId`, 
-                        `@ViewBag.ChatProduct?.Price`, 
-                        `@ViewBag.ChatProduct?.ImagePath`);
-                });
-            }
-
-            // 5. 📸【修复并还原】：发照片按钮点击触发以及文件发送逻辑
-            var attachPhotoBtn = document.getElementById("attachPhotoBtn");
-            var photoFileInput = document.getElementById("photoFileInput");
-            if (attachPhotoBtn && photoFileInput) {
-                attachPhotoBtn.addEventListener("click", function () {
-                    photoFileInput.click();
-                });
-                photoFileInput.addEventListener("change", function () {
-                    var file = this.files[0];
-                    if (!file) return;
-                    if (!file.type.startsWith("image/")) {
-                        alert("Please select a valid image file!");
-                        return;
-                    }
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert("Image size must be within 5MB!");
-                        return;
-                    }
-
-                    var reader = new FileReader();
-                    reader.onload = function (e) {
-                        var base64Data = e.target.result;
-                        var input = document.getElementById("messageInput");
-                        var form = document.getElementById("chatForm");
-                        if (input && form) {
-                            input.value = "[IMAGE_CARD]<div class='p-1 bg-white rounded shadow-sm border text-center' style='max-width: 200px;'>\n" +
-                                "  <img src='" + base64Data + "' class='img-fluid rounded' style='max-height: 200px; object-fit: contain;' />\n" +
-                                "</div>";
-                            input.removeAttribute("required");
-                            form.submit();
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-            }
-
-            // 6. 🔥【卖家专属双拦截机制】：完美对齐变量规范与事件监听
-            @if (User.HasClaim(c => c.Type == "SellerId") || User.IsInRole("Seller"))
-            {
-                <text>
-                document.addEventListener("click", function (event) {
-                    // A. 商品卡片点击自动化拦截
-                    const productBubble = event.target.closest(".js-custom-card, .product-card-bubble");
-                    if (productBubble && !event.target.closest(".js-order-card")) {
-                        const anchor = productBubble.querySelector("a");
-                        if (anchor) {
-                            event.preventDefault();
-                            const titleSpan = productBubble.querySelector(".js-product-title") || productBubble.querySelector("span.fw-bold.text-dark");
-                            let searchWord = "";
-                            
-                            if (titleSpan && !titleSpan.innerText.includes("Home?") && !titleSpan.innerText.includes("%")) {
-                                searchWord = titleSpan.innerText.trim();
-                            } else {
-                                let hrefAttr = anchor.getAttribute("href") || "";
-                                try { while (hrefAttr.includes("%")) { hrefAttr = decodeURIComponent(hrefAttr); } } catch(err) { }
-                                if (hrefAttr.includes("search=")) hrefAttr = hrefAttr.split("search=")[1];
-                                const parts = hrefAttr.split('/');
-                                searchWord = parts[parts.length - 1] || "";
-                                if (searchWord.includes("?")) searchWord = searchWord.split("?")[0];
-                            }
-                            if (searchWord) {
-                                window.location.href = window.location.origin + "/Seller/Home?tab=Product&search=" + encodeURIComponent(searchWord.trim());
-                            }
-                        }
-                    }
-
-                    // B. 订单卡片点击自动化拦截
-                    const orderBubble = event.target.closest(".js-order-card");
-                    if (orderBubble) {
-                        const anchor = orderBubble.querySelector("a");
-                        if (anchor) {
-                            event.preventDefault(); 
-                            let orderId = orderBubble.getAttribute("data-order-id") || "0";
-                            orderId = orderId.trim();
-
-                            if (orderId === "0") {
-                                let hrefAttr = anchor.getAttribute("href") || "";
-                                const parts = hrefAttr.split('=');
-                                orderId = parts[parts.length - 1] || "0";
-                            }
-                            if (orderId && orderId !== "0") {
-                                window.location.href = window.location.origin + "/Seller/Home?tab=Order&search=" + encodeURIComponent(orderId);
-                            }
-                        }
-                    }
-                });
-                </text>
-            }
-        }); // <-- 💡 闭合正确的 DOMContentLoaded
-
-        // 7. 🛍️【统一底层发卡及英文国际化组装函数】
-        function sendCustomCard(type, title, id, price, img) {
-            var input = document.getElementById("messageInput");
-            var form = document.getElementById("chatForm");
-            
-            if(type === 'PRODUCT') {
-                var cleanTitle = title;
-                try { cleanTitle = decodeURIComponent(title); } catch(e){}
-                cleanTitle = cleanTitle.replace(/'/g, "").replace(/"/g, "").trim();
-
-                var standardUrl = "/Customer/ProductDetails/" + id;
-
-                input.value =
-                    "[PRODUCT_CARD]" +
-                    "<div class='product-card-bubble'>" +
-                    "<a href='" + standardUrl + "' class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-info-subtle' style='max-width:260px; text-align:left;'>" +
-                    "<div class='p-1'>" +
-                    "<div class='text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between' style='font-size:11px;'>" +
-                    "<span>Products</span>" +
-                    "<span class='text-primary fw-bold'>Click to view details</span>" +
-                    "</div>" +
-                    "<div class='d-flex align-items-center mb-2'>" +
-                    "<img src='" + img + "' class='rounded border me-2' style='width:55px;height:55px;object-fit:cover;' onerror=\"this.src='/images/default-product.jpg'\" />" +
-                    "<div class='text-truncate' style='line-height:1.2;'>" +
-                    "<span class='d-block fw-bold text-dark text-truncate js-product-title' style='font-size:12px;'> " + cleanTitle + "</span>" +
-                    "<small class='text-muted d-block text-truncate' style='font-size:11px;'>Go to product page</small>" +
-                    "</div>" +
-                    "</div>" +
-                    "<div class='text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1' style='font-size:12px;'>'" +
-                    "<span>Price: <b class='text-danger'>RM " + price + "</b></span>" +
-                    "<span class='text-primary' style='font-size:11px;'>View <i class='bi bi-chevron-right'></i></span>" +
-                    "</div>" +
-                    "</div>" +
-                    "</a>" +
-                    "</div>";
-            }
-            else if(type === 'ORDER') {
-                var cleanOrderName = "Ordered Item";
-                try { cleanOrderName = decodeURIComponent(title) || "Ordered Item"; } catch(e){}
-                cleanOrderName = cleanOrderName.replace(/'/g, "").replace(/"/g, "").trim();
-                
-                input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img + "|" + cleanOrderName;
-            }
-            input.removeAttribute("required");
-            form.submit();
-        }
-
-        // 8. 📸【预览大图函数】
-        function previewChatImage(element) {
-            var img = element.querySelector('img');
-            if (img) {
-                var src = img.getAttribute('src');
-                document.getElementById('previewModalImage').src = src;
-                var myModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
-                myModal.show();
-            }
-        }
-    </script>
+    <script src="~/js/customer/chat-room.js" asp-append-version="true"></script>
 }

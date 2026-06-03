@@ -20,14 +20,36 @@ namespace EcommerceSystem.Controllers
         private readonly ISellerContext _sellerContext;
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _environment;
+        private readonly ICartService _cartService;
+        private readonly INotificationService _notificationService;
 
-        public ChatController(IChatService chatService, ICustomerContext customerContext, AppDbContext context, IWebHostEnvironment environment,ISellerContext sellerContext)
+        public ChatController(
+            IChatService chatService, 
+            ICustomerContext customerContext, 
+            AppDbContext context, 
+            IWebHostEnvironment environment,
+            ICartService cartService,
+            INotificationService notificationService,
+            ISellerContext sellerContext)
         {
             _chatService = chatService;
             _customerContext = customerContext;
             _context = context;
             _environment = environment;
+            _cartService = cartService;
+            _notificationService = notificationService;
             _sellerContext = sellerContext;
+        }
+
+        private async Task LoadNavbarAsync()
+        {
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            if (customer == null) return;
+
+            ViewBag.CartCount = await _cartService.GetCartItemCountAsync(customer.UserId);
+
+            var notifications = await _notificationService.GetForUserAsync(customer.UserId);
+            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
         }
 
         [HttpGet]
@@ -116,6 +138,8 @@ namespace EcommerceSystem.Controllers
         [Route("Customer/CustomerInbox")]
         public async Task<IActionResult> CustomerInbox()
         {
+            await LoadNavbarAsync();
+
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             var inboxList = await _chatService.GetCustomerInboxListAsync(customer.UserId);
 
@@ -125,6 +149,8 @@ namespace EcommerceSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> CustomerConversation(int id, int? sellerId, int? productId)
         {
+            await LoadNavbarAsync();
+            
             ChatRoom chatRoom;
 
             // 1. 如果 id 是 0，说明是尚未创建的虚拟临时聊天室（从商品页初次进来）
