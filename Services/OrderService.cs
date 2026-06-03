@@ -314,7 +314,7 @@ namespace EcommerceSystem.Services
                             .Where(oi => oi.Product != null)
                             .Select(oi =>
                             {
-                                var name = oi.Product.Name;
+                                var name = oi.Product?.Name ?? "Unknown Product";
                                 var varSuffix = BuildVariationSuffix(oi.SelectedVariation);
                                 return string.IsNullOrEmpty(varSuffix)
                                     ? name

@@ -110,9 +110,9 @@
         else if (ViewBag.ActiveTab == "Product")
         {
             var allProducts    = ViewBag.Products as List<EcommerceSystem.Models.Product> ?? new List<EcommerceSystem.Models.Product>();
-            var activeProducts = allProducts.Where(p => !p.IsDraft).ToList();
-            var draftProducts  = allProducts.Where(p => p.IsDraft).ToList();
-            var bannedProducts = new List<EcommerceSystem.Models.Product>();
+            var activeProducts = allProducts.Where(p => !p.IsDraft && !p.IsDeleted).ToList();
+            var draftProducts  = allProducts.Where(p => p.IsDraft && !p.IsDeleted).ToList();
+            var bannedProducts = allProducts.Where(p => p.IsDeleted).ToList();
 
             <div class="product-header">
                 <h2 class="section-title">Your Products</h2>
@@ -151,6 +151,33 @@
                                     <span class="pcl-category">@(item.Category?.Name ?? "—")</span>
                                     <h3 class="pcl-name">@item.Name</h3>
                                     <div class="pcl-price">RM @item.Price.ToString("F2")</div>
+
+                                    @* ── Star Rating ── *@
+                                    <div class="pcl-rating">
+                                        @{
+                                            var rating = item.AverageRating;
+                                            var reviews = (int)item.ReviewCount;
+                                        }
+                                        @for (int s = 1; s <= 5; s++)
+                                        {
+                                            if (s <= Math.Floor(rating))
+                                            {
+                                                <i class="fas fa-star pcl-star filled"></i>
+                                            }
+                                            else if (s - rating < 1 && s - rating > 0)
+                                            {
+                                                <i class="fas fa-star-half-alt pcl-star filled"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="far fa-star pcl-star"></i>
+                                            }
+                                        }
+                                        <span class="pcl-rating-count">
+                                            @rating.ToString("F1") (@reviews @(reviews == 1 ? "review" : "reviews"))
+                                        </span>
+                                    </div>
+
                                     <p class="pcl-desc">@item.Description</p>
                                     <div class="pcl-actions">
                                         <a href="@Url.Action("EditProduct", "Seller", new { id = item.ProductId })" class="btn-pcl-edit">
@@ -219,10 +246,48 @@
             </div>
 
             <div id="tab-banned" class="pst-panel" style="display:none;">
-                <div class="empty-state-panel">
-                    <i class="fas fa-ban empty-icon"></i>
-                    <p>No banned products.</p>
-                </div>
+                @if (bannedProducts.Any())
+                {
+                    <div class="product-grid-large">
+                        @foreach (var item in bannedProducts)
+                        {
+                            <div class="product-card-large" data-name="@item.Name.ToLower()">
+                                <div class="pcl-image" style="position:relative;">
+                                    <img src="@item.ImagePath" alt="@item.Name" style="filter:grayscale(60%);" />
+                                    <span class="draft-badge" style="background:#f8d7da;color:#842029;border-color:#f5c2c7;">
+                                        <i class="fas fa-ban" style="margin-right:3px;"></i> Banned
+                                    </span>
+                                </div>
+                                <div class="pcl-info">
+                                    <span class="pcl-category">@(item.Category?.Name ?? "—")</span>
+                                    <h3 class="pcl-name">@(string.IsNullOrEmpty(item.Name) ? "(Untitled)" : item.Name)</h3>
+                                    <div class="pcl-price" style="color:#dc3545;">@(item.Price > 0 ? "RM " + item.Price.ToString("F2") : "—")</div>
+                                    <p class="pcl-desc">@item.Description</p>
+                                    @if (item.DeletedAt.HasValue)
+                                    {
+                                        <p style="font-size:11px;color:#9a98b6;margin-bottom:10px;">
+                                            <i class="fas fa-clock" style="margin-right:4px;"></i>
+                                            Removed on @item.DeletedAt.Value.ToString("dd MMM yyyy")
+                                        </p>
+                                    }
+                                    <div class="pcl-actions" style="border-top:1px solid #ffd6d6;">
+                                        <span style="font-size:12px;color:#dc3545;font-weight:600;padding:8px 0;display:flex;align-items:center;gap:6px;">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                            This product has been removed by admin
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state-panel">
+                        <i class="fas fa-ban empty-icon"></i>
+                        <p>No banned products.</p>
+                    </div>
+                }
             </div>
 
             <script>
@@ -242,16 +307,23 @@
                 }
 
                 document.addEventListener('DOMContentLoaded', function () {
-                var params = new URLSearchParams(window.location.search);
-                var search = params.get('search');
-                if (search) {
-                    var input = document.getElementById('product-search');
-                    if (input) {
-                        input.value = decodeURIComponent(search);
-                        filterCards();
+                    var params = new URLSearchParams(window.location.search);
+                    var search = params.get('search');
+                    if (search) {
+                        var input = document.getElementById('product-search');
+                        if (input) {
+                            input.value = decodeURIComponent(search);
+                            filterCards();
+                        }
                     }
-                }
-            });
+
+                    // Auto-switch to draft or active sub-tab based on URL ?subtab=
+                    var subtab = params.get('subtab');
+                    if (subtab === 'draft' || subtab === 'active') {
+                        var targetBtn = document.querySelector('.pst-btn[onclick*="' + subtab + '"]');
+                        if (targetBtn) targetBtn.click();
+                    }
+                });
             </script>
         }
         else if (ViewBag.ActiveTab == "Order")
@@ -553,6 +625,74 @@
                 <h1 class="welcome-text">Welcome Back, @ViewBag.ShopName!</h1>
                 <div class="separator"></div>
                 <p class="sub-text">Use the sidebar to manage your products and monitor your orders.</p>
+
+                @if (isApproved && ViewBag.TotalProfit != null)
+                {
+                    decimal totalProfit     = (decimal)ViewBag.TotalProfit;
+                    decimal activeCount     = (int)ViewBag.ActiveProductCount;
+                    decimal revenuePotential = (decimal)ViewBag.TotalRevenuePotential;
+
+                    <div class="profit-cards-row">
+                        <div class="profit-card">
+                            <div class="profit-card-icon profit-icon-green">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="profit-card-body">
+                                <div class="profit-card-label">Actual Profit Earned</div>
+                                <div class="profit-card-value profit-green">RM @totalProfit.ToString("N2")</div>
+                                <div class="profit-card-hint">From delivered orders, minus approved refunds</div>
+                            </div>
+                        </div>
+                        <div class="profit-card">
+                            <div class="profit-card-icon profit-icon-blue">
+                                <i class="fas fa-boxes"></i>
+                            </div>
+                            <div class="profit-card-body">
+                                <div class="profit-card-label">Active Products</div>
+                                <div class="profit-card-value profit-blue">@((int)activeCount)</div>
+                                <div class="profit-card-hint">Products currently listed for sale</div>
+                            </div>
+                        </div>
+                        <div class="profit-card">
+                            <div class="profit-card-icon profit-icon-purple">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <div class="profit-card-body">
+                                <div class="profit-card-label">Revenue Potential</div>
+                                <div class="profit-card-value profit-purple">RM @revenuePotential.ToString("N2")</div>
+                                <div class="profit-card-hint">Remaining stock × Selling Price</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>
+                        .profit-cards-row {
+                            display: flex; gap: 20px; flex-wrap: wrap; margin-top: 28px;
+                        }
+                        .profit-card {
+                            flex: 1; min-width: 220px;
+                            background: #fff; border-radius: 16px;
+                            padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start;
+                            box-shadow: 0 2px 14px rgba(30,27,75,0.07);
+                            border: 1.5px solid #f0f0f8;
+                        }
+                        .profit-card-icon {
+                            width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+                            display: flex; align-items: center; justify-content: center;
+                            font-size: 18px;
+                        }
+                        .profit-icon-green  { background: #e8f5e9; color: #2e7d32; }
+                        .profit-icon-blue   { background: #e3f2fd; color: #1565c0; }
+                        .profit-icon-purple { background: #ede7f6; color: #6a1b9a; }
+                        .profit-card-body   { flex: 1; }
+                        .profit-card-label  { font-size: 11px; font-weight: 700; color: #9a98b6; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+                        .profit-card-value  { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+                        .profit-green  { color: #2e7d32; }
+                        .profit-blue   { color: #1565c0; }
+                        .profit-purple { color: #6a1b9a; }
+                        .profit-card-hint   { font-size: 11.5px; color: #b0aec9; line-height: 1.4; }
+                    </style>
+                }
             </div>
         }
     </main>

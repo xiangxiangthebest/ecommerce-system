@@ -24,6 +24,7 @@ namespace EcommerceSystem.Services
             var orderItem = await _context.OrderItems
                 .Include(oi => oi.Order)
                 .FirstOrDefaultAsync(oi => oi.OrderItemId == orderItemId
+                                        && oi.Order != null
                                         && oi.Order.CustomerUserId == customerId
                                         && oi.Order.CurrentStatus == OrderStatus.RECEIVED);
 

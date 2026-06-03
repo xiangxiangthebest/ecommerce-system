@@ -274,6 +274,7 @@
   height: 28px;
   outline: none;
   -moz-appearance: textfield;
+  appearance: textfield;
   padding: 0;
 }
 
