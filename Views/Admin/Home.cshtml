@@ -1,9 +1,9 @@
 @{
-    ViewData["Title"] = "Admin Overview";
+    ViewData["Title"] = "MMU Shop";
     Layout = "~/Views/Admin/Layout.cshtml";
 }
 
-<link rel="stylesheet" href="~/css/admin/dashboard.css" />
+<link rel="stylesheet" href="~/css/admin/dashboard.css" asp-append-version="true" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
 <div class="dashboard-wrapper">
@@ -105,6 +105,17 @@
                 <p class="feature-description">Monitor product and review reports submitted by customers. Review violations and take action.</p>
                 <a href="@Url.Action("ViewCustomerReports", "Admin")" class="btn btn-manage btn-success">
                     <i class="fas fa-arrow-right me-2"></i> View Reports
+                </a>
+            </div>
+
+            <div class="feature-card success">
+                <div class="feature-icon">
+                    <i class="fas fa-ticket-alt"></i>
+                </div>
+                <h3 class="feature-title">Voucher Management</h3>
+                <p class="feature-description">Create discount vouchers, monitor redemption activity, and manage promotional campaigns across the platform.</p>
+                <a href="@Url.Action("VoucherManagement", "Admin")" class="btn btn-manage btn-success">
+                    <i class="fas fa-ticket me-2"></i> Manage Vouchers
                 </a>
             </div>
         </div>

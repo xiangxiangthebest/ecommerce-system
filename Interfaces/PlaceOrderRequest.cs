@@ -10,6 +10,7 @@ namespace EcommerceSystem.Interfaces
         public int? ProductId { get; set; }
         public int? BuyNowQuantity { get; set; }
         public string BuyNowSelectedVariations { get; set; } = "{}";
+        public int? SelectedVoucherId { get; set; }
         public Dictionary<string, string> SellerMessages { get; set; } = new();
     }
 }

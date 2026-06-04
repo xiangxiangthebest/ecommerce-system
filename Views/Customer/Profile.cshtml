@@ -82,28 +82,38 @@
                         </div>
 
                         <div class="field">
-                            <label asp-for="Gender">Gender</label>
+                            <label asp-for="Gender">
+                                Gender
+                                <span class="info-icon" data-message="Gender can only be updated once.">?</span>
+                            </label>
+
                             <div class="select-wrap">
-                                <select asp-for="Gender" required>
+                                <select asp-for="Gender" required id="genderField">
                                     <option value="" disabled selected>Select gender</option>
                                     <option>Male</option>
                                     <option>Female</option>
                                 </select>
-                                <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                                <i class="ti ti-chevron-down select-chevron"></i>
                             </div>
+
                             <span asp-validation-for="Gender" class="text-danger"></span>
                         </div>
 
                         <div class="field">
-                            <label asp-for="Birthday">Birthday</label>
-                            <input asp-for="Birthday" type="date" required />
+                            <label asp-for="Birthday">
+                                Birthday
+                                <span class="info-icon" data-message="Birthday can only be updated once.">?</span>
+                            </label>
+
+                            <input asp-for="Birthday" type="date" required id="birthdayField" />
+
                             <span asp-validation-for="Birthday" class="text-danger"></span>
                         </div>
 
                         <div class="field">
-                            <label asp-for="Phone">Phone</label>
-                            <input asp-for="Phone" required />
-                            <span asp-validation-for="Phone" class="text-danger"></span>
+                            <label asp-for="PhoneNumber">Phone Number</label>
+                            <input asp-for="PhoneNumber" required />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
                         </div>
                     </div>
                 </div>
@@ -124,6 +134,54 @@
                 </div>
 
             </form>
+
+            <!-- ── Available Vouchers ── -->
+            <div class="form-card">
+                <div class="form-section">
+                    <p class="section-label">Your vouchers</p>
+                    @if (Model.CustomerVouchers != null && Model.CustomerVouchers.Any())
+                    {
+                        <div class="voucher-list">
+                        @foreach (var cv in Model.CustomerVouchers.OrderByDescending(cv => cv.AssignedAt))
+                        {
+                            var v = cv.Voucher;
+                            if (v == null) continue;
+                            var isBirthdayVoucher = string.Equals(v.Type, "Birthday", StringComparison.OrdinalIgnoreCase);
+                            if (isBirthdayVoucher && (DateTime.Now < v.StartDate || DateTime.Now > v.EndDate))
+                            {
+                                continue;
+                            }
+
+                            var isPercent = v.Type?.ToLower().Contains("percent") == true;
+                            var amountDisplay = isPercent ? $"{v.DiscountValue:0}%" : $"{v.DiscountValue:0}";
+                            var unitLabel = isPercent ? "discount" : "RM off";
+                            var minSpend = v.MinimumSpend.HasValue && v.MinimumSpend > 0
+                                ? $"Min spend RM {v.MinimumSpend.Value:0}" : "No minimum spend";
+
+                            <div class="voucher-row @(cv.IsUsed ? "used" : "")">
+                                <div class="voucher-left @(isPercent ? "percent" : "")">
+                                    <span class="voucher-amount">@amountDisplay</span>
+                                    <span class="voucher-unit">@unitLabel</span>
+                                </div>
+                                <div class="voucher-perf"><div class="circle-t"></div><div class="circle-b"></div></div>
+                                <div class="voucher-body">
+                                    <div class="voucher-title">@v.Name</div>
+                                    <div class="voucher-sub">@minSpend · Exp @v.EndDate.ToString("dd MMM yyyy")</div>
+                                </div>
+                                <div class="voucher-right">
+                                    <span class="v-code">@v.Code</span>
+                                    <span class="v-badge @(cv.IsUsed ? "badge-used" : "badge-avail")">@(cv.IsUsed ? "Used" : "Available")</span>
+                                </div>
+                            </div>
+                        }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="empty-state">No vouchers available yet. Update your birthday to get a birthday voucher or check back later.</p>
+                    }
+                </div>
+            </div>
 
             <!-- ── Delivery Address Card ── -->
             <div class="form-card">
@@ -377,5 +435,11 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
+     <script>
+        window.genderLocked = @Model.GenderLocked.ToString().ToLower();
+        window.birthdayLocked = @Model.BirthdayLocked.ToString().ToLower();
+    </script>
+    
     <script src="~/js/customer/profile.js" asp-append-version="true"></script>
 }

@@ -37,7 +37,42 @@ public class UserService : IUserService
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        if (user is Customer customer)
+        {
+            await AssignNewUserVoucherAsync(customer);
+        }
+
         return true;
+    }
+
+    private async Task AssignNewUserVoucherAsync(Customer customer)
+    {
+        var code = $"WELCOME-{customer.UserId}-{DateTime.UtcNow.Ticks}";
+        var voucher = new Voucher
+        {
+            Code = code,
+            Name = "New user voucher",
+            Type = "NewUser",
+            DiscountValue = 10m,
+            MinimumSpend = 0m,
+            StartDate = DateTime.UtcNow,
+            EndDate = DateTime.UtcNow.AddMonths(1),
+            Quantity = 1,
+            IsActive = true
+        };
+
+        _context.Vouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        _context.CustomerVouchers.Add(new CustomerVoucher
+        {
+            CustomerId = customer.UserId,
+            VoucherId = voucher.VoucherId,
+            AssignedAt = DateTime.UtcNow,
+            IsUsed = false
+        });
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task<bool> RegisterSellerAsync(RegisterSellerDto dto)

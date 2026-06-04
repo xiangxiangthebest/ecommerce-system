@@ -630,6 +630,8 @@
     const fileUploadArea = document.getElementById('fileUploadArea');
     const filePreview = document.getElementById('filePreview');
 
+    let selectedFiles = [];
+
     if (!reportBtn) return;
 
     // Open modal
@@ -640,10 +642,12 @@
 
     // Close modal
     function closeReportModal() {
-      reportBackdrop.hidden = true;
-      document.body.style.overflow = 'auto';
-      reportForm.reset();
-      filePreview.innerHTML = '';
+        reportBackdrop.hidden = true;
+        document.body.style.overflow = 'auto';
+        reportForm.reset();
+        selectedFiles = [];
+        filePreview.innerHTML = '';
+        fileInput.value = '';
     }
 
     reportCloseBtn.addEventListener('click', closeReportModal);
@@ -654,75 +658,131 @@
 
     // File upload handling
     fileUploadArea.addEventListener('click', () => fileInput.click());
-    
+
     fileUploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      fileUploadArea.classList.add('dragover');
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
     });
 
     fileUploadArea.addEventListener('dragleave', () => {
-      fileUploadArea.classList.remove('dragover');
+        fileUploadArea.classList.remove('dragover');
     });
 
     fileUploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      fileUploadArea.classList.remove('dragover');
-      fileInput.files = e.dataTransfer.files;
-      updateFilePreview();
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+
+        addFiles(Array.from(e.dataTransfer.files));
     });
 
-    fileInput.addEventListener('change', updateFilePreview);
+    fileInput.addEventListener('change', () => {
+        addFiles(Array.from(fileInput.files));
 
-    function updateFilePreview() {
-      filePreview.innerHTML = '';
-      const files = Array.from(fileInput.files).slice(0, 4);
+        // Allow selecting same file again later
+        fileInput.value = '';
+    });
 
-      if (files.length === 0) return;
+    function addFiles(newFiles) {
 
-      files.forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const div = document.createElement('div');
-          div.className = 'preview-item';
-          div.innerHTML = `
-            <img src="${e.target.result}" alt="Preview ${index + 1}" />
-            <button type="button" class="remove-file" data-index="${index}">×</button>
-          `;
-          filePreview.appendChild(div);
-        };
-        reader.readAsDataURL(file);
-      });
+        newFiles.forEach(file => {
+
+            if (selectedFiles.length >= 4)
+                return;
+
+            const duplicate = selectedFiles.some(f =>
+                f.name === file.name &&
+                f.size === file.size &&
+                f.lastModified === file.lastModified
+            );
+
+            if (!duplicate) {
+                selectedFiles.push(file);
+            }
+        });
+
+        renderFilePreview();
     }
+
+    function renderFilePreview() {
+
+        filePreview.innerHTML = '';
+
+        selectedFiles.forEach((file, index) => {
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+
+                const div = document.createElement('div');
+
+                div.className = 'preview-item';
+
+                div.innerHTML = `
+                    <img src="${e.target.result}" alt="Preview">
+                    <button
+                        type="button"
+                        class="remove-file"
+                        data-index="${index}">
+                        ×
+                    </button>
+                `;
+
+                filePreview.appendChild(div);
+            };
+
+            reader.readAsDataURL(file);
+        });
+    }
+
+    filePreview.addEventListener('click', function (e) {
+
+        const removeBtn = e.target.closest('.remove-file');
+
+        if (!removeBtn) return;
+
+        const index = parseInt(removeBtn.dataset.index);
+
+        selectedFiles.splice(index, 1);
+
+        renderFilePreview();
+    });
 
     // Form submission
     reportForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
+        e.preventDefault();
 
-      const formData = new FormData(reportForm);
-      const submitBtn = document.getElementById('reportSubmitBtn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="ti ti-loader-2"></i> Submitting...';
+        const formData = new FormData(reportForm);
 
-      try {
-        const response = await fetch('/Customer/ReportProduct', {
-          method: 'POST',
-          body: formData
+        formData.delete('evidenceFiles');
+
+        selectedFiles.forEach(file => {
+            formData.append('evidenceFiles', file);
         });
 
-        const result = await response.json();
+        const submitBtn = document.getElementById('reportSubmitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader-2"></i> Submitting...';
 
-        if (result.success) {
-          alert(result.message);
-          closeReportModal();
-        } else {
-          alert('Error: ' + (result.message || 'Failed to submit report'));
+        try {
+            const response = await fetch('/Customer/ReportProduct', {
+            method: 'POST',
+            body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+            alert(result.message);
+            closeReportModal();
+            } else {
+            alert('Error: ' + (result.message || 'Failed to submit report'));
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Submit Report';
         }
-      } catch (error) {
-        alert('Error: ' + error.message);
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Submit Report';
-      }
     });
 
     // Review Report Modal Event Listeners - Setup in DOMContentLoaded

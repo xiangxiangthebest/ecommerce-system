@@ -383,11 +383,125 @@ namespace EcommerceSystem.Controllers
         }
  
         // System Settings
-        public IActionResult Home()
+        public async Task<IActionResult> Home()
         {
+            var vouchers = await _context.Vouchers
+                .OrderByDescending(v => v.VoucherId)
+                .ToListAsync();
+
+            ViewBag.Vouchers = vouchers;
             return View();
         }
- 
+
+        [HttpGet]
+        public IActionResult VoucherManagement()
+        {
+            ViewBag.Vouchers = _context.Vouchers.ToList();
+            return View(new Voucher());
+        }
+
+        public async Task<IActionResult> ManageVouchers()
+        {
+            var vouchers = await _context.Vouchers
+                .OrderByDescending(v => v.VoucherId)
+                .ToListAsync();
+
+            return View(vouchers);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateVoucher(Voucher model)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Vouchers = await _context.Vouchers
+                    .OrderByDescending(v => v.VoucherId)
+                    .ToListAsync();
+                TempData["VoucherError"] = "Please correct the highlighted voucher fields.";
+                return View("VoucherManagement", model);
+            }
+
+            _context.Vouchers.Add(model);
+            await _context.SaveChangesAsync();
+
+            var customerIds = await _context.Customers
+                .Select(c => c.UserId)
+                .ToListAsync();
+
+            foreach (var customerId in customerIds)
+            {
+                _context.CustomerVouchers.Add(new CustomerVoucher
+                {
+                    CustomerId = customerId,
+                    VoucherId = model.VoucherId,
+                    AssignedAt = DateTime.Now,
+                    IsUsed = false
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["VoucherSuccess"] = "Voucher created successfully and assigned to all customers.";
+            return RedirectToAction("VoucherManagement", "Admin");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditVoucher(int id)
+        {
+            var voucher = await _context.Vouchers.FindAsync(id);
+
+            if (voucher == null)
+                return NotFound();
+
+            return View(voucher);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditVoucher(Voucher model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var voucher = await _context.Vouchers.FindAsync(model.VoucherId);
+            if (voucher == null)
+                return NotFound();
+
+            voucher.Code = model.Code;
+            voucher.Name = model.Name;
+            voucher.Type = model.Type;
+            voucher.DiscountValue = model.DiscountValue;
+            voucher.MinimumSpend = model.MinimumSpend;
+            voucher.StartDate = model.StartDate;
+            voucher.EndDate = model.EndDate;
+            voucher.Quantity = model.Quantity;
+            voucher.IsActive = model.IsActive;
+
+            _context.Vouchers.Update(voucher);
+            await _context.SaveChangesAsync();
+
+            TempData["VoucherSuccess"] = "Voucher updated successfully.";
+            return RedirectToAction("VoucherManagement", "Admin");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteVoucher(int id)
+        {
+            var voucher = await _context.Vouchers.FindAsync(id);
+
+            if (voucher == null)
+                return NotFound();
+
+            _context.Vouchers.Remove(voucher);
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("VoucherManagement", "Admin");
+        }
         // View Customer Reports
         public async Task<IActionResult> ViewCustomerReports(string? reportType = "all", string? status = "all", string? searchTerm = "")
         {

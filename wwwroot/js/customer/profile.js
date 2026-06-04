@@ -104,30 +104,72 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelector('[name="Birthday"]').value =
             sessionStorage.getItem("profileBirthday") || "";
 
-        document.querySelector('[name="Phone"]').value =
+        document.querySelector('[name="PhoneNumber"]').value =
             sessionStorage.getItem("profilePhone") || "";
 
         // One-time restore only
         sessionStorage.removeItem("profileDraftRestore");
     }
 
-    if (fullName)
-        document.querySelector('[name="FullName"]').value = fullName;
-
-    if (gender)
-        document.querySelector('[name="Gender"]').value = gender;
-
-    if (birthday)
-        document.querySelector('[name="Birthday"]').value = birthday;
-
-    if (phone)
-        document.querySelector('[name="Phone"]').value = phone;
-
     document.getElementById("profileForm")?.addEventListener("submit", () => {
         sessionStorage.removeItem("profileFullName");
         sessionStorage.removeItem("profileGender");
         sessionStorage.removeItem("profileBirthday");
         sessionStorage.removeItem("profilePhone");
+    });
+
+    // Lock fields (One time update only)
+    const genderWrap = document.querySelector("#genderField")?.closest(".select-wrap");
+    const birthdayField = document.getElementById("birthdayField");
+
+    if (window.genderLocked && genderWrap) {
+        const value = document.getElementById("genderField")?.value;
+
+        const input = document.createElement("input");
+        input.value = value;
+        input.readOnly = true;
+
+        genderWrap.replaceWith(input);
+    }
+
+    if (window.birthdayLocked && birthdayField) {
+        birthdayField.readOnly = true;
+    }
+
+    // Info tooltip
+    document.querySelectorAll(".info-icon").forEach(icon => {
+        const msg = icon.dataset.message;
+
+        const tooltip = document.createElement("div");
+        tooltip.className = "info-tooltip";
+        tooltip.innerText = msg;
+
+        icon.appendChild(tooltip);
+
+        icon.addEventListener("mouseenter", () => {
+            icon.classList.add("show");
+        });
+
+        icon.addEventListener("mouseleave", () => {
+            icon.classList.remove("show");
+        });
+    });
+
+    // Add Address submit
+    document.getElementById("addAddressForm")?.addEventListener("submit", () => {
+        saveProfileDraft();
+    });
+
+    // Edit Address submit
+    document.getElementById("editAddressForm")?.addEventListener("submit", () => {
+        saveProfileDraft();
+    });
+
+    // Remove Address submit
+    document.querySelectorAll('form[asp-action="RemoveAddress"]').forEach(form => {
+        form.addEventListener("submit", () => {
+            saveProfileDraft();
+        });
     });
 });
 
@@ -144,22 +186,5 @@ function saveProfileDraft() {
         document.querySelector('[name="Birthday"]')?.value || "");
 
     sessionStorage.setItem("profilePhone",
-        document.querySelector('[name="Phone"]')?.value || "");
+        document.querySelector('[name="PhoneNumber"]')?.value || "");
 }
-
-// Add Address submit
-document.getElementById("addAddressForm")?.addEventListener("submit", () => {
-    saveProfileDraft();
-});
-
-// Edit Address submit
-document.getElementById("editAddressForm")?.addEventListener("submit", () => {
-    saveProfileDraft();
-});
-
-// Remove Address submit
-document.querySelectorAll('form[asp-action="RemoveAddress"]').forEach(form => {
-    form.addEventListener("submit", () => {
-        saveProfileDraft();
-    });
-});
