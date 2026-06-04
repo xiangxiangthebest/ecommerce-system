@@ -150,11 +150,7 @@
                             <td>
                                 <div class="product-name-cell">
                                     <strong>@product.Name</strong>
-                                    @if (product.IsDeleted)
-                                    {
-                                        <span class="badge bg-danger ms-2"><i class="fas fa-trash me-1"></i> Deleted</span>
-                                    }
-                                    else if (product.StockQuantity == 0 && !product.IsDraft)
+                                    @if (product.StockQuantity == 0 && !product.IsDraft && !product.IsDeleted)
                                     {
                                         <span class="badge bg-danger ms-2">Out of Stock</span>
                                     }
@@ -190,8 +186,8 @@
                             <td>
                                 @if (product.IsDeleted)
                                 {
-                                    <span class=\"pill\" style=\"background-color: #dc3545; color: white;\">
-                                        <i class=\"fas fa-ban me-1\"></i> Deleted
+                                    <span class="pill" style="background-color: #dc3545; color: white;">
+                                        <i class="fas fa-ban me-1"></i> Deleted
                                     </span>
                                 }
                                 else if (product.IsDraft)
@@ -234,11 +230,11 @@
                                     }
                                     else
                                     {
-                                        <form method="post" action="@Url.Action("DeleteProduct", "Admin")" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this product?');">
+                                        <form method="post" action="@Url.Action("DeleteProduct", "Admin")" style="display:inline;" onsubmit="return confirm('Mark this product as deleted?');">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@product.ProductId" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="fas fa-trash me-1"></i> Delete
+                                                <i class="fas fa-ban me-1"></i> Mark Deleted
                                             </button>
                                         </form>
                                     }
@@ -362,11 +358,11 @@
                     }
                     else
                     {
-                        <form method="post" action="@Url.Action("DeleteProduct", "Admin")" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this product? This action cannot be undone.');">
+                        <form method="post" action="@Url.Action("DeleteProduct", "Admin")" style="display:inline;" onsubmit="return confirm('Mark this product as deleted? You can restore it later.');">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@p.ProductId" />
                             <button type="submit" class="btn btn-danger px-4">
-                                <i class="fas fa-trash me-2"></i> Delete Product
+                                <i class="fas fa-ban me-2"></i> Mark as Deleted
                             </button>
                         </form>
                     }

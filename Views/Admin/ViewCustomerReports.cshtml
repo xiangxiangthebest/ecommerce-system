@@ -214,17 +214,17 @@ function updateReportStatus(reportId, reportType, newStatus) {
     if (!confirm(`Are you sure you want to ${newStatus} this report?`)) {
         return;
     }
-    
-    fetch(`/Admin/UpdateReportStatus`, {
+
+    const isProductApproval = reportType === 'product' && newStatus === 'Approved';
+    const url  = isProductApproval ? '/Admin/ResolveReport' : '/Admin/UpdateReportStatus';
+    const body = isProductApproval
+        ? { reportId: reportId, reportType: reportType }
+        : { reportId: reportId, reportType: reportType, newStatus: newStatus };
+
+    fetch(url, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            reportId: reportId,
-            reportType: reportType,
-            newStatus: newStatus
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
     })
     .then(response => response.json())
     .then(data => {

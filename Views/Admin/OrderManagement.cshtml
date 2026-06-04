@@ -1,0 +1,264 @@
+@model List<EcommerceSystem.Models.Order>
+@using EcommerceSystem.Models
+
+@{
+    ViewData["Title"] = "Order Management";
+    Layout = "~/Views/Admin/Layout.cshtml";
+
+    var statusFilter = ViewBag.StatusFilter as string ?? "All";
+    var searchTerm   = ViewBag.SearchTerm   as string ?? "";
+    var tabs = new[]
+    {
+        new { Label = "All",           Count = (int)ViewBag.CountAll,          Icon = "fa-list" },
+        new { Label = "PENDING",       Count = (int)ViewBag.CountPending,      Icon = "fa-clock" },
+        new { Label = "PREPARING",     Count = (int)ViewBag.CountPreparing,    Icon = "fa-gear" },
+        new { Label = "SHIPPED",       Count = (int)ViewBag.CountShipped,      Icon = "fa-truck" },
+        new { Label = "DELIVERED",     Count = (int)ViewBag.CountDelivered,    Icon = "fa-box-open" },
+        new { Label = "RECEIVED",      Count = (int)ViewBag.CountReceived,     Icon = "fa-circle-check" },
+        new { Label = "CANCELED",      Count = (int)ViewBag.CountCancelled,    Icon = "fa-ban" },
+        new { Label = "RETURN_REFUND", Count = (int)ViewBag.CountReturnRefund, Icon = "fa-rotate-left" },
+    };
+}
+
+<link rel="stylesheet" href="~/css/admin/manage-users.css" />
+<link rel="stylesheet" href="~/css/admin/inventory-review.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="~/css/admin/order-management.css" />
+
+<div class="glass-container">
+    @* Header *@
+    <div class="dashboard-header mb-4 d-flex justify-content-between align-items-center">
+        <div class="header-text">
+            <h1><i class="fas fa-truck-fast me-3"></i>Order Management</h1>
+            <p class="subtitle">
+                <i class="fas fa-chart-line me-1"></i>
+                Monitor all order flows across the platform
+            </p>
+        </div>
+        <div class="header-actions">
+            <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary">
+                <i class="fas fa-arrow-left me-2"></i> <span>Dashboard</span>
+            </a>
+        </div>
+    </div>
+
+    @* Summary Stats *@
+    <div class="summary-grid">
+        <div class="summary-card highlight">
+            <div class="s-label">Total Orders</div>
+            <div class="s-value">@ViewBag.CountAll</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Pending</div>
+            <div class="s-value">@ViewBag.CountPending</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Preparing</div>
+            <div class="s-value">@ViewBag.CountPreparing</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Shipped</div>
+            <div class="s-value">@ViewBag.CountShipped</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Delivered</div>
+            <div class="s-value">@ViewBag.CountDelivered</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Received</div>
+            <div class="s-value">@ViewBag.CountReceived</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Cancelled</div>
+            <div class="s-value">@ViewBag.CountCancelled</div>
+        </div>
+        <div class="summary-card">
+            <div class="s-label">Return/Refund</div>
+            <div class="s-value">@ViewBag.CountReturnRefund</div>
+        </div>
+    </div>
+
+    @* Search *@
+    <form method="get" action="@Url.Action("OrderManagement", "Admin")">
+        <input type="hidden" name="statusFilter" value="@statusFilter" />
+        <div class="search-bar-row">
+            <div class="search-input-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" name="searchTerm" value="@searchTerm" placeholder="Search by Order ID or customer name..." />
+            </div>
+            <button type="submit" class="btn-filter">
+                <i class="fas fa-search me-1"></i> Search
+            </button>
+            @if (!string.IsNullOrEmpty(searchTerm))
+            {
+                <a href="@Url.Action("OrderManagement", "Admin", new { statusFilter })" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times me-1"></i> Clear
+                </a>
+            }
+        </div>
+    </form>
+
+    @* Status Tabs *@
+    <div class="order-tabs">
+        @foreach (var tab in tabs)
+        {
+            var isActive = statusFilter == tab.Label;
+            <a class="order-tab @(isActive ? "active" : "")"
+               href="@Url.Action("OrderManagement", "Admin", new { statusFilter = tab.Label, searchTerm })">
+                <i class="fas @tab.Icon"></i>
+                @tab.Label
+                <span class="tab-count">@tab.Count</span>
+            </a>
+        }
+    </div>
+
+    @* Order Cards *@
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>No orders found for the selected filter.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var order in Model)
+        {
+            var badgeClass = order.CurrentStatus switch
+            {
+                OrderStatus.PENDING       => "badge-pending",
+                OrderStatus.PREPARING     => "badge-processing",
+                OrderStatus.SHIPPED       => "badge-shipped",
+                OrderStatus.DELIVERED     => "badge-delivered",
+                OrderStatus.RECEIVED      => "badge-completed",
+                OrderStatus.CANCELED      => "badge-cancelled",
+                OrderStatus.RETURN_REFUND => "badge-returnrefund",
+                _                         => "badge-pending"
+            };
+
+            var flowSteps = new[]
+            {
+                new { Label = "PENDING",   Icon = "fa-clock" },
+                new { Label = "PREPARING", Icon = "fa-gear" },
+                new { Label = "SHIPPED",   Icon = "fa-truck" },
+                new { Label = "DELIVERED", Icon = "fa-box-open" },
+                new { Label = "RECEIVED",  Icon = "fa-circle-check" },
+            };
+
+            var isCancelled    = order.CurrentStatus == OrderStatus.CANCELED;
+            var isReturnRefund = order.CurrentStatus == OrderStatus.RETURN_REFUND;
+            var currentIndex   = Array.FindIndex(flowSteps, s => s.Label == order.CurrentStatus.ToString());
+            var firstProduct   = order.OrderItems?.FirstOrDefault()?.Product?.Name ?? "—";
+            var extraCount     = (order.OrderItems?.Count ?? 1) - 1;
+            var totalItems     = order.OrderItems?.Count ?? 0;
+
+            <div class="order-card">
+                <div class="order-card-header">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="order-id">#@order.OrderId</span>
+                        <span class="order-date">
+                            <i class="fas fa-calendar-alt me-1"></i>
+                            @order.OrderTime.ToString("dd MMM yyyy, HH:mm")
+                        </span>
+                    </div>
+                    <span class="order-status-badge @badgeClass">@order.CurrentStatus</span>
+                </div>
+
+                <div class="order-card-body">
+                    @* Customer *@
+                    <div class="order-meta-block">
+                        <div class="order-meta-label"><i class="fas fa-user me-1"></i>Customer</div>
+                        <div class="order-meta-value">@(order.Customer?.FullName ?? "—")</div>
+                    </div>
+
+                    @* Total *@
+                    <div class="order-meta-block">
+                        <div class="order-meta-label"><i class="fas fa-dollar-sign me-1"></i>Total Amount</div>
+                        <div class="order-meta-value">RM @order.TotalAmount.ToString("0.00")</div>
+                    </div>
+
+                    @* Payment *@
+                    <div class="order-meta-block">
+                        <div class="order-meta-label"><i class="fas fa-credit-card me-1"></i>Payment</div>
+                        <div class="order-meta-value">@(order.PaymentMethod ?? "—")</div>
+                    </div>
+
+                    @* Products *@
+                    <div class="order-products-list">
+                        <div class="order-meta-label"><i class="fas fa-box me-1"></i>Products (@totalItems item@(totalItems == 1 ? "" : "s"))</div>
+                        <div class="order-product-item">
+                            <i class="fas fa-circle-dot"></i>
+                            @firstProduct
+                        </div>
+                        @if (extraCount > 0)
+                        {
+                            <div class="order-product-more">+ @extraCount more item@(extraCount == 1 ? "" : "s")</div>
+                        }
+                    </div>
+
+                    @* Flow Timeline *@
+                    <div style="flex-basis:100%; margin-top:4px;">
+                        <div class="order-meta-label mb-1"><i class="fas fa-route me-1"></i>Order Flow</div>
+                        @if (isCancelled)
+                        {
+                            <div class="order-flow">
+                                @for (int i = 0; i < flowSteps.Length; i++)
+                                {
+                                    <span class="flow-step cancelled">
+                                        <i class="fas @flowSteps[i].Icon"></i>
+                                        @flowSteps[i].Label
+                                    </span>
+                                    @if (i < flowSteps.Length - 1)
+                                    {
+                                        <span class="flow-arrow"><i class="fas fa-chevron-right"></i></span>
+                                    }
+                                }
+                                <span class="flow-arrow"><i class="fas fa-chevron-right"></i></span>
+                                <span class="flow-step cancelled">
+                                    <i class="fas fa-ban"></i> Cancelled
+                                </span>
+                            </div>
+                        }
+                        else if (isReturnRefund)
+                        {
+                            <div class="order-flow">
+                                @for (int i = 0; i < flowSteps.Length; i++)
+                                {
+                                    <span class="flow-step done">
+                                        <i class="fas @flowSteps[i].Icon"></i>
+                                        @flowSteps[i].Label
+                                    </span>
+                                    @if (i < flowSteps.Length - 1)
+                                    {
+                                        <span class="flow-arrow"><i class="fas fa-chevron-right"></i></span>
+                                    }
+                                }
+                                <span class="flow-arrow"><i class="fas fa-chevron-right"></i></span>
+                                <span class="flow-step refund">
+                                    <i class="fas fa-rotate-left"></i> Return/Refund
+                                </span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="order-flow">
+                                @for (int i = 0; i < flowSteps.Length; i++)
+                                {
+                                    var stepClass = i < currentIndex ? "done" : i == currentIndex ? "active" : "";
+                                    <span class="flow-step @stepClass">
+                                        <i class="fas @flowSteps[i].Icon"></i>
+                                        @flowSteps[i].Label
+                                    </span>
+                                    @if (i < flowSteps.Length - 1)
+                                    {
+                                        <span class="flow-arrow"><i class="fas fa-chevron-right"></i></span>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
