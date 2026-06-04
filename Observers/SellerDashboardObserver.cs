@@ -104,12 +104,12 @@ namespace EcommerceSystem.Observers
                         break;
 
                     // ── Return / refund requested ──────────────────────────────────
-                    case OrderStatus.RETURN_REFUND:
-                        title = "Return & Refund Requested";
-                        message =
-                            $"Customer #{customerId} ({customerName}) has requested a " +
-                            $"return/refund for Order #{orderId}. Awaiting for Customer Service's response.";
-                        break;
+                    // case OrderStatus.RETURN_REFUND:
+                    //     title = "Return & Refund Requested";
+                    //     message =
+                    //         $"Customer #{customerId} ({customerName}) has requested a " +
+                    //         $"return/refund for Order #{orderId}. Awaiting for Customer Service's response.";
+                    //     break;
 
                     default:
                         return;

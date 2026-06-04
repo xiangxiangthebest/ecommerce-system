@@ -337,7 +337,8 @@
             int cntDelivered    = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
             int cntReceived     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
             int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
-            int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+            int cntRequestCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED);
+            @* int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND); *@
 
             <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
@@ -353,7 +354,8 @@
                 <button class="order-tab" data-status="DELIVERED">Delivered <span class="order-tab-badge">@cntDelivered</span></button>
                 <button class="order-tab" data-status="RECEIVED">Completed <span class="order-tab-badge">@cntReceived</span></button>
                 <button class="order-tab" data-status="CANCELED">Cancelled <span class="order-tab-badge">@cntCanceled</span></button>
-                <button class="order-tab" data-status="RETURN_REFUND">Return/Refund <span class="order-tab-badge">@cntReturnRefund</span></button>
+                <button class="order-tab" data-status="CANCELED">Request Cancelled <span class="order-tab-badge">@cntRequestCanceled</span></button>
+                @* <button class="order-tab" data-status="RETURN_REFUND">Return/Refund <span class="order-tab-badge">@cntReturnRefund</span></button> *@
             </div>
 
             <div class="order-filter-bar">
@@ -379,7 +381,7 @@
                             <th>Payment</th>
                             <th>Status</th>
                             <th>Details</th>
-                            <th>Chat</th> <!-- 已加：独立的 Chat 列标题 -->
+                            <th>Chat</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -440,19 +442,15 @@
                                             <button type="submit" class="btn-update-status">Update</button>
                                         </form>
                                     }
-                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                                             && !order.ReturnApprovedAt.HasValue)
+                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED)
                                     {
-                                        <button class="btn-update-status" style="background:#f97316" onclick="openApproveReturnModal(@order.OrderId)">
-                                            <i class="fas fa-check-circle"></i> Approve Return
+                                        <button onclick="approveCancel(@order.OrderId)">
+                                            Approve Cancellation
                                         </button>
                                     }
-                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                                             && order.ReturnApprovedAt.HasValue)
-                                    {
-                                        <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
-                                            <i class="fas fa-check-circle"></i> Return Approved
-                                        </span>
+                                        <button onclick="approveReplacement(@order.OrderId)">
+                                            Approve Replacement
+                                        </button>
                                     }
                                     else
                                     {
@@ -798,7 +796,8 @@
     }
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
-        .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && !o.ReturnApprovedAt.HasValue)
+        .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
+        && !o.ReturnApprovedAt.HasValue)
         .Select(o => {
             var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
             var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));

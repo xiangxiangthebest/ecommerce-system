@@ -106,13 +106,13 @@ namespace EcommerceSystem.Observers
                     break;
 
                 // ── Return / refund requested ──────────────────────────────────
-                case OrderStatus.RETURN_REFUND:
-                    title = "Return & Refund Requested";
-                    message =
-                        $"Order #{orderId} — Customer #{customerId} ({customerName}) " +
-                        $"has requested a return/refund from {shopName} (Seller #{sellerId}). " +
-                        $"Total: RM{total:F2}";
-                    break;
+                // case OrderStatus.RETURN_REFUND:
+                //     title = "Return & Refund Requested";
+                //     message =
+                //         $"Order #{orderId} — Customer #{customerId} ({customerName}) " +
+                //         $"has requested a return/refund from {shopName} (Seller #{sellerId}). " +
+                //         $"Total: RM{total:F2}";
+                //     break;
 
                 default:
                     return;

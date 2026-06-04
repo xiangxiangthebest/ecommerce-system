@@ -21,6 +21,7 @@ namespace EcommerceSystem.Factories
                 Email = _dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(_dto.Password),
                 Role = "Customer"
+                
             };
             
         }

@@ -13,10 +13,11 @@ namespace EcommerceSystem.Controllers
     public class AdminController : Controller
     {
         private readonly AppDbContext _context;
-
-        public AdminController(AppDbContext context)
+        private readonly IUserService _userService;
+        public AdminController(AppDbContext context, IUserService userService)
         {
             _context = context;
+            _userService = userService;
         }
 
         // Main Dashboard View
@@ -134,13 +135,15 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            UserCreator creator = new CustomerServiceCreator(model); 
-            User customerServiceAccount = creator.CreateUser();
+           
+            // UserCreator creator = new CustomerServiceCreator(model); 
+            // User customerServiceAccount = creator.CreateUser();
 
-            try 
-            {
-                _context.Users.Add(customerServiceAccount);
-                await _context.SaveChangesAsync();
+            try
+            {    
+                await _userService.RegisterCustomerServiceAsync(model);
+                // _context.Users.Add(customerServiceAccount);
+                // await _context.SaveChangesAsync();
 
                 TempData["AdminSuccess"] = "Customer Service account created successfully!";
                 return RedirectToAction("ManageCustomerService");

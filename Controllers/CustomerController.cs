@@ -383,7 +383,8 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> ConfirmReceived(int orderId)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
+            if (customer == null)
+                return Json(new { success = false, message = "Session expired, please login again." }); // ✅ 改这里
 
             var result = await _orderService.ConfirmReceivedAsync(customer.UserId, orderId);
             return Json(new { success = result.Success, message = result.Error });

@@ -98,12 +98,12 @@ namespace EcommerceSystem.Observers
                     break;
 
                 // ── Return / refund requested ──────────────────────────────────
-                case OrderStatus.RETURN_REFUND:
-                    title = "Return & Refund Requested";
-                    message =
-                        $"Your return/refund request for Order #{orderId} from {shopName} " +
-                        $"has been submitted and is awaiting seller approval.";
-                    break;
+                // case OrderStatus.RETURN_REFUND:
+                //     title = "Return & Refund Requested";
+                //     message =
+                //         $"Your return/refund request for Order #{orderId} from {shopName} " +
+                //         $"has been submitted and is awaiting seller approval.";
+                //     break;
 
                 // RECEIVED — customer triggered this themselves; skip notification.
                 default:

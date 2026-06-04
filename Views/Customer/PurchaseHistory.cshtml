@@ -1,5 +1,5 @@
 @model List<EcommerceSystem.Models.Order>
- @using EcommerceSystem.Interfaces;
+@using EcommerceSystem.Interfaces;
 
 @using System.Text.Json
 
@@ -11,7 +11,7 @@
     var shippedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
     var deliveredCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
     var receivedCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
-    var returnCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+    @* var returnCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND); *@
     var canceledCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
 
     // Build a compact JSON blob for purchase-history.js
@@ -96,7 +96,7 @@
         EcommerceSystem.Models.OrderStatus.SHIPPED       => "Shipped",
         EcommerceSystem.Models.OrderStatus.DELIVERED     => "Delivered",
         EcommerceSystem.Models.OrderStatus.RECEIVED      => "Received",
-        EcommerceSystem.Models.OrderStatus.RETURN_REFUND => "Return / Refund",
+        @* EcommerceSystem.Models.OrderStatus.RETURN_REFUND => "Return / Refund", *@
         EcommerceSystem.Models.OrderStatus.CANCELED      => "Canceled",
         EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED => "Cancel Requested",
         _ => s.ToString()
@@ -240,7 +240,7 @@
                 <button class="ph-tab" data-status="SHIPPED">Shipped <span class="ph-badge">@shippedCnt</span></button>
                 <button class="ph-tab" data-status="DELIVERED">Delivered <span class="ph-badge">@deliveredCnt</span></button>
                 <button class="ph-tab" data-status="RECEIVED">Received <span class="ph-badge">@receivedCnt</span></button>
-                <button class="ph-tab" data-status="RETURN_REFUND">Return/Refund <span class="ph-badge">@returnCnt</span></button>
+                @* <button class="ph-tab" data-status="RETURN_REFUND">Return/Refund <span class="ph-badge">@returnCnt</span></button> *@
                 <button class="ph-tab" data-status="CANCELED">Canceled <span class="ph-badge">@canceledCnt</span></button>
             </div>
         </div>
@@ -511,7 +511,7 @@
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
                             {
                                 <button class="ph-btn ph-btn-return-trigger" onclick="openReturnModal(@order.OrderId)">
-                                    <i class="ti ti-package-off"></i> Return / Refund
+                                    <i class="ti ti-package-off"></i> After-sales Service
                                 </button>
 
                                 <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
@@ -614,7 +614,7 @@
     <div class="rtn-modal-hero">
         <div class="rtn-modal-hero-icon"><i class="ti ti-package-off"></i></div>
         <div class="rtn-modal-hero-text">
-            <div class="rtn-modal-hero-title">Request Return / Refund</div>
+            <div class="rtn-modal-hero-title">After-sale Service</div>
             <div class="rtn-modal-hero-sub">Select the item(s) affected and describe the issue. The seller will review your request.</div>
         </div>
         <button class="rtn-modal-close" onclick="closeReturnModal()" aria-label="Close"><i class="ti ti-x"></i></button>
@@ -627,7 +627,7 @@
         </div>
 
         <div class="rtn-field-group">
-            <label class="rtn-field-label">Return type <span class="rtn-required">*</span></label>
+            <label class="rtn-field-label">Service Type <span class="rtn-required">*</span></label>
             <div class="rtn-type-row">
                 <button class="rtn-type-btn" data-type="Return &amp; Refund" onclick="rtnSelectType(this)">
                     <i class="ti ti-package-export"></i> Return &amp; Refund
@@ -635,14 +635,16 @@
                 <button class="rtn-type-btn" data-type="Refund Only" onclick="rtnSelectType(this)">
                     <i class="ti ti-currency-dollar"></i> Refund Only
                 </button>
+
             </div>
         </div>
 
         <div class="rtn-field-group">
-            <label class="rtn-field-label">Reason <span class="rtn-required">*</span></label>
+            <label class="rtn-field-label">Reason<span class="rtn-required">*</span></label>
             <div class="rtn-reason-grid">
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Wrong item received</button>
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Item not delivered</button>
+                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Change of mind</button>
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Damaged / defective</button>
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Item not as described</button>
                 <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Missing parts / accessories</button>

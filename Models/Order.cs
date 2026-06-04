@@ -59,6 +59,7 @@ public class Order : OrderStatusSubject
     public Customer? Customer { get; set; }
     public Seller? Seller { get; set; }
 
+
     // ── Observer list (not persisted) ───────────────────────────────────────
     [NotMapped]
     private List<OrderStatusObserver> _observers = new List<OrderStatusObserver>();
@@ -90,7 +91,7 @@ public class Order : OrderStatusSubject
         { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
         { OrderStatus.DELIVERED,     new() { } },
         { OrderStatus.RECEIVED,      new() { } },
-        { OrderStatus.RETURN_REFUND, new() { } },
+        // { OrderStatus.RETURN_REFUND, new() { } },
         { OrderStatus.CANCELED,      new() { } },
     };
 
@@ -107,11 +108,16 @@ public class Order : OrderStatusSubject
         { OrderStatus.PENDING,       new() { OrderStatus.CANCELED } },
         { OrderStatus.PREPARING,     new() { OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { } },
-        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
-        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
-        { OrderStatus.RETURN_REFUND, new() { } },
-        { OrderStatus.CANCELED,      new() { } },
-        { OrderStatus.CANCEL_REQUESTED,      new() { } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.AFTER_SALES_REQUESTED } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.AFTER_SALES_REQUESTED } },
+
+        // after sales flow ends order control
+        { OrderStatus.AFTER_SALES_REQUESTED, new() { } },
+
+        { OrderStatus.CANCELED, new() { } },
+        { OrderStatus.CANCEL_REQUESTED, new() { } },
+
+        { OrderStatus.CLOSED, new() { } },
 
     };
 
@@ -124,11 +130,14 @@ public class Order : OrderStatusSubject
         { OrderStatus.PENDING,       new() { OrderStatus.PREPARING, OrderStatus.CANCELED } },
         { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
-        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND } },
-        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND } },
-        { OrderStatus.RETURN_REFUND, new() { } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.AFTER_SALES_REQUESTED } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.AFTER_SALES_REQUESTED } },
         { OrderStatus.CANCELED,      new() { } },
+
+        // after sales flow ends order control
         { OrderStatus.CANCEL_REQUESTED, new() { OrderStatus.CANCELED} },
+        { OrderStatus.AFTER_SALES_REQUESTED, new(){ }},
+        { OrderStatus.CLOSED, new() }
     };
 
     /// <summary>
@@ -139,7 +148,7 @@ public class Order : OrderStatusSubject
     public bool CanTransitionTo(OrderStatus next)
     {
         return AllAllowedTransitions.TryGetValue(CurrentStatus, out var allowed)
-               && allowed.Contains(next);
+        && allowed.Contains(next);
     }
 
     /// <summary>
@@ -166,8 +175,15 @@ public class Order : OrderStatusSubject
             case OrderStatus.CANCELED:
                 CanceledAt = DateTime.UtcNow;
                 break;
-            case OrderStatus.RETURN_REFUND:
+
+            case OrderStatus.AFTER_SALES_REQUESTED:
                 ReturnInitiatedAt = DateTime.UtcNow;
+                ReturnRequested = true;
+                break;
+
+
+            case OrderStatus.CLOSED:
+                // finalize order
                 break;
         }
 

@@ -549,6 +549,7 @@ async function confirmReceived(orderId, btn) {
     } catch (err) {
         btn.disabled = false;
         btn.innerHTML = '<i class="ti ti-circle-check"></i> Order Received';
+        showToast('Network error, please try again.', 'error'); // ← 加这行
         console.error('ConfirmReceived error:', err);
     }
 }
@@ -597,7 +598,7 @@ function rtnRenderItemList() {
                 </div>
             </label>
             <div class="rtn-item-qty-wrap">
-                <span class="rtn-item-qty-label">Return qty:</span>
+                <span class="rtn-item-qty-label">Qty:</span>
                 <input type="number" class="rtn-qty-input"
                        data-order-item-id="${item.orderItemId}"
                        min="1" max="${item.qty}" value="1" />
@@ -957,6 +958,8 @@ async function postJson(url, data) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body:    body.toString(),
     });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`); // ✅ 加这行
     return res.json();
 }
 

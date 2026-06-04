@@ -7,6 +7,7 @@ using EcommerceSystem.Models;
 using EcommerceSystem.Observers;
 using EcommerceSystem.Interfaces;
 using System.Text.Json;
+using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Controllers
 {
@@ -108,122 +109,269 @@ namespace EcommerceSystem.Controllers
         }
 
         public async Task<IActionResult> Home(string tab = "General")
+{
+    var seller = await GetCurrentSellerAsync();
+    if (seller == null) return RedirectToAction("Login", "Auth");
+
+    var currentUserId = int.Parse(
+        User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0"
+    );
+
+    if (!seller.IsApproved && tab != "General" && tab != "Profile")
+        tab = "General";
+
+    ViewBag.ActiveTab = tab;
+    ViewBag.ShopName = seller.ShopName;
+    ViewBag.IsApproved = seller.IsApproved;
+
+    var notifications = await _notificationService.GetForUserAsync(seller.UserId);
+    ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
+
+    if (!seller.IsApproved)
+        return View();
+
+    // ─────────────────────────────────────────────
+    // PRODUCTS
+    // ─────────────────────────────────────────────
+    var products = await _context.Products
+        .Include(p => p.Category)
+        .Where(p => p.SellerId == seller.UserId)
+        .ToListAsync();
+
+    ViewBag.Products = products;
+    ViewBag.BannedProductCount = products.Count(p => p.IsDeleted);
+
+    var activeProducts = products.Where(p => !p.IsDeleted && !p.IsDraft).ToList();
+    ViewBag.ActiveProductCount = activeProducts.Count;
+
+    ViewBag.TotalRevenuePotential = activeProducts
+        .Sum(p => p.Price * p.StockQuantity);
+
+    // 用 dictionary 优化 lookup
+    var productMap = products.ToDictionary(p => p.ProductId);
+
+    // ─────────────────────────────────────────────
+    // ORDERS (DELIVERED + RECEIVED only)
+    // ─────────────────────────────────────────────
+    var orders = await _context.Order
+        .Include(o => o.Customer)
+        .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Product)
+        .Where(o => o.SellerUserId == seller.UserId)
+        .ToListAsync();
+
+    var deliveredOrders = orders
+        .Where(o =>
+            o.CurrentStatus == OrderStatus.DELIVERED ||
+            o.CurrentStatus == OrderStatus.RECEIVED)
+        .ToList();
+
+    // var refundedOrders = orders
+    //     .Where(o =>
+    //         o.CurrentStatus == OrderStatus.AFTER_SALES_PROCESSING &&
+    //         o.AfterSalesType == AfterSalesType.REFUND &&
+    //         o.ReturnApprovedAt.HasValue)
+    //     .ToList();
+
+    // ─────────────────────────────────────────────
+    // PROFIT CALCULATION
+    // ─────────────────────────────────────────────
+    double actualProfit = 0;
+
+    void AddOrderProfit(IEnumerable<Order> orderList, bool isDeduct = false)
+    {
+        foreach (var order in orderList)
         {
-            var seller = await GetCurrentSellerAsync();
-            if (seller == null) return RedirectToAction("Login", "Auth");
-            var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
-
-            if (!seller.IsApproved && tab != "General" && tab != "Profile")
-                tab = "General";
-
-            ViewBag.ActiveTab = tab;
-            ViewBag.ShopName = seller.ShopName;
-            ViewBag.IsApproved = seller.IsApproved;
-
-            var notifications = await _notificationService.GetForUserAsync(seller.UserId);
-            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
-
-            if (seller.IsApproved)
+            foreach (var item in order.OrderItems)
             {
-                var products = await _context.Products
-                    .Include(p => p.Category)
-                    .Where(p => p.SellerId == seller.UserId)
-                    .ToListAsync();
+                if (!productMap.TryGetValue(item.ProductId, out var product))
+                    continue;
 
-                ViewBag.Products = products;
-                ViewBag.BannedProductCount = products.Count(p => p.IsDeleted);
+                var costPrice = product.OriginalPrice > 0
+                    ? product.OriginalPrice
+                    : (double)item.Price;
 
-                // ── Active products for revenue potential ──
-                var activeProducts = products.Where(p => !p.IsDeleted && !p.IsDraft).ToList();
-                ViewBag.ActiveProductCount = activeProducts.Count;
+                var margin = (double)item.Price - costPrice;
 
-                // ── Revenue Potential = remaining stock × selling price ──
-                ViewBag.TotalRevenuePotential = activeProducts
-                    .Sum(p => p.Price * p.StockQuantity);
+                if (margin <= 0) continue;
 
-                // ── Actual Profit = delivered orders (profit margin per unit sold) ──
-                //    minus refunded amounts (approved returns only)
-                var deliveredOrders = await _context.Order
-                    .Include(o => o.OrderItems)
-                    .Where(o => o.SellerUserId == seller.UserId
-                            && (o.CurrentStatus == OrderStatus.DELIVERED
-                            || o.CurrentStatus == OrderStatus.RECEIVED
-                            || o.CurrentStatus == OrderStatus.RETURN_REFUND))
-                    .ToListAsync();
-
-                double actualProfit = 0;
-
-                foreach (var order in deliveredOrders)
-                {
-                    foreach (var item in order.OrderItems)
-                    {
-                        // Find the original cost price of this product
-                        var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                        var costPrice = product != null && product.OriginalPrice > 0
-                            ? product.OriginalPrice
-                            : (double)item.Price; // fallback: no margin known
-
-                        var margin = (double)item.Price - costPrice;
-                        if (margin > 0)
-                            actualProfit += margin * item.Quantity;
-                    }
-
-                    // Subtract refunded profit if return was approved
-                    if (order.ReturnApprovedAt.HasValue)
-                    {
-                        foreach (var item in order.OrderItems)
-                        {
-                            var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                            var costPrice = product != null && product.OriginalPrice > 0
-                                ? product.OriginalPrice
-                                : (double)item.Price;
-
-                            var margin = (double)item.Price - costPrice;
-                            if (margin > 0)
-                                actualProfit -= margin * item.Quantity;
-                        }
-                    }
-                }
-
-                ViewBag.TotalProfit = (decimal)actualProfit;
-                if (tab == "Order")
-                {
-                    var orders = await _context.Order
-                        .Include(o => o.Customer)
-                        .Include(o => o.OrderItems)
-                            .ThenInclude(oi => oi.Product)
-                        .Where(o => o.SellerUserId == seller.UserId)
-                        .OrderByDescending(o => o.OrderTime)
-                        .ToListAsync();
-                    ViewBag.Orders = orders;                                   
-                }
-                if (tab == "Profile")
-                    {
-                        ViewBag.ProfileSeller = seller;
-                    }            
-
-                if (tab == "Chat")
-                {
-                    // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
-                    var chatList = await _context.ChatRoom
-                        .Where(r => r.SellerId == currentUserId)
-                        .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
-                        {
-                            ChatRoomId = r.ChatRoomId,
-                            CustomerName = r.Customer != null ? r.Customer.FullName : "Unknown Customer",
-                            LastMessage = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.MessageText).FirstOrDefault() ?? "",
-                            LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.SentAt).FirstOrDefault(),
-                            UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
-                        })
-                        .OrderByDescending(x => x.LastMessageTime)
-                        .ToListAsync();
-
-                    // 💡 返回的是卖家主视图，但带上了聊天列表数据模型
-                    return View("Home", chatList); 
-                }
+                actualProfit += isDeduct
+                    ? -(margin * item.Quantity)
+                    : (margin * item.Quantity);
             }
-            return View();
         }
+    }
+
+    AddOrderProfit(deliveredOrders, false);
+    // AddOrderProfit(refundedOrders, true);
+
+    ViewBag.TotalProfit = (decimal)actualProfit;
+
+    // ─────────────────────────────────────────────
+    // TAB: ORDER
+    // ─────────────────────────────────────────────
+    if (tab == "Order")
+    {
+        ViewBag.Orders = orders
+            .OrderByDescending(o => o.OrderTime)
+            .ToList();
+    }
+
+    // ─────────────────────────────────────────────
+    // TAB: PROFILE
+    // ─────────────────────────────────────────────
+    if (tab == "Profile")
+    {
+        ViewBag.ProfileSeller = seller;
+    }
+
+    // ─────────────────────────────────────────────
+    // TAB: CHAT
+    // ─────────────────────────────────────────────
+    if (tab == "Chat")
+    {
+        var chatList = await _context.ChatRoom
+            .Where(r => r.SellerId == currentUserId)
+            .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
+            {
+                ChatRoomId = r.ChatRoomId,
+                CustomerName = r.Customer != null ? r.Customer.FullName : "Unknown Customer",
+                LastMessage = r.Messages
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => m.MessageText)
+                    .FirstOrDefault() ?? "",
+                LastMessageTime = r.Messages
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => m.SentAt)
+                    .FirstOrDefault(),
+                UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
+            })
+            .OrderByDescending(x => x.LastMessageTime)
+            .ToListAsync();
+
+        return View("Home", chatList);
+    }
+
+    return View();
+}
+
+        // public async Task<IActionResult> Home(string tab = "General")
+        // {
+        //     var seller = await GetCurrentSellerAsync();
+        //     if (seller == null) return RedirectToAction("Login", "Auth");
+        //     var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
+
+        //     if (!seller.IsApproved && tab != "General" && tab != "Profile")
+        //         tab = "General";
+
+        //     ViewBag.ActiveTab = tab;
+        //     ViewBag.ShopName = seller.ShopName;
+        //     ViewBag.IsApproved = seller.IsApproved;
+
+        //     var notifications = await _notificationService.GetForUserAsync(seller.UserId);
+        //     ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
+
+        //     if (seller.IsApproved)
+        //     {
+        //         var products = await _context.Products
+        //             .Include(p => p.Category)
+        //             .Where(p => p.SellerId == seller.UserId)
+        //             .ToListAsync();
+
+        //         ViewBag.Products = products;
+        //         ViewBag.BannedProductCount = products.Count(p => p.IsDeleted);
+
+        //         // ── Active products for revenue potential ──
+        //         var activeProducts = products.Where(p => !p.IsDeleted && !p.IsDraft).ToList();
+        //         ViewBag.ActiveProductCount = activeProducts.Count;
+
+        //         // ── Revenue Potential = remaining stock × selling price ──
+        //         ViewBag.TotalRevenuePotential = activeProducts
+        //             .Sum(p => p.Price * p.StockQuantity);
+
+        //         // ── Actual Profit = delivered orders (profit margin per unit sold) ──
+        //         //    minus refunded amounts (approved returns only)
+        //         var deliveredOrders = await _context.Order
+        //             .Include(o => o.OrderItems)
+        //             .Where(o =>
+        //                 o.SellerUserId == seller.UserId &&
+        //                 (o.CurrentStatus == OrderStatus.DELIVERED
+        //                 || o.CurrentStatus == OrderStatus.RECEIVED))
+        //             .ToListAsync();
+
+        //         double actualProfit = 0;
+
+        //         foreach (var order in deliveredOrders)
+        //         {
+        //             foreach (var item in order.OrderItems)
+        //             {
+        //                 // Find the original cost price of this product
+        //                 var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+        //                 var costPrice = product != null && product.OriginalPrice > 0
+        //                     ? product.OriginalPrice
+        //                     : (double)item.Price; // fallback: no margin known
+
+        //                 var margin = (double)item.Price - costPrice;
+        //                 if (margin > 0)
+        //                     actualProfit += margin * item.Quantity;
+        //             }
+
+        //             // Subtract refunded profit if return was approved
+        //             if (order.ReturnApprovedAt.HasValue)
+        //             {
+        //                 foreach (var item in order.OrderItems)
+        //                 {
+        //                     var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+        //                     var costPrice = product != null && product.OriginalPrice > 0
+        //                         ? product.OriginalPrice
+        //                         : (double)item.Price;
+
+        //                     var margin = (double)item.Price - costPrice;
+        //                     if (margin > 0)
+        //                         actualProfit -= margin * item.Quantity;
+        //                 }
+        //             }
+        //         }
+
+        //         ViewBag.TotalProfit = (decimal)actualProfit;
+        //         if (tab == "Order")
+        //         {
+        //             var orders = await _context.Order
+        //                 .Include(o => o.Customer)
+        //                 .Include(o => o.OrderItems)
+        //                     .ThenInclude(oi => oi.Product)
+        //                 .Where(o => o.SellerUserId == seller.UserId)
+        //                 .OrderByDescending(o => o.OrderTime)
+        //                 .ToListAsync();
+        //             ViewBag.Orders = orders;                                   
+        //         }
+        //         if (tab == "Profile")
+        //             {
+        //                 ViewBag.ProfileSeller = seller;
+        //             }            
+
+        //         if (tab == "Chat")
+        //         {
+        //             // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
+        //             var chatList = await _context.ChatRoom
+        //                 .Where(r => r.SellerId == currentUserId)
+        //                 .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
+        //                 {
+        //                     ChatRoomId = r.ChatRoomId,
+        //                     CustomerName = r.Customer != null ? r.Customer.FullName : "Unknown Customer",
+        //                     LastMessage = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.MessageText).FirstOrDefault() ?? "",
+        //                     LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.SentAt).FirstOrDefault(),
+        //                     UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
+        //                 })
+        //                 .OrderByDescending(x => x.LastMessageTime)
+        //                 .ToListAsync();
+
+        //             // 💡 返回的是卖家主视图，但带上了聊天列表数据模型
+        //             return View("Home", chatList); 
+        //         }
+        //     }
+        //     return View();
+        // }
 
         // ─────────────────────────────────────────────────────────────────────
         // SELLER PROFILE — Update Address
@@ -704,12 +852,12 @@ namespace EcommerceSystem.Controllers
 
             // Role check: seller is not allowed to set CANCELED or RETURN_REFUND.
             // This is enforced server-side regardless of what the UI shows.
-            if (newStatus == OrderStatus.CANCELED || newStatus == OrderStatus.RETURN_REFUND)
-            {
-                TempData["OrderError"] = $"Sellers cannot set an order to {newStatus}. " +
-                                          "This action can only be performed by the customer.";
-                return RedirectToAction("Home", new { tab = "Order" });
-            }
+            // if (newStatus == OrderStatus.CANCELED || newStatus == OrderStatus.RETURN_REFUND)
+            // {
+            //     TempData["OrderError"] = $"Sellers cannot set an order to {newStatus}. " +
+            //                               "This action can only be performed by the customer.";
+            //     return RedirectToAction("Home", new { tab = "Order" });
+            // }
 
             // Check against the seller-specific transition map
             var sellerAllowed = Order.SellerAllowedTransitions.TryGetValue(
@@ -744,154 +892,154 @@ namespace EcommerceSystem.Controllers
         // The order stays in RETURN_REFUND status (terminal for both sides);
         // ReturnApprovedAt is stamped so the admin / dashboard can track it.
         // ─────────────────────────────────────────────────────────────────────
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ApproveReturn(int orderId,
-            List<int> approveItemIds, List<int> approveQtys, string? returnType)
-        {
-            var seller = await GetCurrentSellerAsync();
-            if (seller == null) return RedirectToAction("Login", "Auth");
+        // [HttpPost]
+        // [ValidateAntiForgeryToken]
+        // public async Task<IActionResult> ApproveReturn(int orderId,
+        //     List<int> approveItemIds, List<int> approveQtys, string? returnType)
+        // {
+        //     var seller = await GetCurrentSellerAsync();
+        //     if (seller == null) return RedirectToAction("Login", "Auth");
 
-            if (!seller.IsApproved)
-            {
-                TempData["OrderError"] = "Your account is pending admin approval.";
-                return RedirectToAction("Home", new { tab = "General" });
-            }
+        //     if (!seller.IsApproved)
+        //     {
+        //         TempData["OrderError"] = "Your account is pending admin approval.";
+        //         return RedirectToAction("Home", new { tab = "General" });
+        //     }
 
-            var order = await _context.Order
-                .Include(o => o.OrderItems)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                     && o.SellerUserId == seller.UserId
-                                     && o.CurrentStatus == OrderStatus.RETURN_REFUND);
+        //     var order = await _context.Order
+        //         .Include(o => o.OrderItems)
+        //         .FirstOrDefaultAsync(o => o.OrderId == orderId
+        //                              && o.SellerUserId == seller.UserId
+        //                              && o.CurrentStatus == OrderStatus.RETURN_REFUND);
 
-            if (order == null)
-            {
-                TempData["OrderError"] = "Order not found or not in RETURN_REFUND status.";
-                return RedirectToAction("Home", new { tab = "Order" });
-            }
+        //     if (order == null)
+        //     {
+        //         TempData["OrderError"] = "Order not found or not in RETURN_REFUND status.";
+        //         return RedirectToAction("Home", new { tab = "Order" });
+        //     }
 
-            if (order.ReturnApprovedAt.HasValue)
-            {
-                TempData["OrderError"] = "Return has already been approved for this order.";
-                return RedirectToAction("Home", new { tab = "Order" });
-            }
+        //     if (order.ReturnApprovedAt.HasValue)
+        //     {
+        //         TempData["OrderError"] = "Return has already been approved for this order.";
+        //         return RedirectToAction("Home", new { tab = "Order" });
+        //     }
 
-            if (approveItemIds == null || approveItemIds.Count == 0)
-            {
-                TempData["OrderError"] = "Please select at least one item to approve.";
-                return RedirectToAction("Home", new { tab = "Order" });
-            }
+        //     if (approveItemIds == null || approveItemIds.Count == 0)
+        //     {
+        //         TempData["OrderError"] = "Please select at least one item to approve.";
+        //         return RedirectToAction("Home", new { tab = "Order" });
+        //     }
 
-            // ── Stock restoration logic ──────────────────────────────────────
-            // ReturnRefund : customer physically sends item back → add stock back.
-            // RefundOnly   : item was never received / partially missing → stock
-            //                stays as-is (items were never returned to warehouse).
-            bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
-                                      StringComparison.OrdinalIgnoreCase);
+        //     // ── Stock restoration logic ──────────────────────────────────────
+        //     // ReturnRefund : customer physically sends item back → add stock back.
+        //     // RefundOnly   : item was never received / partially missing → stock
+        //     //                stays as-is (items were never returned to warehouse).
+        //     bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
+        //                               StringComparison.OrdinalIgnoreCase);
 
-            var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
-            var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+        //     var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
+        //     var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
 
-            // ── Calculate the actual approved refund amount ───────────────────
-            // Sum only approved items × approved qty × unit price.
-            // This is what shows in the notification — NOT the full order total.
-            decimal approvedRefundAmount = 0;
-            foreach (var (itemId, qty) in pairs)
-            {
-                if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
-                if (qty <= 0 || qty > orderItem.Quantity) continue;
+        //     // ── Calculate the actual approved refund amount ───────────────────
+        //     // Sum only approved items × approved qty × unit price.
+        //     // This is what shows in the notification — NOT the full order total.
+        //     decimal approvedRefundAmount = 0;
+        //     foreach (var (itemId, qty) in pairs)
+        //     {
+        //         if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
+        //         if (qty <= 0 || qty > orderItem.Quantity) continue;
 
-                approvedRefundAmount += qty * orderItem.Price;
+        //         approvedRefundAmount += qty * orderItem.Price;
 
-                if (isReturnRefund)
-                {
-                    // Physical return: restore the approved quantity to stock
-                    var product = await _context.Products.FindAsync(orderItem.ProductId);
-                    if (product != null)
-                        product.StockQuantity += qty;
-                }
-                // RefundOnly: no stock change — items were not physically returned
-            }
+        //         if (isReturnRefund)
+        //         {
+        //             // Physical return: restore the approved quantity to stock
+        //             var product = await _context.Products.FindAsync(orderItem.ProductId);
+        //             if (product != null)
+        //                 product.StockQuantity += qty;
+        //         }
+        //         // RefundOnly: no stock change — items were not physically returned
+        //     }
 
-            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
-            order.ReturnApprovedAt = DateTime.UtcNow;
+        //     order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
+        //     order.ReturnApprovedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+        //     await _context.SaveChangesAsync();
 
-            // ── Notify Customer, Seller, and Admin after return approval ──────
-            // ReturnStatus moves to Approved but CurrentStatus stays RETURN_REFUND,
-            // so the standard observers won't fire — we send notifications directly.
-            try
-            {
-                // Reload with nav props so messages can include names/details
-                var orderWithDetails = await _context.Order
-                    .Include(o => o.Customer)
-                    .Include(o => o.Seller)
-                    .Include(o => o.OrderItems)
-                        .ThenInclude(oi => oi.Product)
-                    .FirstOrDefaultAsync(o => o.OrderId == orderId);
+        //     // ── Notify Customer, Seller, and Admin after return approval ──────
+        //     // ReturnStatus moves to Approved but CurrentStatus stays RETURN_REFUND,
+        //     // so the standard observers won't fire — we send notifications directly.
+        //     try
+        //     {
+        //         // Reload with nav props so messages can include names/details
+        //         var orderWithDetails = await _context.Order
+        //             .Include(o => o.Customer)
+        //             .Include(o => o.Seller)
+        //             .Include(o => o.OrderItems)
+        //                 .ThenInclude(oi => oi.Product)
+        //             .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
-                if (orderWithDetails != null)
-                {
-                    var returnTypeLabel = isReturnRefund ? "Return & Refund" : "Refund Only";
-                    var customerName    = orderWithDetails.Customer?.FullName ?? "Customer";
-                    var customerId      = orderWithDetails.Customer?.UserId;
-                    var sellerId        = orderWithDetails.Seller?.UserId;
-                    var shopName        = orderWithDetails.Seller?.ShopName   ?? "the seller";
-                    // Use the calculated approved amount, not the full order total
-                    var total           = approvedRefundAmount;
+        //         if (orderWithDetails != null)
+        //         {
+        //             var returnTypeLabel = isReturnRefund ? "Return & Refund" : "Refund Only";
+        //             var customerName    = orderWithDetails.Customer?.FullName ?? "Customer";
+        //             var customerId      = orderWithDetails.Customer?.UserId;
+        //             var sellerId        = orderWithDetails.Seller?.UserId;
+        //             var shopName        = orderWithDetails.Seller?.ShopName   ?? "the seller";
+        //             // Use the calculated approved amount, not the full order total
+        //             var total           = approvedRefundAmount;
 
-                    // Notify Customer
-                    if (customerId.HasValue)
-                    {
-                        await _notificationService.CreateAsync(
-                            userId:  customerId.Value,
-                            title:   "Return & Refund Approved",
-                            message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
-                                     $"has been approved. Total: RM{total:F2}"
-                        );
-                    }
+        //             // Notify Customer
+        //             if (customerId.HasValue)
+        //             {
+        //                 await _notificationService.CreateAsync(
+        //                     userId:  customerId.Value,
+        //                     title:   "Return & Refund Approved",
+        //                     message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
+        //                              $"has been approved. Total: RM{total:F2}"
+        //                 );
+        //             }
 
-                    // Notify Seller (confirmation echo)
-                    if (sellerId.HasValue)
-                    {
-                        await _notificationService.CreateAsync(
-                            userId:  sellerId.Value,
-                            title:   "Return & Refund Approved",
-                            message: $"You have approved the {returnTypeLabel} request for Order #{orderId} " +
-                                     $"from {customerName}. Total: RM{total:F2}"
-                        );
-                    }
+        //             // Notify Seller (confirmation echo)
+        //             if (sellerId.HasValue)
+        //             {
+        //                 await _notificationService.CreateAsync(
+        //                     userId:  sellerId.Value,
+        //                     title:   "Return & Refund Approved",
+        //                     message: $"You have approved the {returnTypeLabel} request for Order #{orderId} " +
+        //                              $"from {customerName}. Total: RM{total:F2}"
+        //                 );
+        //             }
 
-                    // Notify all Admins
-                    var adminIds = await _context.Users
-                        .Where(u => u.Role == "Admin" && u.IsActive)
-                        .Select(u => u.UserId)
-                        .ToListAsync();
+        //             // Notify all Admins
+        //             var adminIds = await _context.Users
+        //                 .Where(u => u.Role == "Admin" && u.IsActive)
+        //                 .Select(u => u.UserId)
+        //                 .ToListAsync();
 
-                    foreach (var adminId in adminIds)
-                    {
-                        await _notificationService.CreateAsync(
-                            userId:  adminId,
-                            title:   "Return & Refund Approved",
-                            message: $"Order #{orderId} — {shopName} has approved a {returnTypeLabel} " +
-                                     $"request from {customerName}. Total: RM{total:F2}"
-                        );
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[SellerController] Return approval notification failed for order #{orderId}: {ex.Message}");
-            }
+        //             foreach (var adminId in adminIds)
+        //             {
+        //                 await _notificationService.CreateAsync(
+        //                     userId:  adminId,
+        //                     title:   "Return & Refund Approved",
+        //                     message: $"Order #{orderId} — {shopName} has approved a {returnTypeLabel} " +
+        //                              $"request from {customerName}. Total: RM{total:F2}"
+        //                 );
+        //             }
+        //         }
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Console.Error.WriteLine($"[SellerController] Return approval notification failed for order #{orderId}: {ex.Message}");
+        //     }
  
-            var stockMsg = isReturnRefund
-                ? "Stock has been restored."
-                : "Stock unchanged (Refund Only — items not physically returned).";
+        //     var stockMsg = isReturnRefund
+        //         ? "Stock has been restored."
+        //         : "Stock unchanged (Refund Only — items not physically returned).";
 
-            TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
-            return RedirectToAction("Home", new { tab = "Order" });
-        }
+        //     TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
+        //     return RedirectToAction("Home", new { tab = "Order" });
+        // }
 
         public IActionResult Chat()
         {

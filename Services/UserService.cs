@@ -53,4 +53,18 @@ public class UserService : IUserService
 
         return true;
     }
+
+    public async Task<bool> RegisterCustomerServiceAsync(RegisterCustomerServiceDto dto)
+    {
+        if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
+            return false;
+
+        UserCreator creator = new CustomerServiceCreator(dto);
+        var user = creator.CreateUser();
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
 }
