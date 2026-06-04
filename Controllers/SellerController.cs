@@ -151,26 +151,17 @@ namespace EcommerceSystem.Controllers
                             || o.CurrentStatus == OrderStatus.RETURN_REFUND))
                     .ToListAsync();
 
-                double actualProfit = 0;
+                    double actualProfit = 0;
 
-                foreach (var order in deliveredOrders)
-                {
-                    foreach (var item in order.OrderItems)
+                    foreach (var order in deliveredOrders)
                     {
-                        // Find the original cost price of this product
-                        var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                        var costPrice = product != null && product.OriginalPrice > 0
-                            ? product.OriginalPrice
-                            : (double)item.Price; // fallback: no margin known
+                        // Compute voucher discount ratio for this order
+                        decimal rawSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+                        decimal voucherDiscount = order.VoucherDiscountAmount > 0
+                            ? order.VoucherDiscountAmount
+                            : Math.Max(0m, rawSubtotal - order.TotalAmount);
+                        decimal discountRatio = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
 
-                        var margin = (double)item.Price - costPrice;
-                        if (margin > 0)
-                            actualProfit += margin * item.Quantity;
-                    }
-
-                    // Subtract refunded profit if return was approved
-                    if (order.ReturnApprovedAt.HasValue)
-                    {
                         foreach (var item in order.OrderItems)
                         {
                             var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
@@ -178,12 +169,43 @@ namespace EcommerceSystem.Controllers
                                 ? product.OriginalPrice
                                 : (double)item.Price;
 
-                            var margin = (double)item.Price - costPrice;
-                            if (margin > 0)
-                                actualProfit -= margin * item.Quantity;
+                            // Discounted selling price per unit (what customer actually paid per unit)
+                            var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
+
+                            var margin = discountedUnitPrice - costPrice;
+                            // Allow negative margin — don't skip with "if margin > 0"
+                            actualProfit += margin * item.Quantity;
+                        }
+
+                        // Subtract the approved refund's profit impact
+                        if (order.ReturnApprovedAt.HasValue && order.ApprovedRefundAmount > 0)
+                        {
+                            // ApprovedRefundAmount is the discounted revenue returned to customer.
+                            // We need to subtract only the PROFIT portion of that refund,
+                            // i.e. refund revenue minus the cost of those refunded items.
+                            // Simplest accurate approach: recalculate per item using stored refund amount
+                            // proportionally against order revenue.
+                            decimal paidMerchandise = rawSubtotal - voucherDiscount;
+                            if (paidMerchandise > 0)
+                            {
+                                // refundRatio = what fraction of total paid merchandise is being refunded
+                                decimal refundRatio = order.ApprovedRefundAmount / paidMerchandise;
+
+                                foreach (var item in order.OrderItems)
+                                {
+                                    var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                                    var costPrice = product != null && product.OriginalPrice > 0
+                                        ? product.OriginalPrice
+                                        : (double)item.Price;
+
+                                    var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
+                                    var margin = discountedUnitPrice - costPrice;
+                                    // Subtract back the profit of refunded portion
+                                    actualProfit -= margin * item.Quantity * (double)refundRatio;
+                                }
+                            }
                         }
                     }
-                }
 
                 ViewBag.TotalProfit = (decimal)actualProfit;
                 if (tab == "Order")
@@ -790,31 +812,45 @@ namespace EcommerceSystem.Controllers
                                       StringComparison.OrdinalIgnoreCase);
 
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
-            var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+
+            // ── Compute per-item discounted price ────────────────────────────
+            // TotalAmount stores the post-voucher MERCHANDISE total only
+            // (shipping/SST are excluded from TotalAmount in your checkout).
+            // So we never need to subtract shipping here.
+            decimal merchandiseSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+
+            // Voucher discount: use stored field (preferred), else derive from TotalAmount
+            decimal voucherDiscount = order.VoucherDiscountAmount > 0
+                ? order.VoucherDiscountAmount
+                : Math.Max(0m, merchandiseSubtotal - order.TotalAmount);
+
+            // Proportional discount ratio across all items
+            decimal discountRatio = merchandiseSubtotal > 0
+                ? voucherDiscount / merchandiseSubtotal
+                : 0m;
 
             // ── Calculate the actual approved refund amount ───────────────────
-            // Sum only approved items × approved qty × unit price.
-            // This is what shows in the notification — NOT the full order total.
             decimal approvedRefundAmount = 0;
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
 
-                approvedRefundAmount += qty * orderItem.Price;
+                decimal discountedUnitPrice = Math.Round(orderItem.Price * (1 - discountRatio), 2);
+                approvedRefundAmount += qty * discountedUnitPrice;
 
                 if (isReturnRefund)
                 {
-                    // Physical return: restore the approved quantity to stock
                     var product = await _context.Products.FindAsync(orderItem.ProductId);
                     if (product != null)
                         product.StockQuantity += qty;
                 }
-                // RefundOnly: no stock change — items were not physically returned
             }
 
             order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
             order.ReturnApprovedAt = DateTime.UtcNow;
+            order.ApprovedRefundAmount  = approvedRefundAmount;  
 
             await _context.SaveChangesAsync();
 
