@@ -82,28 +82,38 @@
                         </div>
 
                         <div class="field">
-                            <label asp-for="Gender">Gender</label>
+                            <label asp-for="Gender">
+                                Gender
+                                <span class="info-icon" data-message="Gender can only be updated once.">?</span>
+                            </label>
+
                             <div class="select-wrap">
-                                <select asp-for="Gender" required>
+                                <select asp-for="Gender" required id="genderField">
                                     <option value="" disabled selected>Select gender</option>
                                     <option>Male</option>
                                     <option>Female</option>
                                 </select>
-                                <i class="ti ti-chevron-down select-chevron" aria-hidden="true"></i>
+                                <i class="ti ti-chevron-down select-chevron"></i>
                             </div>
+
                             <span asp-validation-for="Gender" class="text-danger"></span>
                         </div>
 
                         <div class="field">
-                            <label asp-for="Birthday">Birthday</label>
-                            <input asp-for="Birthday" type="date" required />
+                            <label asp-for="Birthday">
+                                Birthday
+                                <span class="info-icon" data-message="Birthday can only be updated once.">?</span>
+                            </label>
+
+                            <input asp-for="Birthday" type="date" required id="birthdayField" />
+
                             <span asp-validation-for="Birthday" class="text-danger"></span>
                         </div>
 
                         <div class="field">
-                            <label asp-for="Phone">Phone</label>
-                            <input asp-for="Phone" required />
-                            <span asp-validation-for="Phone" class="text-danger"></span>
+                            <label asp-for="PhoneNumber">Phone Number</label>
+                            <input asp-for="PhoneNumber" required />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
                         </div>
                     </div>
                 </div>
@@ -425,5 +435,11 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
+     <script>
+        window.genderLocked = @Model.GenderLocked.ToString().ToLower();
+        window.birthdayLocked = @Model.BirthdayLocked.ToString().ToLower();
+    </script>
+    
     <script src="~/js/customer/profile.js" asp-append-version="true"></script>
 }

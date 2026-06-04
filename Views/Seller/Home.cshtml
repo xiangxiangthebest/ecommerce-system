@@ -840,7 +840,7 @@
                 returnReason    = displayReturnReason,
                 returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "",
                 customerEmail   = o.Customer?.Email ?? "—",
-                customerPhone   = o.Customer?.Phone ?? "—",
+                customerPhone   = o.Customer?.PhoneNumber ?? "—",
                 customerName    = (o.Customer?.FullName ?? ""),
                 deliveryName    = o.DeliveryRecipientName,
                 deliveryPhone   = o.DeliveryPhoneNumber,

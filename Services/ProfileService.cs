@@ -36,13 +36,22 @@ namespace EcommerceSystem.Services
 
             var originalBirthday = customer.Birthday;
 
+            if (!customer.GenderLocked && updated.Gender != customer.Gender)
+            {
+                customer.Gender = updated.Gender;
+                customer.GenderLocked = true;
+            }
+
+            if (!customer.BirthdayLocked && updated.Birthday != customer.Birthday)
+            {
+                customer.Birthday = updated.Birthday;
+                customer.BirthdayLocked = true;
+            }
+
             // Update fields (business rules live here now)
             customer.FullName = updated.FullName;
             customer.Email = updated.Email;
             customer.PhoneNumber = updated.PhoneNumber;
-            customer.Phone = updated.Phone;
-            customer.Gender = updated.Gender;
-            customer.Birthday = updated.Birthday;
 
             if (profileImage != null && profileImage.Length > 0)
             {
