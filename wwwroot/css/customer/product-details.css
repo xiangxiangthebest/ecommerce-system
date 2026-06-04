@@ -1073,6 +1073,7 @@
 .report-modal {
     background: #fff;
     border-radius: 20px;
+    margin: auto 0;
     width: 100%;
     max-width: 480px;
     border: 1px solid rgba(0, 0, 0, 0.07);
