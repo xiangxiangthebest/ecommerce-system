@@ -5,14 +5,16 @@
 }
 
 <link rel="stylesheet" href="~/css/admin/voucher-management.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/admin/manage-users.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <div class="voucher-management-section">
     <div class="voucher-management-header">
         <h2>Voucher Management</h2>
         <p>Manage all vouchers from the admin dashboard. Create new vouchers, edit existing ones, and delete expired or invalid vouchers.</p>
         <div class="header-actions">
-            <a href="@Url.Action("Home", "Admin")" class="btn btn-outline-secondary px-4 py-2">
-                <i class="fas fa-arrow-left me-2"></i> <span>Dashboard</span>
+            <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary"">
+                <i class="fas fa-arrow-left"></i> Dashboard
             </a>
         </div>
     </div>
