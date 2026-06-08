@@ -155,7 +155,16 @@ namespace EcommerceSystem.Controllers
                     .Where(o => o.SellerUserId == seller.UserId
                             && (o.CurrentStatus == OrderStatus.DELIVERED
                             || o.CurrentStatus == OrderStatus.RECEIVED
-                            || o.CurrentStatus == OrderStatus.RETURN_REFUND))
+                            || o.CurrentStatus == OrderStatus.RETURN_REFUND
+                            // ── After-sales statuses ───────────────────────────────
+                            // An order moves to AFTER_SALES_REQUESTED while a return/refund
+                            // is pending (and may end up REFUND for refund-only). We keep
+                            // counting its profit here so revenue doesn't "drop" while the
+                            // request is pending. Once approved, ReturnApprovedAt +
+                            // ApprovedRefundAmount are set and the deduction below applies —
+                            // exactly the same way your original RETURN_REFUND case did.
+                            || o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED
+                            || o.CurrentStatus == OrderStatus.REFUND))
                     .ToListAsync();
 
 double actualProfit = 0;
@@ -936,7 +945,7 @@ double actualProfit = 0;
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                                     && o.SellerUserId == seller.UserId
-                                    && o.CurrentStatus == OrderStatus.RETURN_REFUND);
+                                    && o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED);
 
             if (order == null)
             {
@@ -999,6 +1008,8 @@ var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
                 order.ReturnType           = isReturnRefund
                                             ? EcommerceSystem.Enums.ReturnType.ReturnRefund
                                             : EcommerceSystem.Enums.ReturnType.RefundOnly;
+
+                order.CurrentStatus = OrderStatus.RETURN_REFUND;
 
             await _context.SaveChangesAsync();
 

@@ -2,8 +2,8 @@
    purchase-history.js
    Customer Purchase History – all interactive logic
    ============================================================ */
-
 'use strict';
+
 
 // ── Order data (injected by Razor via window.PH_ORDERS) ────
 const _orders = window.PH_ORDERS || [];
@@ -750,15 +750,14 @@ function rtnRenderPreviews() {
 
 async function submitReturn() {
     const orderId = currentReturnOrderId;
-    // const orderId = document.getElementById('returnOrderId').value;
     const description = document.getElementById('returnReason').value.trim();
+
     if (!description) {
         showInlineError('returnModal', 'Please describe your issue.');
         return;
     }
 
     const checkedBoxes = document.querySelectorAll('#rtnItemList .rtn-item-checkbox:checked');
-
     if (!checkedBoxes.length) {
         showInlineError('returnModal', 'Please select at least one item.');
         return;
@@ -774,10 +773,8 @@ async function submitReturn() {
         return;
     }
 
-    // build selected items (optional debug/info only)
     const items = Array.from(checkedBoxes).map(cb => {
         const row = cb.closest('.rtn-item-row');
-
         return {
             orderItemId: parseInt(cb.dataset.orderItemId),
             qty: parseInt(row.querySelector('.rtn-qty-input').value || 1)
@@ -785,19 +782,18 @@ async function submitReturn() {
     });
 
     const formData = new FormData();
+    formData.append('orderId', orderId);
+    formData.append('requestServiceType', _rtnSelectedType);   
+    formData.append('requestIssueType', _rtnSelectedReason);   
+    formData.append('description', description);
 
-    // ===== match controller params EXACTLY =====
-    formData.append("orderId", orderId);
+    items.forEach(item => {                                     
+        formData.append('requestItemIds', item.orderItemId);
+        formData.append('requestItemQtys', item.qty);
+    });
 
-    formData.append("requestServiceType", _rtnSelectedType);
-
-    formData.append("requestIssueType", _rtnSelectedReason);
-
-    formData.append("description", description);
-
-    // images (IMPORTANT: must match List<IFormFile> images)
     _rtnFiles.forEach(file => {
-        formData.append("images", file);
+        formData.append('images', file);
     });
 
     const btn = document.querySelector('#returnModal .ph-btn-return');
@@ -816,10 +812,10 @@ async function submitReturn() {
             closeReturnModal();
             showToast('Request submitted successfully!', 'success');
             setTimeout(() => location.reload(), 1000);
+            return; // exit before re-enabling (page reloads anyway)
         } else {
             showInlineError('returnModal', data.message || 'Failed to submit request.');
         }
-
     } catch (err) {
         console.error(err);
         showInlineError('returnModal', 'Network error. Please try again.');
@@ -827,7 +823,6 @@ async function submitReturn() {
 
     btn.disabled = false;
     btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
-
 }
 
 /* ============================================================
