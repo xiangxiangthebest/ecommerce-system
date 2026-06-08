@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
-using EcommerceSystem.Observers;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -749,9 +749,9 @@ namespace EcommerceSystem.Controllers
             }
 
             // Attach observers — they are called inside SetStatusAsync()
-            order.Attach(new CustomerDashboardObserver(_notificationService));
-            order.Attach(new SellerDashboardObserver(_notificationService));
-            order.Attach(new AdminPanelObserver(_notificationService, _context));
+            order.Attach(new CustomerNotificationObserver(_notificationService));
+            order.Attach(new SellerNotificationObserver(_notificationService));
+            order.Attach(new AdminNotificationObserver(_notificationService, _context));
 
             // SetStatusAsync does the final validation, stamps timestamps, notifies observers
             await order.SetStatusAsync(newStatus);

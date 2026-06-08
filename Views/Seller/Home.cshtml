@@ -880,8 +880,7 @@
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
 
-        const typeIconMap = { 'Refund Only': { icon: '💰', label: 'Refund Only' }, 'RefundOnly': { icon: '💰', label: 'Refund Only' }, 'Return & Refund': { icon: '📦', label: 'Return & Refund' }, 'ReturnRefund': { icon: '📦', label: 'Return & Refund' } };
-        const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
+        const typeIconMap = { 'Refund Only': { icon: '💰', label: 'Refund Only' }, 'RefundOnly': { icon: '💰', label: 'Refund Only' }, 'Return \u0026 Refund': { icon: '📦', label: 'Return \u0026 Refund' }, 'ReturnRefund': { icon: '📦', label: 'Return \u0026 Refund' } };        const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
         const custName   = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
 
         let summaryHtml = `
@@ -1020,7 +1019,7 @@
         });
 
         if (res.ok) { location.reload(); } 
-        else { btn.disabled = false; btn.textContent = 'Approve & Process'; alert('Failed to approve return.'); }
+        else { btn.disabled = false; btn.textContent = 'Approve \u0026 Process'; alert('Failed to approve return.'); }
     }
 
     const statusLabels = {
@@ -1087,7 +1086,7 @@
 
         if (noteLines.length) {
             let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
-            notesEl.innerHTML = `<div class="od-section-label">Notes & Remarks</div>${noteHtml}`;
+            notesEl.innerHTML = `<div class=\"od-section-label\">Notes \u0026 Remarks</div>${noteHtml}`;
             notesEl.style.display = 'block';
         } else {
             notesEl.style.display = 'none';

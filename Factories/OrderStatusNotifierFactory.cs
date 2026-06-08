@@ -27,9 +27,9 @@ public class OrderStatusNotifierFactory
         var notifier = new OrderStatusNotifier();
 
         // Attach all three observers
-        notifier.Attach(new CustomerDashboardObserver(_notificationService));
-        notifier.Attach(new SellerDashboardObserver(_notificationService));
-        notifier.Attach(new AdminPanelObserver(_notificationService, _context));
+        notifier.Attach(new CustomerNotificationObserver(_notificationService));
+        notifier.Attach(new SellerNotificationObserver(_notificationService));
+        notifier.Attach(new AdminNotificationObserver(_notificationService, _context));
 
         return notifier;
     }
