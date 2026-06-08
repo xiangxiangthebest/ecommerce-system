@@ -15,6 +15,7 @@ let _rtnOrderItems          = [];
 let _rtnSelectedType        = '';
 let _rtnSelectedReason      = '';
 let _ratingFilesByOrderItem = {};   // { [orderItemId]: File[] }
+let currentReturnOrderId = null;
 
 /* ============================================================
    INIT
@@ -470,7 +471,6 @@ function openCancelModal(orderId, request) {
         submitBtn.dataset.isRequest = "false";
     }
 
-
     showModal('cancelBackdrop', 'cancelModal');
 }
 
@@ -560,6 +560,7 @@ async function confirmReceived(orderId, btn) {
 function openReturnModal(orderId) {
     const order = _orders.find(o => o.orderId === orderId);
     if (!order) return;
+    currentReturnOrderId = orderId;
 
     _rtnOrderItems  = order.items.map(it => ({
         orderItemId: it.orderItemId,
@@ -571,6 +572,7 @@ function openReturnModal(orderId) {
     _rtnSelectedType   = '';
     _rtnSelectedReason = '';
 
+
     document.getElementById('returnOrderId').value = orderId;
     document.getElementById('returnReason').value  = '';
     document.querySelectorAll('.rtn-type-btn').forEach(b => b.classList.remove('active'));
@@ -579,6 +581,81 @@ function openReturnModal(orderId) {
     rtnRenderItemList();
     rtnRenderPreviews();
     showModal('returnBackdrop', 'returnModal');
+}
+
+async function openRequestModal(orderId) {
+    showModal('requestDetailBackdrop', 'requestDetailModal'); // ✅ 改用 showModal
+    document.getElementById('requestDetailBody').innerHTML = `
+        <div style="text-align:center; padding: 40px;">
+            <i class="ti ti-loader" style="font-size:28px;"></i>
+        </div>`;
+
+    const res = await fetch(`/Request/GetRequest?orderId=${orderId}`);
+    const result = await res.json();
+
+    if (!result.success) {
+        document.getElementById('requestDetailBody').innerHTML = `<p style="color:red;">${result.message}</p>`;
+        return;
+    }
+
+    const itemsHtml = result.orderItems.map(item => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #ebebf5;">
+            <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
+                ${item.imageUrl
+                    ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover;">`
+                    : `<i class="ti ti-box" style="font-size:20px;color:#9a98b6;"></i>`}
+            </div>
+            <div style="flex:1;">
+                <p style="margin:0;font-size:13px;font-weight:500;">${item.productName}</p>
+                <p style="margin:0;font-size:11px;color:#9a98b6;">x${item.quantity}</p>
+            </div>
+            <p style="margin:0;font-size:13px;font-weight:500;">RM ${parseFloat(item.price).toFixed(2)}</p>
+        </div>
+    `).join('');
+
+    const imagesHtml = result.images?.length
+        ? result.images.map(url => `<img src="${url}" style="width:68px;height:68px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
+        : '<span style="font-size:13px;color:#9a98b6;">No photos attached</span>';
+
+    document.getElementById('requestDetailBody').innerHTML = `
+    <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request submitted</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.createdAt}</p>
+        </div>
+        <i class="ti ti-clock" style="font-size:20px;color:#9a98b6;"></i>
+    </div>
+
+    <div style="background:#f8f8fc;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order items</p>
+        ${itemsHtml}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+            <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Service type</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.serviceType}</p>
+        </div>
+        <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+            <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.issueType}</p>
+        </div>
+    </div>
+
+    <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
+        <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.5;">${result.description || '—'}</p>
+    </div>
+
+    <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Photos</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${imagesHtml}</div>
+    </div>
+`;
+}
+
+function closeRequestModal() {
+    hideModal('requestDetailBackdrop', 'requestDetailModal'); 
 }
 
 function rtnRenderItemList() {
@@ -622,7 +699,7 @@ function rtnSelectType(btn) {
 function rtnSelectReason(btn) {
     document.querySelectorAll('.rtn-reason-chip').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
-    _rtnSelectedReason = btn.textContent.trim();
+    _rtnSelectedReason = btn.dataset.value;
 }
 
 function closeReturnModal() {
@@ -670,67 +747,87 @@ function rtnRenderPreviews() {
     }).join('');
 }
 
+
 async function submitReturn() {
-    const orderId     = document.getElementById('returnOrderId').value;
+    const orderId = currentReturnOrderId;
+    // const orderId = document.getElementById('returnOrderId').value;
     const description = document.getElementById('returnReason').value.trim();
+    if (!description) {
+        showInlineError('returnModal', 'Please describe your issue.');
+        return;
+    }
 
     const checkedBoxes = document.querySelectorAll('#rtnItemList .rtn-item-checkbox:checked');
+
     if (!checkedBoxes.length) {
-        showInlineError('returnModal', 'Please select at least one item to return.');
-        return;
-    }
-    if (!_rtnSelectedType) {
-        showInlineError('returnModal', 'Please select a return type.');
-        return;
-    }
-    if (!_rtnSelectedReason) {
-        showInlineError('returnModal', 'Please select a reason for your return.');
+        showInlineError('returnModal', 'Please select at least one item.');
         return;
     }
 
-    // Format: "[Type] Reason - Description ||[items json]"
-    let reasonStr = `[${_rtnSelectedType}] ${_rtnSelectedReason}`;
-    if (description) reasonStr += ` - ${description}`;
-    reasonStr += `||${JSON.stringify(
-        Array.from(checkedBoxes).map(cb => {
-            const row    = cb.closest('.rtn-item-row');
-            const itemId = cb.dataset.orderItemId;
-            const item   = _rtnOrderItems.find(it => String(it.orderItemId) === String(itemId));
-            const qty    = Math.max(1, Math.min(parseInt(row.querySelector('.rtn-qty-input').value) || 1, item?.qty ?? 1));
-            return { orderItemId: parseInt(itemId), name: item?.name ?? '', returnQty: qty };
-        })
-    )}`;
+    if (!_rtnSelectedType) {
+        showInlineError('returnModal', 'Please select service type.');
+        return;
+    }
+
+    if (!_rtnSelectedReason) {
+        showInlineError('returnModal', 'Please select issue type.');
+        return;
+    }
+
+    // build selected items (optional debug/info only)
+    const items = Array.from(checkedBoxes).map(cb => {
+        const row = cb.closest('.rtn-item-row');
+
+        return {
+            orderItemId: parseInt(cb.dataset.orderItemId),
+            qty: parseInt(row.querySelector('.rtn-qty-input').value || 1)
+        };
+    });
+
+    const formData = new FormData();
+
+    // ===== match controller params EXACTLY =====
+    formData.append("orderId", orderId);
+
+    formData.append("requestServiceType", _rtnSelectedType);
+
+    formData.append("requestIssueType", _rtnSelectedReason);
+
+    formData.append("description", description);
+
+    // images (IMPORTANT: must match List<IFormFile> images)
+    _rtnFiles.forEach(file => {
+        formData.append("images", file);
+    });
 
     const btn = document.querySelector('#returnModal .ph-btn-return');
     btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting…';
+    btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting...';
 
     try {
-        const formData = new FormData();
-        formData.append('orderId', orderId);
-        formData.append('reason',  reasonStr);
-        _rtnFiles.forEach(f => formData.append('images', f));
-        if (_rtnFiles.length) formData.append('image', _rtnFiles[0]);
-        formData.append('__RequestVerificationToken',
-            document.querySelector('input[name="__RequestVerificationToken"]').value);
+        const res = await fetch('/Request/CreateAfterSalesRequest', {
+            method: 'POST',
+            body: formData
+        });
 
-        const res  = await fetch('/Customer/RequestReturnRefund', { method: 'POST', body: formData });
         const data = await res.json();
 
         if (data.success) {
             closeReturnModal();
-            showToast('Return request submitted!', 'success');
-            setTimeout(() => location.reload(), 1200);
+            showToast('Request submitted successfully!', 'success');
+            setTimeout(() => location.reload(), 1000);
         } else {
-            showInlineError('returnModal', data.message || 'Could not submit request.');
+            showInlineError('returnModal', data.message || 'Failed to submit request.');
         }
+
     } catch (err) {
-        console.error('ReturnRefund error:', err);
-        showInlineError('returnModal', 'Network error — please try again.');
+        console.error(err);
+        showInlineError('returnModal', 'Network error. Please try again.');
     }
 
     btn.disabled = false;
     btn.innerHTML = '<i class="ti ti-send"></i> Submit Request';
+
 }
 
 /* ============================================================

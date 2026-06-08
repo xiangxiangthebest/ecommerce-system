@@ -10,8 +10,6 @@ public enum OrderStatus
     CANCELED,
     CANCEL_REQUESTED,
     AFTER_SALES_REQUESTED,
-    // AFTER_SALES_PROCESSING,
     RETURN_REFUND,
-    RETURN,
-    CLOSED
+    REFUND
 }

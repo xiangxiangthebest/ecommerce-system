@@ -399,9 +399,37 @@
                                 <td>@order.TotalAmount.ToString("F2")</td>
                                 <td>@order.PaymentMethod</td>
                                 <td>
+
                                     <span class="status-badge status-@order.CurrentStatus.ToString().ToLower()">
-                                        @order.CurrentStatus
+
+                                        @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+
+                                        {
+
+                                            var afRequest = ViewBag.Requests as List<EcommerceSystem.Models.Request>;
+
+                                            var afReq = afRequest?.FirstOrDefault(r => r.OrderId == order.OrderId);
+
+                                            @(afReq?.RequestServiceType switch {
+
+                                                EcommerceSystem.Enums.RequestServiceType.RETURN_REFUND => "Require Return & Refund",
+
+                                                EcommerceSystem.Enums.RequestServiceType.REFUND => "Require Refund Only",
+
+                                                _ => "After-sales"
+
+                                            })
+                                        }
+                                        else if(order.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED){
+                                            @:Require Cancel
+                                        }
+                                        else
+                                        {
+                                            @order.CurrentStatus
+                                        }
+
                                     </span>
+
                                 </td>
                                 <td>
                                     <button class="btn-view-details" onclick="openOrderDetails(@order.OrderId)">
@@ -444,12 +472,14 @@
                                     }
                                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED)
                                     {
-                                        <button onclick="approveCancel(@order.OrderId)">
-                                            Approve Cancellation
+                                        <button class="btn-view-details" onclick="openApproveCancelModal(@order.OrderId)">
+                                            <i class="ti ti-ban"></i> View Cancel Request
                                         </button>
                                     }
-                                        <button onclick="approveReplacement(@order.OrderId)">
-                                            Approve Replacement
+                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                                    {
+                                        <button class="btn-view-details" onclick="openAfterSaleModal(@order.OrderId)">
+                                            <i class="ti ti-package-off"></i> View After-sale Request
                                         </button>
                                     }
                                     else
@@ -679,7 +709,7 @@
                             display: flex; align-items: center; justify-content: center;
                             font-size: 18px;
                         }
-                        .profit-icon-green  { background: #e8f5e9; color: #2e7d32; }
+                        .profit-iconest-green  { background: #e8f5e9; color: #2e7d32; }
                         .profit-icon-blue   { background: #e3f2fd; color: #1565c0; }
                         .profit-icon-purple { background: #ede7f6; color: #6a1b9a; }
                         .profit-card-body   { flex: 1; }
@@ -695,6 +725,385 @@
         }
     </main>
 </div>
+
+<script>
+    function showModal(backdropId, modalId) {
+        document.getElementById(backdropId).classList.add('active');
+        document.getElementById(modalId).classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function hideModal(backdropId, modalId) {
+        document.getElementById(backdropId).classList.remove('active');
+        document.getElementById(modalId).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    async function openApproveCancelModal(orderId) {
+        document.getElementById('approveCancelOrderId').value = orderId;
+        document.getElementById('approveCancelBody').innerHTML = `
+            <div style="text-align:center; padding: 40px;">
+                <i class="ti ti-loader" style="font-size:28px;"></i>
+            </div>`;
+        showModal('approveCancelBackdrop', 'approveCancelModal');
+
+        const res = await fetch(`/Seller/GetCancelRequest?orderId=${orderId}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            document.getElementById('approveCancelBody').innerHTML = `<p style="color:red;">${data.message}</p>`;
+            return;
+        }
+
+        document.getElementById('approveCancelBody').innerHTML = `
+            <div class="rtn-field-group">
+                <label class="rtn-field-label">Customer</label>
+                <p>${data.customerName}</p>
+            </div>
+            <div class="rtn-field-group">
+                <label class="rtn-field-label">Reason</label>
+                <p>${data.cancelReason}</p>
+            </div>
+        `;
+    }
+
+    function closeApproveCancelModal() {
+        hideModal('approveCancelBackdrop', 'approveCancelModal');
+    }
+
+    async function approveCancel() {
+        const orderId = document.getElementById('approveCancelOrderId').value;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        const res = await fetch('/Seller/ApproveCancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `orderId=${orderId}&__RequestVerificationToken=${token}`
+        });
+        const data = await res.json();
+        closeApproveCancelModal();
+        if (data.success) {
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert(data.message || 'Failed to approve.');
+        }
+    }
+
+    async function rejectCancel() {
+        const orderId = document.getElementById('approveCancelOrderId').value;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        const res = await fetch('/Seller/RejectCancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `orderId=${orderId}&__RequestVerificationToken=${token}`
+        });
+        const data = await res.json();
+        closeApproveCancelModal();
+        if (data.success) {
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert(data.message || 'Failed to reject.');
+        }
+    }
+
+    let isAfterSaleLoading = false;
+    let currentRequestId = null;
+
+    async function openAfterSaleModal(orderId) {
+        if (isAfterSaleLoading) return;
+        isAfterSaleLoading = true;
+
+        try {
+            document.getElementById('afterSaleOrderId').value = orderId;
+            document.getElementById('afterSaleBody').innerHTML = `
+                <div style="text-align:center;padding:40px;">
+                    <i class="ti ti-loader" style="font-size:28px;"></i>
+                </div>`;
+            showModal('afterSaleBackdrop', 'afterSaleModal');
+
+            const res = await fetch(`/Request/GetRequest?orderId=${orderId}`);
+            const result = await res.json();
+            currentRequestId = result.requestId;
+
+            if (!result.success) {
+                document.getElementById('afterSaleBody').innerHTML = `<p style="color:red;">${result.message}</p>`;
+                return;
+            }
+
+            const itemsHtml = result.orderItems.map(item => `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #ebebf5;">
+                    <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
+                        ${item.imageUrl
+                            ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover;">`
+                            : `<i class="ti ti-box" style="font-size:20px;color:#9a98b6;"></i>`}
+                    </div>
+                    <div style="flex:1;">
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${item.productName}</p>
+                        <p style="margin:0;font-size:11px;color:#9a98b6;">x${item.quantity}</p>
+                    </div>
+                    <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">RM ${parseFloat(item.price).toFixed(2)}</p>
+                </div>
+            `).join('');
+
+            const imagesHtml = result.images?.length
+                ? result.images.map(url => `<img src="${url}" style="width:68px;height:68px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
+                : '<span style="font-size:13px;color:#9a98b6;">No photos attached</span>';
+
+            document.getElementById('afterSaleBody').innerHTML = `
+                <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request submitted</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.createdAt}</p>
+                    </div>
+                    <i class="ti ti-clock" style="font-size:20px;color:#9a98b6;"></i>
+                </div>
+
+                <div style="background:#f8f8fc;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order items</p>
+                    ${itemsHtml}
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Service type</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.serviceType}</p>
+                    </div>
+                    <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.issueType}</p>
+                    </div>
+                </div>
+
+                <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+                    <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
+                    <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.5;">${result.description || '—'}</p>
+                </div>
+
+                <div style="background:#f8f8fc;border-radius:10px;padding:10px 14px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Photos</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">${imagesHtml}</div>
+                </div>
+            `;
+
+            const sellerIssueTypes = ['Wrong item received', 'Change of mind', 'Item not as described'];
+            const showActions = sellerIssueTypes.includes(result.issueType);
+
+            const footerEl = document.getElementById('afterSaleFooter');
+            footerEl.innerHTML = `
+                ${showActions ? `
+                <div class="ac-btn-group">
+                    <button class="ac-btn ac-btn-reject" onclick="rejectAfterSale()">
+                        <i class="ti ti-x"></i> Reject
+                    </button>
+                    <button class="ac-btn ac-btn-approve" onclick="approveAfterSale()">
+                        <i class="ti ti-check"></i> Approve
+                    </button>
+                </div>` : ''}
+            `;
+        } finally {
+            isAfterSaleLoading = false;
+        }
+    }
+
+    function closeAfterSaleModal() {
+        hideModal('afterSaleBackdrop', 'afterSaleModal');
+    }
+
+    async function approveAfterSale() {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        const res = await fetch(`/Request/ApproveRequest?requestId=${currentRequestId}`, {  // ← 用 requestId
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `requestId=${currentRequestId}&__RequestVerificationToken=${token}`
+        });
+        const data = await res.json();
+        closeAfterSaleModal();
+        if (data.success) {
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert(data.message || '操作失败');
+        }
+    }
+
+    async function rejectAfterSale() {
+        const orderId = document.getElementById('afterSaleOrderId').value;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+        const res = await fetch(`/Request/RejectAfterSale?requestId=${currentRequestId}&orderId=${orderId}`, {  // ← 两个参数都传
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `requestId=${currentRequestId}&orderId=${orderId}&__RequestVerificationToken=${token}`
+        });
+        const data = await res.json();
+        closeAfterSaleModal();
+        if (data.success) {
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert(data.message || '操作失败');
+        }
+    }
+</script>
+
+<style>
+    .ph-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+.ph-modal-backdrop.active { display: block; }
+
+    .ph-modal {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        z-index: 1001;
+        width: 90%;
+        max-width: 500px;
+        flex-direction: column;
+        gap: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .ph-modal.active { display: flex; }
+</style>
+
+
+<div class="ph-modal-backdrop" id="approveCancelBackdrop" onclick="closeApproveCancelModal()"></div>
+<div class="ac-modal" id="approveCancelModal">
+    <div class="ac-modal-header">
+        <div class="ac-modal-icon">
+            <i class="ti ti-ban"></i>
+        </div>
+        <div class="ac-modal-title-wrap">
+            <h3 class="ac-modal-title">Cancellation Request</h3>
+            <p class="ac-modal-sub">Review the customer's request below</p>
+        </div>
+        <button class="ac-btn ac-btn-ghost" onclick="closeApproveCancelModal()">
+            <i class="ti ti-x"></i> X
+        </button>
+    </div>
+
+    <div class="ac-modal-body" id="approveCancelBody"></div>
+    <input type="hidden" id="approveCancelOrderId" />
+
+    <div class="ac-modal-footer">
+        <div class="ac-btn-group">
+            <button class="ac-btn ac-btn-reject" onclick="rejectCancel()">
+                <i class="ti ti-x"></i> Reject
+            </button>
+            <button class="ac-btn ac-btn-approve" onclick="approveCancel()">
+                <i class="ti ti-check"></i> Approve
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="ph-modal-backdrop" id="afterSaleBackdrop" onclick="closeAfterSaleModal()"></div>
+<div class="ac-modal" id="afterSaleModal">
+    <div class="ac-modal-header">
+        <div class="ac-modal-icon" style="background:#fff7ed;color:#f97316;">
+            <i class="ti ti-package-off"></i>
+        </div>
+        <div class="ac-modal-title-wrap">
+            <h3 class="ac-modal-title">After-sale Request</h3>
+            <p class="ac-modal-sub">Customer's after-sale request details</p>
+        </div>
+        <button class="ac-btn ac-btn-ghost" onclick="closeAfterSaleModal()">
+            <i class="ti ti-x"></i> X
+        </button>
+    </div>
+    <div class="ac-modal-body" id="afterSaleBody"></div>
+    <input type="hidden" id="afterSaleOrderId" />
+    <div class="ac-modal-footer">
+        <div id="afterSaleFooter"></div> 
+    </div>
+</div>
+
+<style>
+    .ac-modal {
+        display: none;
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 460px;
+        z-index: 1001;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        overflow: hidden;
+    }
+    .ac-modal.active { display: flex; }
+
+    .ac-modal-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 24px 24px 16px;
+        border-bottom: 1px solid #f0f0f8;
+    }
+    .ac-modal-icon {
+        width: 44px; height: 44px;
+        border-radius: 12px;
+        background: #fff1f1;
+        display: flex; align-items: center; justify-content: center;
+        color: #ef4444;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+    .ac-modal-title-wrap { flex: 1; }
+    .ac-modal-title { margin: 0; font-size: 16px; font-weight: 700; color: #1e1b4b; }
+    .ac-modal-sub { margin: 3px 0 0; font-size: 12px; color: #9a98b6; }
+    .ac-modal-close {
+        background: none; border: none; cursor: pointer;
+        color: #9a98b6; font-size: 18px; padding: 4px;
+        border-radius: 6px; transition: background 0.15s;
+    }
+    .ac-modal-close:hover { background: #f0f0f8; color: #1e1b4b; }
+
+    .ac-modal-body { padding: 20px 24px; }
+
+    .ac-field { margin-bottom: 14px; }
+    .ac-field-label {
+        font-size: 11px; font-weight: 700; color: #9a98b6;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        display: block; margin-bottom: 5px;
+    }
+    .ac-field-value {
+        font-size: 14px; color: #1e1b4b; font-weight: 500;
+        background: #f8f8fc;
+        border: 1px solid #ebebf5;
+        border-radius: 8px;
+        padding: 10px 14px;
+    }
+
+    .ac-modal-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        border-top: 1px solid #f0f0f8;
+        background: #fafafa;
+    }
+    .ac-btn-group { display: flex; gap: 8px; }
+    .ac-btn {
+        padding: 9px 18px; border-radius: 10px;
+        font-size: 13px; font-weight: 700; cursor: pointer;
+        border: none; display: inline-flex; align-items: center;
+        gap: 6px; transition: all 0.15s;
+    }
+    .ac-btn-ghost { background: #f0f0f8; color: #6b6b8a; }
+    .ac-btn-ghost:hover { background: #e4e4f0; }
+    .ac-btn-reject { background: #fff1f1; color: #ef4444; }
+    .ac-btn-reject:hover { background: #fee2e2; }
+    .ac-btn-approve { background: #1e1b4b; color: #fff; }
+    .ac-btn-approve:hover { background: #312e81; }
+</style>
 
 {{!-- ── Fixed notification bell (always on top, never occluded) ── --}}
 <div id="notifWrapper" style="position:fixed;top:18px;right:24px;z-index:2000;">
@@ -830,6 +1239,7 @@
             if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]")) displayReturnReason = displayReturnReason[1..^1].Trim();
             return new {
                 orderId         = o.OrderId,
+                CanceledAt         = o.CanceledAt,
                 orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
                 status          = o.CurrentStatus.ToString(),
                 paymentMethod   = o.PaymentMethod,
@@ -1068,20 +1478,20 @@
         document.getElementById('od-payment').textContent = o.paymentMethod;
 
         const notesEl = document.getElementById('od-notes-section');
-        const noteLines = [];
-        if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
-        if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
-        if (o.returnReason)    noteLines.push({ icon: 'fa-undo',          label: 'Return reason',   val: o.returnReason });
-        if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
 
-        if (noteLines.length) {
-            let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
-            notesEl.innerHTML = `<div class="od-section-label">Notes & Remarks</div>${noteHtml}`;
-            notesEl.style.display = 'block';
-        } else {
-            notesEl.style.display = 'none';
-        }
-
+        
+            const noteLines = [];
+            if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
+            if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
+            if (o.returnReason)    noteLines.push({ icon: 'fa-undo',          label: 'Return reason',   val: o.returnReason });
+            if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
+            if (noteLines.length > 0 && o.CanceledAt) {
+                let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
+                notesEl.innerHTML = `<div class="od-section-label">Notes & Remarks</div>${noteHtml}`;
+                notesEl.style.display = 'block';
+            } else {
+                notesEl.style.display = 'none';
+            }
         document.getElementById('od-backdrop').classList.add('active');
         document.getElementById('od-modal').classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -1227,7 +1637,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-credit-card" style="color:#9a98b6;font-size:15px"></i><div><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Payment</div><div id="od-payment" style="font-size:14px;font-weight:600;color:#1e1b4b"></div></div></div>
                 <div style="text-align:right"><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Order Total</div><div id="od-total" style="font-size:22px;font-weight:800;color:#1e1b4b"></div></div>
             </div>
-            <div id="od-notes-section" style="display:none;background:#fffbf0;border:1px solid #ffe082;border-radius:12px;padding:14px 18px;display:flex;flex-direction:column;gap:10px"></div>
+            < id="od-notes-section" style="display:none;background:#fffbf0;border:1px solid #ffe082;border-radius:12px;padding:14px 18px;flex-direction:column;gap:10px">>
         </div>
     </div>
 

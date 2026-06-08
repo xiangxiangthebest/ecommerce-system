@@ -28,6 +28,8 @@ public class AppDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<ProductReport> ProductReports { get; set; }
     public DbSet<ReviewReport> ReviewReports { get; set; }
+    public DbSet<Request> Request { get; set; }
+    public DbSet<RequestImage> RequestImage { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -53,5 +55,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ReviewReport>().ToTable("ReviewReport").HasKey(r => r.ReviewReportId);
         modelBuilder.Entity<ReviewReport>().HasOne(r => r.Review).WithMany().HasForeignKey(r => r.ReviewId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ReviewReport>().HasOne(r => r.Customer).WithMany().HasForeignKey(r => r.CustomerId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Request>()
+        .HasOne(r => r.Order)
+        .WithMany()
+        .HasForeignKey(r => r.OrderId)
+        .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Request>()
+            .HasOne(r => r.ReportedUser)
+            .WithMany()
+            .HasForeignKey(r => r.ReportedUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Request>()
+        .Property(r => r.RequestServiceType)
+        .HasConversion<string>();
+
+        modelBuilder.Entity<Request>()
+            .Property(r => r.RequestIssueType)
+            .HasConversion<string>();
+        
+        modelBuilder.Entity<RequestImage>().ToTable("RequestImage");
+                        
     }
 }

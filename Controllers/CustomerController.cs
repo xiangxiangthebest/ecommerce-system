@@ -20,6 +20,7 @@ namespace EcommerceSystem.Controllers
         private readonly IProductService _productService;
         private readonly ICartService _cartService;
         private readonly IOrderService _orderService;
+        private readonly IRequestService _requestService;
         private readonly IReviewService _reviewService;
         private readonly IProfileService _profileService;
         private readonly IReturnImageStorage _returnImageStorage;
@@ -40,7 +41,8 @@ namespace EcommerceSystem.Controllers
             INotificationService notificationService,
             IProductReportService productReportService,
             IReviewReportService reviewReportService,
-            AppDbContext context)
+            AppDbContext context,
+            IRequestService requestService)
         {
             _customerContext = customerContext;
             _productService = productService;
@@ -53,6 +55,7 @@ namespace EcommerceSystem.Controllers
             _productReportService = productReportService;
             _reviewReportService = reviewReportService;
             _context = context;
+            _requestService = requestService;
         }
         
         // =========================
@@ -304,8 +307,16 @@ namespace EcommerceSystem.Controllers
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
-            return View(orders);
+            // var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
+            // return View(orders);
+
+            var vm = new PurchaseHistoryVM
+            {
+                Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
+                Requests = await _requestService.GetByUserId(customer.UserId)
+            };
+
+            return View(vm);
         }
 
         // =========================
@@ -349,31 +360,31 @@ namespace EcommerceSystem.Controllers
         // =========================
         // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
         // =========================
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
-        {
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Unauthorized();
+        // [HttpPost]
+        // [ValidateAntiForgeryToken]
+        // public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
+        // {
+        //     var customer = await _customerContext.GetCurrentCustomerAsync(User);
+        //     if (customer == null) return Unauthorized();
 
-            List<string> imagePaths = new();
+        //     List<string> imagePaths = new();
 
-            if (images != null && images.Count > 4)
-                return Json(new { success = false, message = "Maximum 4 images allowed." });
+        //     if (images != null && images.Count > 4)
+        //         return Json(new { success = false, message = "Maximum 4 images allowed." });
 
-            if (images != null && images.Any())
-                imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
+        //     if (images != null && images.Any())
+        //         imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
 
-            var result = await _orderService.RequestReturnRefundAsync(
-                customer.UserId,
-                orderId,
-                reason,
-                imagePaths,
-                ReturnInitiatedBy.Customer
-            );
+        //     var result = await _orderService.RequestReturnRefundAsync(
+        //         customer.UserId,
+        //         orderId,
+        //         reason,
+        //         imagePaths,
+        //         ReturnInitiatedBy.Customer
+        //     );
 
-            return Json(new { success = result.Success, message = result.Error });
-        }
+        //     return Json(new { success = result.Success, message = result.Error });
+        // }
 
         // =========================
         // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)

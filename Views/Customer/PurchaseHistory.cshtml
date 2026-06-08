@@ -1,21 +1,26 @@
-@model List<EcommerceSystem.Models.Order>
+@* @model List<EcommerceSystem.Models.Order> *@
 @using EcommerceSystem.Interfaces;
+@using EcommerceSystem.Models
+@using EcommerceSystem.Enums
+@model EcommerceSystem.Models.ViewModels.PurchaseHistoryVM
 
 @using System.Text.Json
 
 <link rel="stylesheet" href="~/css/customer/purchase-history.css" asp-append-version="true" />
 
 @{
-    var pendingCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
-    var preparingCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
-    var shippedCnt   = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
-    var deliveredCnt = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
-    var receivedCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
-    @* var returnCnt    = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND); *@
-    var canceledCnt  = Model.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
+    var pendingCnt   = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING);
+    var preparingCnt = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING);
+    var shippedCnt   = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.SHIPPED);
+    var deliveredCnt = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
+    var receivedCnt  = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
+    var canceledCnt  = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
+    var afterSaleCnt  = Model.Orders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED || 
+                                    o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND ||
+                                    o.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND);
 
     // Build a compact JSON blob for purchase-history.js
-    var orderData = Model.Select(o => new {
+    var orderData = Model.Orders.Select(o => new {
         orderId         = o.OrderId,
         orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
         status          = o.CurrentStatus.ToString().ToUpper(),
@@ -35,7 +40,7 @@
                             (o.ReturnReason != null && o.ReturnReason.Contains("||"))
                                 ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
                                 : (o.ReturnReason ?? "")
-                          ),
+                ),
 
         // If approved timestamp exists, show Approved even if enum didn’t update
         returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
@@ -96,7 +101,6 @@
         EcommerceSystem.Models.OrderStatus.SHIPPED       => "Shipped",
         EcommerceSystem.Models.OrderStatus.DELIVERED     => "Delivered",
         EcommerceSystem.Models.OrderStatus.RECEIVED      => "Received",
-        @* EcommerceSystem.Models.OrderStatus.RETURN_REFUND => "Return / Refund", *@
         EcommerceSystem.Models.OrderStatus.CANCELED      => "Canceled",
         EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED => "Cancel Requested",
         _ => s.ToString()
@@ -210,7 +214,7 @@
     <div class="ph-header">
         <div>
             <h1 class="ph-title">My Orders</h1>
-            <p class="ph-subtitle">@Model.Count order@(Model.Count != 1 ? "s" : "") placed across all time</p>
+            <p class="ph-subtitle">@Model.Orders.Count order@(Model.Orders.Count != 1 ? "s" : "") placed across all time</p>
         </div>
         <div class="ph-search-wrap">
             <i class="ti ti-search"></i>
@@ -218,7 +222,7 @@
         </div>
     </div>
 
-    @if (!Model.Any())
+    @if (!Model.Orders.Any())
     {
         <div class="ph-empty">
             <div class="ph-empty-icon"><i class="ti ti-shopping-bag-x"></i></div>
@@ -234,21 +238,22 @@
         <!-- Toolbar -->
         <div class="ph-toolbar">
             <div class="ph-tabs" id="phTabs">
-                <button class="ph-tab active" data-status="ALL">All <span class="ph-badge">@Model.Count</span></button>
+                <button class="ph-tab active" data-status="ALL">All <span class="ph-badge">@Model.Orders.Count</span></button>
                 <button class="ph-tab" data-status="PENDING">Pending <span class="ph-badge">@pendingCnt</span></button>
                 <button class="ph-tab" data-status="PREPARING">Preparing <span class="ph-badge">@preparingCnt</span></button>
                 <button class="ph-tab" data-status="SHIPPED">Shipped <span class="ph-badge">@shippedCnt</span></button>
                 <button class="ph-tab" data-status="DELIVERED">Delivered <span class="ph-badge">@deliveredCnt</span></button>
                 <button class="ph-tab" data-status="RECEIVED">Received <span class="ph-badge">@receivedCnt</span></button>
-                @* <button class="ph-tab" data-status="RETURN_REFUND">Return/Refund <span class="ph-badge">@returnCnt</span></button> *@
                 <button class="ph-tab" data-status="CANCELED">Canceled <span class="ph-badge">@canceledCnt</span></button>
+                <button class="ph-tab" data-status="AFTER SALE">After-Sale <span class="ph-badge">@afterSaleCnt</span></button>
             </div>
         </div>
 
         <!-- Order Cards -->
         <div id="phOrderList">
-            @foreach (var order in Model)
-            {
+            @foreach (var order in Model.Orders)
+            {   
+                var request = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
                 var statusKey     = order.CurrentStatus.ToString().ToUpper();
                 var sellerName    = order.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop";
                 var sellerInitial = sellerName.Length > 0 ? sellerName[0].ToString().ToUpper() : "S";
@@ -330,11 +335,44 @@
                         <div class="ph-notice ph-notice-warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
                             <i class="ti ti-hourglass" style="color: #d97706; font-size: 20px; margin-top: 2px;"></i>
                             <div>
-                                <strong style="color: #92400e; display: block;">Cancellation Requested</strong>
-                                <span style="color: #b45309; font-size: 14px;">
-                                    Waiting for seller's response. 
-                                    <text>@order.CancelReason</text>
-                                </span>
+                                <strong style="color: #b45309; display: block;">Cancellation Requested. Waiting for seller's response. </strong>
+                                <span>@order.CancelReason</span>
+                            </div>
+                        </div>
+                    }
+
+                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                    {
+                        
+                        <div class="ph-notice ph-notice-warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
+                            <i class="ti ti-hourglass" style="color: #d97706; font-size: 20px; margin-top: 2px;"></i>
+                            <div>
+                                @if (request != null)
+                                    {
+                                        <strong style="color: #b45309; display: block;">
+                                            Require @(request.RequestServiceType switch {
+                                                RequestServiceType.RETURN_REFUND => "Return & Refund",
+                                                RequestServiceType.REFUND => "Refund Only",
+                                                _ => request.RequestServiceType.ToString()
+                                            }). Waiting for @(request.RequestIssueType switch {
+                                                RequestIssueType.WrongItemReceived => "seller",
+                                                RequestIssueType.ChangeOfMind => "seller",
+                                                RequestIssueType.ItemNotAsDescribed => "seller",
+                                                _ => "customer service"
+                                            })'s response.
+                                        </strong>
+                                        <span>
+                                            @(request.RequestIssueType switch {
+                                                RequestIssueType.WrongItemReceived => "Wrong item received",
+                                                RequestIssueType.ChangeOfMind => "Change of mind",
+                                                RequestIssueType.ItemNotAsDescribed => "Item not as described",
+                                                RequestIssueType.ItemNotDelivered => "Item not delivered",
+                                                RequestIssueType.DamagedDefective => "Damaged / defective",
+                                                RequestIssueType.MissingPartsAccessories => "Missing parts / accessories",
+                                                _ => "Other"
+                                            })
+                                        </span>
+                                    }
                             </div>
                         </div>
                     }
@@ -395,7 +433,7 @@
                                         {
                                             <div class="rn-strip-thumb" onclick="rtnOpenLightbox('@img')" title="View proof photo">
                                                 <img src="@img" alt="Return proof"
-                                                     onerror="this.closest('.rn-strip-thumb').style.display='none'" />
+                                                    onerror="this.closest('.rn-strip-thumb').style.display='none'" />
                                                 <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
                                             </div>
                                         }
@@ -519,6 +557,14 @@
                                 </button>
                             }
 
+                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND 
+                            || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND)
+                            {
+                                <button class="ph-btn ph-btn-return-trigger" onclick="console.log('clicked', @order.OrderId); openRequestModal(@order.OrderId)">
+                                    <i class="ti ti-package-off"></i> Your Request
+                                </button>
+                            }
+
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)
                             {
                                 if (!order.ReviewSubmitted)
@@ -607,6 +653,24 @@
     </div>
 </div>
 
+<!-- View Request Modal -->
+<div class="ph-modal-backdrop" id="requestDetailBackdrop" onclick="closeRequestModal()"></div>
+<div class="ph-modal" id="requestDetailModal">
+    <div class="rtn-modal-hero">
+        <div class="rtn-modal-hero-icon"><i class="ti ti-package-off"></i></div>
+        <div class="rtn-modal-hero-text">
+            <div class="rtn-modal-hero-title">Your After-sale Request</div>
+            <div class="rtn-modal-hero-sub">Details of your submitted request.</div>
+        </div>
+        <button class="rtn-modal-close" onclick="closeRequestModal()"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div class="rtn-modal-body" id="requestDetailBody">
+        <div style="text-align:center; padding: 40px;">
+            <i class="ti ti-loader" style="font-size:28px;"></i>
+        </div>
+    </div>
+</div>
 
 <!-- Return Modal -->
 <div class="ph-modal-backdrop" id="returnBackdrop" onclick="closeReturnModal()"></div>
@@ -627,12 +691,12 @@
         </div>
 
         <div class="rtn-field-group">
-            <label class="rtn-field-label">Service Type <span class="rtn-required">*</span></label>
+            <label class="rtn-field-label">Service Type<span class="rtn-required">*</span></label>
             <div class="rtn-type-row">
-                <button class="rtn-type-btn" data-type="Return &amp; Refund" onclick="rtnSelectType(this)">
+                <button class="rtn-type-btn" data-type="RETURN_REFUND" onclick="rtnSelectType(this)">
                     <i class="ti ti-package-export"></i> Return &amp; Refund
                 </button>
-                <button class="rtn-type-btn" data-type="Refund Only" onclick="rtnSelectType(this)">
+                <button class="rtn-type-btn" data-type="REFUND" onclick="rtnSelectType(this)">
                     <i class="ti ti-currency-dollar"></i> Refund Only
                 </button>
 
@@ -642,13 +706,13 @@
         <div class="rtn-field-group">
             <label class="rtn-field-label">Reason<span class="rtn-required">*</span></label>
             <div class="rtn-reason-grid">
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Wrong item received</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Item not delivered</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Change of mind</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Damaged / defective</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Item not as described</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Missing parts / accessories</button>
-                <button class="rtn-reason-chip" onclick="rtnSelectReason(this)">Other</button>
+                <button type="button" class="rtn-reason-chip" data-value="WrongItemReceived" onclick="rtnSelectReason(this)">Wrong item received</button>
+                <button type="button" class="rtn-reason-chip" data-value="ItemNotDelivered" onclick="rtnSelectReason(this)">Item not delivered</button>
+                <button type="button" class="rtn-reason-chip" data-value="ChangeOfMind" onclick="rtnSelectReason(this)">Change of mind</button>
+                <button type="button" class="rtn-reason-chip" data-value="DamagedDefective" onclick="rtnSelectReason(this)">Damaged / defective</button>
+                <button type="button" class="rtn-reason-chip" data-value="ItemNotAsDescribed" onclick="rtnSelectReason(this)">Item not as described</button>
+                <button type="button" class="rtn-reason-chip" data-value="MissingPartsAccessories" onclick="rtnSelectReason(this)">Missing parts / accessories</button>
+                <button type="button" class="rtn-reason-chip" data-value="Other" onclick="rtnSelectReason(this)">Other</button>
             </div>
         </div>
 
@@ -675,6 +739,7 @@
     </div>
 
     <input type="hidden" id="returnOrderId" />
+    <input type="hidden" id="returnSelectedReason" />
 
     <div class="ph-modal-footer">
         <button class="ph-btn ph-btn-ghost" onclick="closeReturnModal()">Cancel</button>

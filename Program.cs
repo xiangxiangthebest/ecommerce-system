@@ -41,6 +41,7 @@ builder.Services.AddScoped<OrderStatusNotifierFactory>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddHostedService<AutoReceiveOrdersJob>();
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IRequestService, RequestService>();
 
 var app = builder.Build();
 

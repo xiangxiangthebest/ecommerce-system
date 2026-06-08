@@ -115,9 +115,7 @@ public class Order : OrderStatusSubject
         { OrderStatus.AFTER_SALES_REQUESTED, new() { } },
 
         { OrderStatus.CANCELED, new() { } },
-        { OrderStatus.CANCEL_REQUESTED, new() { } },
-
-        { OrderStatus.CLOSED, new() { } },
+        { OrderStatus.CANCEL_REQUESTED, new() { } }
 
     };
 
@@ -136,8 +134,7 @@ public class Order : OrderStatusSubject
 
         // after sales flow ends order control
         { OrderStatus.CANCEL_REQUESTED, new() { OrderStatus.CANCELED} },
-        { OrderStatus.AFTER_SALES_REQUESTED, new(){ }},
-        { OrderStatus.CLOSED, new() }
+        { OrderStatus.AFTER_SALES_REQUESTED, new(){ }}
     };
 
     /// <summary>
@@ -174,16 +171,6 @@ public class Order : OrderStatusSubject
                 break;
             case OrderStatus.CANCELED:
                 CanceledAt = DateTime.UtcNow;
-                break;
-
-            case OrderStatus.AFTER_SALES_REQUESTED:
-                ReturnInitiatedAt = DateTime.UtcNow;
-                ReturnRequested = true;
-                break;
-
-
-            case OrderStatus.CLOSED:
-                // finalize order
                 break;
         }
 
