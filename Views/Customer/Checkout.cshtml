@@ -53,6 +53,8 @@
             }
         }
 
+        <input type="hidden" name="SelectedVoucherId" id="SelectedVoucherId" value="" />
+
         <div class="checkout-layout">
 
             <!-- ══════════════════════════════
@@ -314,16 +316,77 @@
             <div class="checkout-right">
 
                 <!-- Voucher -->
-                <div class="summary-card promo-card">
-                    <div class="summary-card-header">
-                        <i class="ti ti-tag"></i> Voucher / Promo Code
+                <div class="voucher-wallet-card" id="voucherWalletCard">
+                    <div class="voucher-wallet-header">
+                        <span class="voucher-wallet-title">
+                            <i class="ti ti-ticket" aria-hidden="true"></i>
+                            Voucher
+                        </span>
+                        @if (Model.AvailableVouchers != null && Model.AvailableVouchers.Any())
+                        {
+                            <button type="button" class="voucher-browse-btn" id="voucherBrowseBtn">
+                                <span id="voucherBrowseBtnLabel">@Model.AvailableVouchers.Count() available</span>
+                                <i class="ti ti-chevron-down" id="voucherBrowseChevron"></i>
+                            </button>
+                        }
                     </div>
-                    <div class="promo-row">
+
+                    <!-- Manual code entry -->
+                    <div class="voucher-input-row">
                         <input type="text" id="promoInput" name="PromoCode"
-                               class="form-input promo-input" placeholder="Enter promo code" />
-                        <button type="button" class="promo-btn" id="applyPromoBtn">Apply</button>
+                            class="form-input voucher-code-input"
+                            placeholder="Enter voucher code" />
+                        <button type="button" class="voucher-apply-btn" id="applyPromoBtn">Apply</button>
                     </div>
                     <p class="promo-feedback" id="promoFeedback"></p>
+
+                    <!-- Applied ticket display (hidden until a voucher is applied) -->
+                    <div class="voucher-applied-ticket" id="voucherAppliedTicket" style="display:none;">
+                        <div class="ticket-left">
+                            <i class="ti ti-check-circle" aria-hidden="true"></i>
+                        </div>
+                        <div class="ticket-perf"></div>
+                        <div class="ticket-right">
+                            <span class="ticket-label">Voucher applied</span>
+                            <span class="ticket-code" id="ticketCode"></span>
+                            <span class="ticket-savings">− RM <span id="ticketSavings">0.00</span></span>
+                        </div>
+                        <button type="button" class="ticket-remove-btn" id="ticketRemoveBtn" title="Remove voucher">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+
+                    <!-- Voucher tray -->
+                    @if (Model.AvailableVouchers != null && Model.AvailableVouchers.Any())
+                    {
+                        <div class="voucher-tray" id="voucherTray">
+                            <p class="voucher-tray-label">Your vouchers</p>
+                            <div class="voucher-tray-list">
+                                @foreach (var cv in Model.AvailableVouchers)
+                                {
+                                    <button type="button"
+                                            class="voucher-stub"
+                                            data-code="@cv.Voucher?.Code"
+                                            data-value="@cv.Voucher?.DiscountValue"
+                                            data-min="@cv.Voucher?.MinimumSpend"
+                                            data-vid="@cv.CustomerVoucherId">
+                                        <div class="stub-accent"></div>
+                                        <div class="stub-body">
+                                            <span class="stub-name">@cv.Voucher?.Name</span>
+                                            <span class="stub-code">@cv.Voucher?.Code</span>
+                                        </div>
+                                        <div class="stub-perf"></div>
+                                        <div class="stub-value">
+                                            <span class="stub-rm">RM</span>
+                                            <span class="stub-amount">@cv.Voucher?.DiscountValue.ToString("0.00")</span>
+                                            <span class="stub-off">off</span>
+                                        </div>
+                                        <i class="ti ti-chevron-right stub-arrow" aria-hidden="true"></i>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
 
                 <!-- Payment details -->
@@ -392,6 +455,15 @@
 <script>
     window.checkoutSource = "@ViewBag.Source";
     window.checkoutProductId = "@ViewBag.ProductId";
+    window.availableVouchers = @Html.Raw(JsonSerializer.Serialize(Model.AvailableVouchers.Select(cv => new {
+        Id = cv.CustomerVoucherId,
+        Code = cv.Voucher?.Code,
+        Name = cv.Voucher?.Name,
+        DiscountValue = cv.Voucher?.DiscountValue,
+        MinimumSpend = cv.Voucher?.MinimumSpend,
+        StartDate = cv.Voucher?.StartDate,
+        EndDate = cv.Voucher?.EndDate
+    })));
 </script>
 
 <script src="~/js/customer/checkout.js" asp-append-version="true"></script>

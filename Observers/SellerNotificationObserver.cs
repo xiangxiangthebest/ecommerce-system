@@ -15,11 +15,11 @@ namespace EcommerceSystem.Observers
     ///   CANCELED       → "Order Cancelled"      (customer cancelled)
     ///   RETURN_REFUND  → "Return & Refund Requested"
     /// </summary>
-    public class SellerDashboardObserver : OrderStatusObserver
+    public class SellerNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
 
-        public SellerDashboardObserver(INotificationService notificationService)
+        public SellerNotificationObserver(INotificationService notificationService)
         {
             _notificationService = notificationService;
         }
@@ -28,13 +28,13 @@ namespace EcommerceSystem.Observers
         {
             try
             {
-                Console.WriteLine($"[SellerDashboardObserver] Update called for Order #{order.OrderId}, Status: {order.CurrentStatus}");
+                Console.WriteLine($"[SellerNotificationObserver] Update called for Order #{order.OrderId}, Status: {order.CurrentStatus}");
                 if (order.Seller == null)
                 {
-                    Console.WriteLine($"[SellerDashboardObserver] Seller is NULL for Order #{order.OrderId}");
+                    Console.WriteLine($"[SellerNotificationObserver] Seller is NULL for Order #{order.OrderId}");
                     return;
                 }
-                Console.WriteLine($"[SellerDashboardObserver] Seller found: UserId={order.Seller.UserId}, ShopName={order.Seller.ShopName}");
+                Console.WriteLine($"[SellerNotificationObserver] Seller found: UserId={order.Seller.UserId}, ShopName={order.Seller.ShopName}");
 
                 var sellerId    = order.Seller.UserId;
                 var orderId     = order.OrderId;
@@ -115,17 +115,17 @@ namespace EcommerceSystem.Observers
                         return;
                 }
 
-                Console.WriteLine($"[SellerDashboardObserver] Creating notification for UserId={sellerId}, Title={title}");
+                Console.WriteLine($"[SellerNotificationObserver] Creating notification for UserId={sellerId}, Title={title}");
                 await _notificationService.CreateAsync(
                     userId:  sellerId,
                     title:   title,
                     message: message
                 );
-                Console.WriteLine($"[SellerDashboardObserver] Notification created successfully");
+                Console.WriteLine($"[SellerNotificationObserver] Notification created successfully");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[SellerDashboardObserver] Notification failed: {ex.Message}");
+                Console.Error.WriteLine($"[SellerNotificationObserver] Notification failed: {ex.Message}");
             }
         }
 

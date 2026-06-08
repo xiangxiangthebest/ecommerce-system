@@ -1,45 +1,58 @@
 (function () {
 
+    /* ───────────────────── GLOBALS ───────────────────── */
     const source = window.checkoutSource;
     const productId = window.checkoutProductId;
+    const availableVouchers = window.availableVouchers || [];
 
-    const backBtn = document.getElementById("backBtn");
+    let appliedVoucher = null;
 
-    if (backBtn) {
-        if (source === "product") {
-            backBtn.href = `/Customer/ProductDetails/${productId}`;
-        } else {
-            backBtn.href = `/Customer/Cart`;
-        }
+    /* ───────────────────── INIT ───────────────────── */
+    document.addEventListener("DOMContentLoaded", init);
+
+    function init() {
+        setupBackButton();
+        setupAddressSelection();
+        setupPayment();
+        setupCardFormatting();
+        setupVoucherUI();
+        refreshPayment();
+        updatePlaceOrderState();
     }
 
-    document.addEventListener("DOMContentLoaded", function () {
+    /* ───────────────────── BACK BUTTON ───────────────────── */
+    function setupBackButton() {
+        const backBtn = document.getElementById("backBtn");
+        if (!backBtn) return;
 
-        // Address select UI highlight
-        const radios = document.querySelectorAll('input[name="SelectedAddressId"]');
+        backBtn.href = source === "product"
+            ? `/Customer/ProductDetails/${productId}`
+            : `/Customer/Cart`;
+    }
 
-        radios.forEach(radio => {
-            radio.addEventListener("change", function () {
+    /* ───────────────────── ADDRESS SELECTION ───────────────────── */
+    function setupAddressSelection() {
+        document.querySelectorAll('input[name="SelectedAddressId"]')
+            .forEach(radio => {
+                radio.addEventListener("change", () => {
+                    document.querySelectorAll(".saved-address-card")
+                        .forEach(card => card.classList.remove("selected"));
 
-                document.querySelectorAll(".saved-address-card")
-                    .forEach(card => card.classList.remove("selected"));
+                    radio.closest(".saved-address-card")?.classList.add("selected");
 
-                this.closest(".saved-address-card")
-                    ?.classList.add("selected");
-
-                updatePlaceOrderState();
+                    updatePlaceOrderState();
+                });
             });
-        });
+    }
 
-        updatePlaceOrderState();
-    });
+    /* ───────────────────── PAYMENT ───────────────────── */
+    function setupPayment() {
 
-    /* Payment method */
-    const pmRadios = document.querySelectorAll('.pm-radio');
-    const cardForm = document.getElementById('cardDetailsForm');
+        document.querySelectorAll('.pm-radio')
+            .forEach(r => r.addEventListener('change', refreshPayment));
+    }
 
     function refreshPayment() {
-
         const val = document.querySelector('.pm-radio:checked')?.value;
 
         document.querySelectorAll('.payment-option').forEach(el => {
@@ -49,6 +62,7 @@
             );
         });
 
+        const cardForm = document.getElementById('cardDetailsForm');
         if (cardForm) {
             cardForm.style.display = val === 'Card' ? '' : 'none';
         }
@@ -56,45 +70,136 @@
         updatePlaceOrderState();
     }
 
-    pmRadios.forEach(r => r.addEventListener('change', refreshPayment));
-    refreshPayment();
+    /* ───────────────────── CARD INPUT FORMAT ───────────────────── */
+    function setupCardFormatting() {
 
-    /* Card formatting */
-    const cardNumInput = document.getElementById('cardNumberInput');
+        const cardNumInput = document.getElementById('cardNumberInput');
+        if (cardNumInput) {
+            cardNumInput.addEventListener('input', function () {
+                let v = this.value.replace(/\D/g, '').substring(0, 16);
+                this.value = v.replace(/(.{4})/g, '$1 ').trim();
+            });
+        }
 
-    if (cardNumInput) {
-        cardNumInput.addEventListener('input', function () {
-            let v = this.value.replace(/\D/g, '').substring(0, 16);
-            this.value = v.replace(/(.{4})/g, '$1 ').trim();
-        });
+        const cardExpiry = document.getElementById('cardExpiry');
+        if (cardExpiry) {
+            cardExpiry.addEventListener('input', function () {
+                let v = this.value.replace(/\D/g, '').substring(0, 4);
+                this.value = v.length >= 3
+                    ? v.substring(0, 2) + ' / ' + v.substring(2)
+                    : v;
+            });
+        }
     }
 
-    const cardExpiry = document.getElementById('cardExpiry');
+    /* ───────────────────── VOUCHER UI ───────────────────── */
+    function setupVoucherUI() {
 
-    if (cardExpiry) {
-        cardExpiry.addEventListener('input', function () {
-            let v = this.value.replace(/\D/g, '').substring(0, 4);
+        const browseBtn   = document.getElementById('voucherBrowseBtn');
+        const voucherTray = document.getElementById('voucherTray');
 
-            if (v.length >= 3) {
-                v = v.substring(0, 2) + ' / ' + v.substring(2);
-            }
-
-            this.value = v;
+        /* Toggle tray */
+        browseBtn?.addEventListener('click', () => {
+            const open = voucherTray.classList.toggle('open');
+            browseBtn.classList.toggle('open', open);
         });
+
+        /* Voucher click (auto apply) */
+        document.querySelectorAll('.voucher-stub').forEach(stub => {
+            stub.addEventListener('click', () => {
+                applyVoucher(stub.dataset.code, true);
+
+                document.querySelectorAll('.voucher-stub')
+                    .forEach(s => s.classList.remove('stub-selected'));
+                stub.classList.add('stub-selected');
+
+                voucherTray?.classList.remove('open');
+                browseBtn?.classList.remove('open');
+            });
+        });
+
+        document.getElementById('applyPromoBtn')
+            ?.addEventListener('click', () => {
+                const code = document.getElementById('promoInput').value;
+                applyVoucher(code);
+            });
+
+        document.getElementById('ticketRemoveBtn')
+            ?.addEventListener('click', removeVoucher);
     }
 
-    /* Promo codes */
-    const PROMO_CODES = {
-        'SAVE10':   { type: 'voucher', amount: 10, label: 'RM10 off' },
-        'FREESHIP': { type: 'ship', amount: null, label: 'Free shipping' },
-        'WELCOME5': { type: 'voucher', amount: 5, label: 'RM5 off' }
-    };
+    /* ───────────────────── VOUCHER LOGIC ───────────────────── */
+    function applyVoucher(code, silent = false) {
 
-    let appliedPromo = null;
+        const input = document.getElementById('promoInput');
+        const feedback = document.getElementById('promoFeedback');
+        const selectedInput = document.getElementById('SelectedVoucherId');
+        const applyBtn = document.getElementById('applyPromoBtn');
 
-    const applyBtn = document.getElementById('applyPromoBtn');
-    const promoFeedback = document.getElementById('promoFeedback');
+        code = (code || '').trim().toUpperCase();
 
+        if (appliedVoucher) {
+            removeVoucher();
+            return;
+        }
+
+        if (!code) {
+            showError('Enter a voucher code.');
+            return;
+        }
+
+        const voucher = availableVouchers.find(v =>
+            (v.Code || '').toUpperCase() === code
+        );
+
+        if (!voucher) {
+            showError('✕ Invalid voucher code.');
+            return;
+        }
+
+        appliedVoucher = voucher;
+        if (selectedInput) selectedInput.value = voucher.Id;
+
+        if (input) input.value = code;
+
+        applyBtn.textContent = 'Remove';
+
+        showAppliedTicket(code, Number(voucher.DiscountValue));
+        recalcSummary();
+
+        function showError(msg) {
+            if (silent) return;
+            feedback.textContent = msg;
+            feedback.className = 'promo-feedback error';
+        }
+    }
+
+    function removeVoucher() {
+
+        appliedVoucher = null;
+
+        document.getElementById('SelectedVoucherId').value = '';
+        document.getElementById('promoInput').value = '';
+        document.getElementById('applyPromoBtn').textContent = 'Apply';
+
+        document.getElementById('voucherAppliedTicket').style.display = 'none';
+        document.querySelectorAll('.voucher-stub')
+            .forEach(s => s.classList.remove('stub-selected'));
+
+        recalcSummary();
+    }
+
+    function showAppliedTicket(code, savings) {
+        document.getElementById('voucherAppliedTicket').style.display = 'flex';
+        document.getElementById('ticketCode').textContent = code;
+        document.getElementById('ticketSavings').textContent = savings.toFixed(2);
+
+        const fb = document.getElementById('promoFeedback');
+        fb.textContent = '';
+        fb.className = 'promo-feedback';
+    }
+
+    /* ───────────────────── CALCULATION ───────────────────── */
     function recalcSummary() {
 
         const base =
@@ -103,95 +208,30 @@
         let shipBase = base >= 100 ? 0 : 10;
         let shipSst  = +(shipBase * 0.08).toFixed(2);
 
-        let shipDisc = 0;
-        let voucherD = 0;
+        let voucherD = appliedVoucher
+            ? Number(appliedVoucher.DiscountValue)
+            : 0;
 
-        if (appliedPromo) {
-            if (appliedPromo.type === 'ship') {
-                shipDisc = +(shipBase + shipSst).toFixed(2);
-                shipBase = 0;
-                shipSst = 0;
-            } else {
-                voucherD = appliedPromo.amount;
-            }
-        }
+        const total = Math.max(0, base + shipBase + shipSst - voucherD);
 
-        const total =
-            Math.max(0, base + shipBase + shipSst - shipDisc - voucherD);
+        setText('sumShippingBase', shipBase);
+        setText('sumShippingSst', shipSst);
+        setText('sumVoucherDiscount', voucherD);
+        setText('sumTotal', total);
+        setText('btnTotal', total);
 
-        document.getElementById('sumShippingBase').textContent =
-            shipBase.toFixed(2);
-
-        document.getElementById('sumShippingSst').textContent =
-            shipSst.toFixed(2);
-
-        document.getElementById('lineShipDiscount').style.display =
-            shipDisc > 0 ? '' : 'none';
-
-        document.getElementById('lineVoucherDiscount').style.display =
-            voucherD > 0 ? '' : 'none';
-
-        document.getElementById('sumShipDiscount').textContent =
-            shipDisc.toFixed(2);
-
-        document.getElementById('sumVoucherDiscount').textContent =
-            voucherD.toFixed(2);
-
-        document.getElementById('sumTotal').textContent =
-            total.toFixed(2);
-
-        document.getElementById('btnTotal').textContent =
-            total.toFixed(2);
+        toggle('lineVoucherDiscount', voucherD > 0);
     }
 
-    if (applyBtn) {
-        applyBtn.addEventListener('click', function () {
-
-            const input = document.getElementById('promoInput');
-            const code = (input?.value || '').trim().toUpperCase();
-            const promo = PROMO_CODES[code];
-
-            if (!code) {
-                promoFeedback.textContent = '';
-                return;
-            }
-
-            if (promo) {
-                appliedPromo = promo;
-
-                promoFeedback.textContent =
-                    `✓ "${code}" applied — ${promo.label}`;
-
-                promoFeedback.className = 'promo-feedback success';
-
-                applyBtn.textContent = 'Remove';
-
-                applyBtn.onclick = function () {
-                    appliedPromo = null;
-                    promoFeedback.textContent = '';
-                    promoFeedback.className = 'promo-feedback';
-
-                    if (input) input.value = '';
-
-                    applyBtn.textContent = 'Apply';
-
-                    location.reload();
-                };
-
-            } else {
-                appliedPromo = null;
-
-                promoFeedback.textContent =
-                    '✕ Invalid promo code. Try SAVE10, FREESHIP or WELCOME5';
-
-                promoFeedback.className = 'promo-feedback error';
-            }
-
-            recalcSummary();
-        });
+    function setText(id, val) {
+        document.getElementById(id).textContent = val.toFixed(2);
     }
 
-    /* Place order validation */
+    function toggle(id, show) {
+        document.getElementById(id).style.display = show ? '' : 'none';
+    }
+
+    /* ───────────────────── PLACE ORDER VALIDATION ───────────────────── */
     function updatePlaceOrderState() {
 
         const btn = document.getElementById('placeOrderBtn');
@@ -199,31 +239,23 @@
 
         if (!btn) return;
 
-        const addressChecked =
-            document.querySelector('input[name="SelectedAddressId"]:checked');
+        const hasAddress = !!document.querySelector('[name="SelectedAddressId"]:checked');
+        const hasPayment = !!document.querySelector('[name="PaymentMethod"]:checked');
 
-        const paymentChecked =
-            document.querySelector('input[name="PaymentMethod"]:checked');
-
-        const ok = !!addressChecked && !!paymentChecked;
+        const ok = hasAddress && hasPayment;
 
         btn.disabled = !ok;
 
-        if (msg) {
-            if (ok) {
-                msg.textContent = '';
-                msg.className = 'checkout-guard-msg';
-            } else {
-                if (!addressChecked) {
-                    msg.textContent =
-                        'Please select a delivery address to continue.';
-                } else if (!paymentChecked) {
-                    msg.textContent =
-                        'Please select a payment method to continue.';
-                }
+        if (!msg) return;
 
-                msg.className = 'checkout-guard-msg show';
-            }
+        if (ok) {
+            msg.textContent = '';
+            msg.className = 'checkout-guard-msg';
+        } else {
+            msg.textContent = !hasAddress
+                ? 'Please select a delivery address.'
+                : 'Please select a payment method.';
+            msg.className = 'checkout-guard-msg show';
         }
     }
 
@@ -232,25 +264,17 @@
 
             updatePlaceOrderState();
 
-            if (document.getElementById('placeOrderBtn')?.disabled) {
+            if (document.getElementById('placeOrderBtn').disabled) {
                 e.preventDefault();
 
-                const hasAddress =
-                    !!document.querySelector(
-                        'input[name="SelectedAddressId"]:checked'
-                    );
+                const hasAddress = document.querySelector('[name="SelectedAddressId"]:checked');
+                const hasPayment = document.querySelector('.pm-radio:checked');
 
-                const pmChosen =
-                    !!document.querySelector('.pm-radio:checked');
-
-                if (!hasAddress) {
-                    document.querySelector('.checkout-card')
-                        ?.scrollIntoView({ behavior: 'smooth' });
-                } else if (!pmChosen) {
-                    document.querySelector('.payment-methods')
-                        ?.scrollIntoView({ behavior: 'smooth' });
-                }
+                (!hasAddress
+                    ? document.querySelector('.checkout-card')
+                    : document.querySelector('.payment-methods')
+                )?.scrollIntoView({ behavior: 'smooth' });
             }
         });
 
-}());
+})();

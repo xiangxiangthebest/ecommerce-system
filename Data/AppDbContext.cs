@@ -28,6 +28,8 @@ public class AppDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<ProductReport> ProductReports { get; set; }
     public DbSet<ReviewReport> ReviewReports { get; set; }
+    public DbSet<CustomerVoucher> CustomerVouchers { get; set; }
+    public DbSet<Voucher> Vouchers { get; set; }
     public DbSet<Request> Request { get; set; }
     public DbSet<RequestImage> RequestImage { get; set; }
 
@@ -53,7 +55,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ProductReport>().HasOne(p => p.Product).WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ProductReport>().HasOne(p => p.Customer).WithMany().HasForeignKey(p => p.CustomerId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ReviewReport>().ToTable("ReviewReport").HasKey(r => r.ReviewReportId);
-        modelBuilder.Entity<ReviewReport>().HasOne(r => r.Review).WithMany().HasForeignKey(r => r.ReviewId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ReviewReport>().HasOne(r => r.Review).WithMany().HasForeignKey(r => r.ReviewId).OnDelete(DeleteBehavior.NoAction);
         modelBuilder.Entity<ReviewReport>().HasOne(r => r.Customer).WithMany().HasForeignKey(r => r.CustomerId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Request>()
         .HasOne(r => r.Order)

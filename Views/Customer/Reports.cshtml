@@ -68,7 +68,16 @@
                         <div class="report-card-header">
                             <div class="report-info">
                                 <h3 class="report-product-name">@(report.Product?.Name ?? "Product")</h3>
-                                <p class="report-product-id">Product ID: @report.ProductId</p>
+                                <p class="report-product-id">
+                                    @if (report.ProductId.HasValue)
+                                    {
+                                        <span>Product ID: @report.ProductId</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #999; font-style: italic;">Product Deleted</span>
+                                    }
+                                </p>
                             </div>
                             <span class="report-status status-@statusClass">
                                 <i class="ti ti-circle-filled" aria-hidden="true"></i>
@@ -115,10 +124,10 @@
                                 <span>@reportDate</span>
                             </div>
 
-                            @if (report.Status?.ToLower() == "resolved")
+                            @if (report.Status?.ToLower() == "approved")
                             {
                                 <div class="report-row">
-                                    <label>Resolved On</label>
+                                    <label>Approved On</label>
                                     <span>@(report.ResolvedAt?.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture) ?? "N/A")</span>
                                 </div>
                             }
@@ -166,17 +175,23 @@
                 {
                     var reportDate = report.ReportedAt.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
                     var statusClass = (report.Status?.ToLower() ?? "pending").Replace(" ", "-");
-                    int rating    = report.Review?.Rating ?? 0;
+                    
+                    // Use saved snapshot data if review is deleted, otherwise use live data
+                    int rating = report.Review?.Rating ?? report.SavedRating;
+                    string productName = report.Review?.Product?.Name ?? report.SavedProductName ?? "Unknown Product";
+                    string reviewerName = report.Review?.OrderItem?.Order?.Customer?.FullName ?? report.SavedReviewerName ?? "Customer";
+                    string reviewText = report.Review?.ReviewText ?? report.SavedReviewText ?? "";
+                    
                     int emptyStars = 5 - rating;
 
                     <div class="report-card">
                         <div class="report-card-header">
                             <div class="report-info">
                                 <h3 class="report-product-name">
-                                    Reviewed by @(report.Review?.OrderItem?.Order?.Customer?.FullName ?? "Customer")
+                                    Reviewed by @reviewerName
                                 </h3>
                                 <p class="report-product-id">
-                                    Product: @(report.Review?.Product?.Name ?? "Unknown Product")
+                                    Product: @productName
                                 </p>
                             </div>
                             <span class="report-status status-@statusClass">
@@ -195,11 +210,11 @@
                                 </span>
                             </div>
 
-                            @if (!string.IsNullOrEmpty(report.Review?.ReviewText))
+                            @if (!string.IsNullOrEmpty(reviewText))
                             {
                                 <div class="report-row">
                                     <label>Review Text</label>
-                                    <p class="review-text">"@report.Review.ReviewText"</p>
+                                    <p class="review-text">"@reviewText"</p>
                                 </div>
                             }
 

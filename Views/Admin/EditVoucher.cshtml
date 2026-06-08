@@ -1,0 +1,75 @@
+@model EcommerceSystem.Models.Voucher
+@{
+    ViewData["Title"] = "Edit Voucher";
+    Layout = "~/Views/Admin/Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin/edit-voucher.css" asp-append-version="true" />
+
+<div class="voucher-edit-page">
+    <h2>Edit Voucher</h2>
+
+    <form asp-controller="Admin" asp-action="EditVoucher" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="VoucherId" />
+
+        <div class="form-row">
+            <label asp-for="Code"></label>
+            <input asp-for="Code" />
+            <span asp-validation-for="Code" class="text-danger"></span>
+        </div>
+
+        <div class="form-row">
+            <label asp-for="Name"></label>
+            <input asp-for="Name" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <div class="form-row">
+            <label asp-for="Type"></label>
+            <input asp-for="Type" />
+            <span asp-validation-for="Type" class="text-danger"></span>
+        </div>
+
+        <div class="form-row two-col">
+            <div>
+                <label asp-for="DiscountValue"></label>
+                <input asp-for="DiscountValue" type="number" step="0.01" min="0" />
+                <span asp-validation-for="DiscountValue" class="text-danger"></span>
+            </div>
+            <div>
+                <label asp-for="MinimumSpend"></label>
+                <input asp-for="MinimumSpend" type="number" step="0.01" min="0" />
+                <span asp-validation-for="MinimumSpend" class="text-danger"></span>
+            </div>
+        </div>
+
+        <div class="form-row two-col">
+            <div>
+                <label asp-for="StartDate"></label>
+                <input asp-for="StartDate" type="date" />
+                <span asp-validation-for="StartDate" class="text-danger"></span>
+            </div>
+            <div>
+                <label asp-for="EndDate"></label>
+                <input asp-for="EndDate" type="date" />
+                <span asp-validation-for="EndDate" class="text-danger"></span>
+            </div>
+        </div>
+
+        <div class="form-row two-col">
+            <div>
+                <label asp-for="Quantity"></label>
+                <input asp-for="Quantity" type="number" min="1" />
+                <span asp-validation-for="Quantity" class="text-danger"></span>
+            </div>
+            <div class="form-row">
+                <label asp-for="IsActive">Active</label>
+                <input asp-for="IsActive" type="checkbox" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a asp-action="VoucherManagement" asp-controller="Admin" class="btn btn-secondary">Back to Voucher Management</a>
+    </form>
+</div>

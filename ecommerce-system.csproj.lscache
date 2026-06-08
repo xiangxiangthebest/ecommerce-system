@@ -125,9 +125,9 @@ obj/Debug/net10.0/
  ecommerce-system.GlobalUsings.g.cs
  ecommerce-system.RazorAssemblyInfo.cs
 Observers/
- AdminPanelObserver.cs
- CustomerDashboardObserver.cs
- SellerDashboardObserver.cs
+ AdminNotificationObserver.cs
+ CustomerNotificationObserver.cs
+ SellerNotificationObserver.cs
 Program.cs
 
 [metadataReferences]

@@ -1,7 +1,7 @@
 @using System.Linq
 
 @{
-    ViewData["Title"] = "Seller Dashboard";
+    ViewData["Title"] = "MMU Shop";
     bool isApproved = ViewBag.IsApproved == true;
 }
 
@@ -60,6 +60,11 @@
                 <li class="nav-locked" title="Pending admin approval">
                     <span class="nav-text nav-text-locked">
                         <i class="fas fa-lock nav-lock-icon"></i> Profile
+                    </span>
+                </li>
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Chat
                     </span>
                 </li>
             }
@@ -1211,23 +1216,28 @@
             var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
             var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
             var useAllItems = requestedQtys.Count == 0;
-            return new {
-                orderId           = o.OrderId,
-                returnType        = returnType,
-                returnReason      = reasonText,
-                returnDescription = description,
-                returnImages      = ParseImagePaths(o.ReturnImagePathsJson),
-                customerEmail     = o.Customer?.Email ?? "—",
-                customerName      = o.Customer?.FullName ?? "",
-                items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
-                    orderItemId  = oi.OrderItemId,
-                    name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                    sku          = oi.Product?.SKU ?? "—",
-                    orderedQty   = oi.Quantity,
-                    requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
-                    unitPrice    = oi.Price.ToString("F2")
-                }).ToList()
-            };
+            var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+            // TotalAmount is merchandise-only (no shipping/SST), so discount = rawSubtotal - TotalAmount
+            var vDiscount   = Math.Max(0m, rawSubtotal - o.TotalAmount);
+            var discRatio   = rawSubtotal > 0 ? vDiscount / rawSubtotal : 0m;
+        
+        return new {
+            orderId           = o.OrderId,
+            returnType        = returnType,
+            returnReason      = reasonText,
+            returnDescription = description,
+            returnImages      = ParseImagePaths(o.ReturnImagePathsJson),
+            customerEmail     = o.Customer?.Email ?? "—",
+            customerName      = o.Customer?.FullName ?? "",
+            items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
+                orderItemId  = oi.OrderItemId,
+                name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                sku          = oi.Product?.SKU ?? "—",
+                orderedQty   = oi.Quantity,
+                requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
+                unitPrice    = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2")  // ← discounted price
+            }).ToList()
+        };
         }).ToList();
 
     var allOrdersForDetails = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
@@ -1249,7 +1259,7 @@
                 returnReason    = displayReturnReason,
                 returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "",
                 customerEmail   = o.Customer?.Email ?? "—",
-                customerPhone   = o.Customer?.Phone ?? "—",
+                customerPhone   = o.Customer?.PhoneNumber ?? "—",
                 customerName    = (o.Customer?.FullName ?? ""),
                 deliveryName    = o.DeliveryRecipientName,
                 deliveryPhone   = o.DeliveryPhoneNumber,
@@ -1279,8 +1289,7 @@
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
 
-        const typeIconMap = { 'Refund Only': { icon: '💰', label: 'Refund Only' }, 'RefundOnly': { icon: '💰', label: 'Refund Only' }, 'Return & Refund': { icon: '📦', label: 'Return & Refund' }, 'ReturnRefund': { icon: '📦', label: 'Return & Refund' } };
-        const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
+        const typeIconMap = { 'Refund Only': { icon: '💰', label: 'Refund Only' }, 'RefundOnly': { icon: '💰', label: 'Refund Only' }, 'Return \u0026 Refund': { icon: '📦', label: 'Return \u0026 Refund' }, 'ReturnRefund': { icon: '📦', label: 'Return \u0026 Refund' } };        const typeInfo   = typeIconMap[order.returnType] || { icon: '🔄', label: order.returnType || 'Not specified' };
         const custName   = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
 
         let summaryHtml = `
@@ -1419,7 +1428,7 @@
         });
 
         if (res.ok) { location.reload(); } 
-        else { btn.disabled = false; btn.textContent = 'Approve & Process'; alert('Failed to approve return.'); }
+        else { btn.disabled = false; btn.textContent = 'Approve \u0026 Process'; alert('Failed to approve return.'); }
     }
 
     const statusLabels = {
@@ -1478,20 +1487,20 @@
         document.getElementById('od-payment').textContent = o.paymentMethod;
 
         const notesEl = document.getElementById('od-notes-section');
+        const noteLines = [];
+        if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
+        if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
+        if (o.returnReason)    noteLines.push({ icon: 'fa-undo',          label: 'Return reason',   val: o.returnReason });
+        if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
 
-        
-            const noteLines = [];
-            if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
-            if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
-            if (o.returnReason)    noteLines.push({ icon: 'fa-undo',          label: 'Return reason',   val: o.returnReason });
-            if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
-            if (noteLines.length > 0 && o.CanceledAt) {
-                let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
-                notesEl.innerHTML = `<div class="od-section-label">Notes & Remarks</div>${noteHtml}`;
-                notesEl.style.display = 'block';
-            } else {
-                notesEl.style.display = 'none';
-            }
+        if (noteLines.length && o.CanceledAt) {
+            let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
+            notesEl.innerHTML = `<div class=\"od-section-label\">Notes \u0026 Remarks</div>${noteHtml}`;
+            notesEl.style.display = 'block';
+        } else {
+            notesEl.style.display = 'none';
+        }
+
         document.getElementById('od-backdrop').classList.add('active');
         document.getElementById('od-modal').classList.add('active');
         document.body.style.overflow = 'hidden';

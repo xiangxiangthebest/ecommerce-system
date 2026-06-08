@@ -1,9 +1,9 @@
 @{
-    ViewData["Title"] = "Admin Overview";
+    ViewData["Title"] = "MMU Shop";
     Layout = "~/Views/Admin/Layout.cshtml";
 }
 
-<link rel="stylesheet" href="~/css/admin/dashboard.css" />
+<link rel="stylesheet" href="~/css/admin/dashboard.css" asp-append-version="true" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
 <div class="dashboard-wrapper">
@@ -38,18 +38,6 @@
             </form>
         </div>
 
-        <div class="stats-section">
-            <div class="card stat-card primary">
-                <div class="card-body d-flex align-items-center p-4">
-                    <div class="icon-shape"><i class="fas fa-shopping-cart"></i></div>
-                    <div>
-                        <div class="stat-label">Total Orders</div>
-                        <div class="stat-value">@ViewBag.TotalOrders</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="cards-section">
             <div class="feature-card info">
                 <div class="feature-icon">
@@ -58,7 +46,7 @@
                 <h3 class="feature-title">Support Staff</h3>
                 <p class="feature-description">Monitor support activity, update account permissions, and manage your customer service team.</p>
                 
-                <a href="@Url.Action("ManageCustomerService", "Admin")" class="btn btn-manage btn-info">
+                <a href="@Url.Action("ManageCustomerService", "Admin")" class="btn btn-manage btn-info" style="margin-top: auto;">
                     <i class="fas fa-users-gear me-2"></i> Manage Staff
                 </a>
             </div>
@@ -70,8 +58,8 @@
                 <h3 class="feature-title">User Access</h3>
                 <p class="feature-description">Review seller applications, manage accounts, and control permissions across the platform.</p>
                 
-                <a href="@Url.Action("ManageUsers", "Admin")" class="btn btn-manage btn-primary">
-                    <i class="fas fa-arrow-right me-2"></i> Manage Users
+                <a href="@Url.Action("ManageUsers", "Admin")" class="btn btn-manage btn-primary" style="margin-top: auto;">
+                    <i class="fas fa-users me-2"></i> Manage Users
                 </a>
             </div>
 
@@ -81,19 +69,41 @@
                 </div>
                 <h3 class="feature-title">Inventory Review</h3>
                 <p class="feature-description">Validate product listings, review violations, and maintain catalog quality standards.</p>
-                <a href="@Url.Action("InventoryReview", "Admin")" class="btn btn-manage btn-warning">
-                    <i class="fas fa-arrow-right me-2"></i> Review Queue
+                <a href="@Url.Action("InventoryReview", "Admin")" class="btn btn-manage btn-warning" style="margin-top: auto;">
+                    <i class="fas fa-list-check me-2"></i> Review Queue
                 </a>
             </div>
 
-            <div class="feature-card dark">
+            <div class="feature-card info">
                 <div class="feature-icon">
-                    <i class="fas fa-gears"></i>
+                    <i class="fas fa-truck-fast"></i>
                 </div>
-                <h3 class="feature-title">System Settings</h3>
-                <p class="feature-description">Configure API keys, platform fees, and manage site-wide maintenance modes.</p>
-                <a href="@Url.Action("Settings", "Admin")" class="btn btn-manage btn-dark">
-                    <i class="fas fa-arrow-right me-2"></i> Configure
+                <h3 class="feature-title">Order Management</h3>
+                <p class="feature-description">Monitor all incoming orders.</p>
+                <a href="@Url.Action("OrderManagement", "Admin")" class="btn btn-manage btn-info" style="margin-top: auto;">
+                    <i class="fas fa-truck-fast me-2"></i> Manage Orders
+                </a>
+            </div>
+
+            <div class="feature-card success">
+                <div class="feature-icon">
+                    <i class="fas fa-flag"></i>
+                </div>
+                <h3 class="feature-title">Customer Reports</h3>
+                <p class="feature-description">Monitor product and review reports submitted by customers. Review violations and take action.</p>
+                <a href="@Url.Action("ViewCustomerReports", "Admin")" class="btn btn-manage btn-success" style="margin-top: auto;">
+                    <i class="fas fa-flag me-2"></i> View Reports
+                </a>
+            </div>
+
+            <div class="feature-card success">
+                <div class="feature-icon">
+                    <i class="fas fa-ticket-alt"></i>
+                </div>
+                <h3 class="feature-title">Voucher Management</h3>
+                <p class="feature-description">Create discount vouchers, monitor redemption activity, and manage promotional campaigns across the platform.</p>
+                <a href="@Url.Action("VoucherManagement", "Admin")" class="btn btn-manage btn-success" style="margin-top: auto;">
+                    <i class="fas fa-ticket me-2"></i> Manage Vouchers
                 </a>
             </div>
         </div>

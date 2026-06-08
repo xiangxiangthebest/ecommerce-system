@@ -1,0 +1,142 @@
+@model EcommerceSystem.Models.Voucher
+@{
+    ViewData["Title"] = "Voucher Management";
+    Layout = "~/Views/Admin/Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/admin/voucher-management.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/admin/manage-users.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="voucher-management-section">
+    <div class="voucher-management-header">
+        <h2>Voucher Management</h2>
+        <p>Manage all vouchers from the admin dashboard. Create new vouchers, edit existing ones, and delete expired or invalid vouchers.</p>
+        <div class="header-actions">
+            <a href="@Url.Action("Home", "Admin")" class="glass-btn secondary"">
+                <i class="fas fa-arrow-left"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+
+    @if (TempData["VoucherError"] != null)
+    {
+        <div class="alert alert-error">@TempData["VoucherError"]</div>
+    }
+    @if (TempData["VoucherSuccess"] != null)
+    {
+        <div class="alert alert-success">@TempData["VoucherSuccess"]</div>
+    }
+
+    <div class="voucher-management-grid">
+        <div class="voucher-card voucher-create">
+            <h3>Create new voucher</h3>
+            <form asp-controller="Admin" asp-action="CreateVoucher" method="post">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="validation-summary-errors text-danger"></div>
+                <div class="form-row">
+                    <label asp-for="Code"></label>
+                    <input asp-for="Code" class="form-control" />
+                    <span asp-validation-for="Code" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label asp-for="Name"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label asp-for="Type"></label>
+                    <input asp-for="Type" class="form-control" placeholder="e.g. General, NewUser, Birthday" />
+                    <span asp-validation-for="Type" class="text-danger"></span>
+                </div>
+                <div class="form-row two-col">
+                    <div>
+                        <label asp-for="DiscountValue"></label>
+                        <input asp-for="DiscountValue" type="number" step="0.01" min="0" class="form-control" />
+                        <span asp-validation-for="DiscountValue" class="text-danger"></span>
+                    </div>
+                    <div>
+                        <label asp-for="MinimumSpend"></label>
+                        <input asp-for="MinimumSpend" type="number" step="0.01" min="0" class="form-control" />
+                        <span asp-validation-for="MinimumSpend" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-row two-col">
+                    <div>
+                        <label asp-for="StartDate"></label>
+                        <input asp-for="StartDate" type="date" class="form-control" />
+                        <span asp-validation-for="StartDate" class="text-danger"></span>
+                    </div>
+                    <div>
+                        <label asp-for="EndDate"></label>
+                        <input asp-for="EndDate" type="date" class="form-control" />
+                        <span asp-validation-for="EndDate" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-row two-col">
+                    <div>
+                        <label asp-for="Quantity"></label>
+                        <input asp-for="Quantity" type="number" min="1" class="form-control" />
+                        <span asp-validation-for="Quantity" class="text-danger"></span>
+                    </div>
+                    <div class="voucher-active-toggle">
+                        <label asp-for="IsActive"></label>
+                        <input asp-for="IsActive" type="checkbox" />
+                        <span asp-validation-for="IsActive" class="text-danger"></span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-create-voucher">Create Voucher</button>
+            </form>
+        </div>
+
+        <div class="voucher-card voucher-list">
+            <h3>Existing vouchers</h3>
+            <table class="voucher-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Discount</th>
+                        <th>Valid</th>
+                        <th>Qty</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (ViewBag.Vouchers != null && ((List<Voucher>)ViewBag.Vouchers).Any())
+                    {
+                        foreach (var voucher in (List<Voucher>)ViewBag.Vouchers)
+                        {
+                            <tr>
+                                <td>@voucher.Code</td>
+                                <td>@voucher.Name</td>
+                                <td>@voucher.Type</td>
+                                <td>RM @voucher.DiscountValue.ToString("0.00")</td>
+                                <td>@voucher.StartDate.ToString("yyyy-MM-dd") – @voucher.EndDate.ToString("yyyy-MM-dd")</td>
+                                <td>@voucher.Quantity</td>
+                                <td>@(voucher.IsActive ? "Active" : "Inactive")</td>
+                                <td class="voucher-actions">
+                                    <a href="@Url.Action("EditVoucher", "Admin", new { id = voucher.VoucherId })" class="btn btn-sm btn-edit">Edit</a>
+                                    <form asp-action="DeleteVoucher" asp-controller="Admin" method="post" class="inline-form" onsubmit="return confirm('Delete this voucher?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@voucher.VoucherId" />
+                                        <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8">No vouchers found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

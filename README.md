@@ -197,9 +197,9 @@ High-level modules should not depend on low-level modules. Both should depend on
 - `/Factories/CustomerCreator.cs`
 - `/Factories/CustomerServiceCreator.cs`
 - `/Factories/SellerCreator.cs`
-- `/Observers/AdminPanelObserver.cs`
-- `/Observers/CustomerDashboardObserver.cs`
-- `/Observers/SellerDashboardObserver.cs`
+- `/Observers/AdminNotificationObserver.cs`
+- `/Observers/CustomerNotificationObserver.cs`
+- `/Observers/SellerNotificationObserver.cs`
 
 ## Abstractions
 - `/Abstractions/UserCreator.cs`
@@ -237,9 +237,9 @@ Used to notify components when order status changes.
 
 - `/Interfaces/OrderStatusObserver.cs`
 - `/Interfaces/OrderStatusSubject.cs`
-- `/Observers/AdminPanelObserver.cs`
-- `/Observers/CustomerDashboardObserver.cs`
-- `/Observers/SellerDashboardObserver.cs`
+- `/Observers/AdminNotificationObserver.cs`
+- `/Observers/CustomerNotificationObserver.cs`
+- `/Observers/NotificationObserver.cs`
 
 ---
 

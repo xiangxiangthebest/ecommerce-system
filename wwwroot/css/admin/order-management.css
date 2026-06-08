@@ -1,0 +1,286 @@
+/* ── Status badge colours ─────────────────────────────────── */
+.badge-pending      { background:#fff3cd; color:#856404; }
+.badge-processing   { background:#cfe2ff; color:#084298; }
+.badge-shipped      { background:#d1ecf1; color:#0c5460; }
+.badge-delivered    { background:#d4edda; color:#155724; }
+.badge-completed    { background:#c3e6cb; color:#155724; font-weight:700; }
+.badge-cancelled    { background:#f8d7da; color:#721c24; }
+.badge-returnrefund { background:#e2d9f3; color:#4a235a; }
+
+/* ── Order status flow timeline ───────────────────────────── */
+.order-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 6px 0 0;
+}
+.flow-step {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    color: #aaa;
+    background: #f3f3f3;
+    border: 1.5px solid #e0e0e0;
+    transition: all .2s;
+}
+.flow-step.active {
+    color: #fff;
+    background: #4e4af2;
+    border-color: #4e4af2;
+    box-shadow: 0 2px 8px #4e4af233;
+}
+.flow-step.done {
+    color: #28a745;
+    background: #eafaf1;
+    border-color: #b7e4c7;
+}
+.flow-step.cancelled {
+    color: #dc3545;
+    background: #fff0f0;
+    border-color: #f5c6cb;
+}
+.flow-step.refund {
+    color: #6f42c1;
+    background: #f3eeff;
+    border-color: #d6bee4;
+}
+.flow-arrow {
+    font-size: 10px;
+    color: #ccc;
+    margin: 0 2px;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────── */
+.order-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 24px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.order-tabs::-webkit-scrollbar { 
+    display: none;
+}
+.order-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color .15s, border-color .15s;
+}
+.order-tab:hover { 
+    color: #4e4af2;
+    text-decoration: none;
+}
+.order-tab.active {
+    color: #1a1a2e;
+    border-bottom-color: #4e4af2;
+}
+.order-tab .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
+    border-radius: 20px;
+    background: #e9ecef;
+    color: #555;
+}
+.order-tab.active .tab-count {
+    background: #4e4af2;
+    color: #fff;
+}
+
+/* ── Order cards ──────────────────────────────────────────── */
+.order-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    transition: box-shadow .2s;
+}
+.order-card:hover { 
+    box-shadow: 0 4px 18px rgba(78,74,242,.10);
+}
+.order-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.order-id {
+    font-size: 13px;
+    font-weight: 700;
+    color: #4e4af2;
+}
+.order-date {
+    font-size: 12px;
+    color: #888;
+}
+.order-status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 14px;
+    border-radius: 20px;
+}
+.order-card-body {
+    padding: 16px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+}
+.order-meta-block { 
+    min-width: 140px;
+}
+.order-meta-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 700;
+    color: #aaa;
+    margin-bottom: 2px;
+}
+.order-meta-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #222;
+}
+.order-products-list {
+    flex: 1;
+    min-width: 200px;
+}
+.order-product-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #444;
+    padding: 2px 0;
+}
+.order-product-item i { 
+    color: #bbb;
+    font-size: 11px;
+}
+.order-product-more {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* ── Search bar ───────────────────────────────────────────── */
+.search-bar-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+.search-input-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 380px;
+}
+.search-input-wrap i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #aaa;
+    font-size: 13px;
+}
+.search-input-wrap input {
+    padding-left: 34px;
+    height: 40px;
+    border: 1.5px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 13px;
+    width: 100%;
+}
+.search-input-wrap input:focus {
+    outline: none;
+    border-color: #4e4af2;
+    box-shadow: 0 0 0 3px #4e4af215;
+}
+.btn-filter {
+    height: 40px;
+    padding: 0 20px;
+    background: #4e4af2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+.btn-filter:hover { 
+    background: #3a36d4;
+}
+
+/* ── Empty state ──────────────────────────────────────────── */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+}
+.empty-state i { 
+    font-size: 40px;
+    margin-bottom: 12px;
+    display: block;
+}
+.empty-state p { 
+    font-size: 15px;
+}
+
+/* ── Summary stats ────────────────────────────────────────── */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+}
+.summary-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+}
+.summary-card .s-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: #aaa;
+    font-weight: 700;
+}
+.summary-card .s-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1.2;
+    margin-top: 4px;
+}
+.summary-card.highlight .s-value { 
+    color: #4e4af2;
+}

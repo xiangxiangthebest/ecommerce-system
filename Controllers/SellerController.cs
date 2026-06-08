@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
-using EcommerceSystem.Observers;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -146,63 +146,75 @@ namespace EcommerceSystem.Controllers
             ViewBag.TotalRevenuePotential = activeProducts
                 .Sum(p => p.Price * p.StockQuantity);
 
-            // 用 dictionary 优化 lookup
-            var productMap = products.ToDictionary(p => p.ProductId);
+                // ── Actual Profit Calculation ──────────────────────────────────────────
+                // Return & Refund → deduct PROFIT only (goods came back, cost is recovered)
+                // Refund Only     → deduct full REVENUE (goods not returned, full loss)
 
-            // ─────────────────────────────────────────────
-            // ORDERS (DELIVERED + RECEIVED only)
-            // ─────────────────────────────────────────────
-            var orders = await _context.Order
-                .Include(o => o.Customer)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
-                .Where(o => o.SellerUserId == seller.UserId)
-                .ToListAsync();
+                var deliveredOrders = await _context.Order
+                    .Include(o => o.OrderItems)
+                    .Where(o => o.SellerUserId == seller.UserId
+                            && (o.CurrentStatus == OrderStatus.DELIVERED
+                            || o.CurrentStatus == OrderStatus.RECEIVED
+                            || o.CurrentStatus == OrderStatus.RETURN_REFUND))
+                    .ToListAsync();
 
-            var deliveredOrders = orders
-                .Where(o =>
-                    o.CurrentStatus == OrderStatus.DELIVERED ||
-                    o.CurrentStatus == OrderStatus.RECEIVED)
-                .ToList();
+double actualProfit = 0;
 
-            // var refundedOrders = orders
-            //     .Where(o =>
-            //         o.CurrentStatus == OrderStatus.AFTER_SALES_PROCESSING &&
-            //         o.AfterSalesType == AfterSalesType.REFUND &&
-            //         o.ReturnApprovedAt.HasValue)
-            //     .ToList();
-
-            // ─────────────────────────────────────────────
-            // PROFIT CALCULATION
-            // ─────────────────────────────────────────────
-            double actualProfit = 0;
-
-            void AddOrderProfit(IEnumerable<Order> orderList, bool isDeduct = false)
-            {
-                foreach (var order in orderList)
+                foreach (var order in deliveredOrders)
                 {
+                    // Voucher discount ratio for this order
+                    decimal rawSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+                    decimal voucherDiscount = Math.Max(0m, rawSubtotal - order.TotalAmount);
+                    decimal discountRatio = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
+
+                    // Step 1: Add profit (revenue - cost) for every item in this order
                     foreach (var item in order.OrderItems)
                     {
-                        if (!productMap.TryGetValue(item.ProductId, out var product))
-                            continue;
-
-                        var costPrice = product.OriginalPrice > 0
+                        var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                        var costPrice = product != null && product.OriginalPrice > 0
                             ? product.OriginalPrice
                             : (double)item.Price;
 
-                        var margin = (double)item.Price - costPrice;
+                        var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
+                        actualProfit += (discountedUnitPrice - costPrice) * item.Quantity;
+                    }
 
-                        if (margin <= 0) continue;
+                    // Step 2: Deduct refund impact if return was approved
+                    if (order.ReturnApprovedAt.HasValue && order.ApprovedRefundAmount > 0)
+                    {
+                        bool isReturnRefund = order.ReturnType.HasValue &&
+                            order.ReturnType.Value == EcommerceSystem.Enums.ReturnType.ReturnRefund;
 
-                        actualProfit += isDeduct
-                            ? -(margin * item.Quantity)
-                            : (margin * item.Quantity);
+                        if (isReturnRefund)
+                        {
+                            // Goods came back → seller recovers the cost, loses only the profit.
+                            // costRatio = total cost / total paid revenue (post-voucher)
+                            // Deduct = ApprovedRefundAmount × (1 - costRatio)  ← profit portion only
+                            // e.g. cost RM3, sell RM6, 3 items: costRatio=0.5 → deduct RM18×0.5 = RM9 ✅
+                            decimal paidMerchandise = rawSubtotal - voucherDiscount;
+                            if (paidMerchandise > 0)
+                            {
+                                double totalCost = 0;
+                                foreach (var item in order.OrderItems)
+                                {
+                                    var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                                    var costPrice = product != null && product.OriginalPrice > 0
+                                        ? product.OriginalPrice
+                                        : (double)item.Price;
+                                    totalCost += costPrice * item.Quantity;
+                                }
+                                double costRatio = totalCost / (double)paidMerchandise;
+                                actualProfit -= (double)order.ApprovedRefundAmount * (1.0 - costRatio);
+                            }
+                        }
+                        else
+                        {
+                            // Refund Only → goods NOT returned, full refunded revenue is lost.
+                            // e.g. 2 items at RM5.50 → deduct RM11 straight from profit ✅
+                            actualProfit -= (double)order.ApprovedRefundAmount;
+                        }
                     }
                 }
-            }
-
-            AddOrderProfit(deliveredOrders, false);
-            // AddOrderProfit(refundedOrders, true);
 
             ViewBag.TotalProfit = (decimal)actualProfit;
 
@@ -211,6 +223,16 @@ namespace EcommerceSystem.Controllers
             // ─────────────────────────────────────────────
             if (tab == "Order")
             {
+
+                var orders = await _context.Order
+                        .Include(o => o.Customer)
+                        .Include(o => o.OrderItems)
+                            .ThenInclude(oi => oi.Product)
+                        .Where(o => o.SellerUserId == seller.UserId)
+                        .OrderByDescending(o => o.OrderTime)
+                        .ToListAsync();
+                ViewBag.Orders = orders; 
+                    
                 ViewBag.Orders = orders
                     .OrderByDescending(o => o.OrderTime)
                     .ToList();
@@ -875,9 +897,9 @@ namespace EcommerceSystem.Controllers
             }
 
             // Attach observers — they are called inside SetStatusAsync()
-            order.Attach(new CustomerDashboardObserver(_notificationService));
-            order.Attach(new SellerDashboardObserver(_notificationService));
-            order.Attach(new AdminPanelObserver(_notificationService, _context));
+            order.Attach(new CustomerNotificationObserver(_notificationService));
+            order.Attach(new SellerNotificationObserver(_notificationService));
+            order.Attach(new AdminNotificationObserver(_notificationService, _context));
 
             // SetStatusAsync does the final validation, stamps timestamps, notifies observers
             await order.SetStatusAsync(newStatus);
@@ -932,35 +954,51 @@ namespace EcommerceSystem.Controllers
             // ReturnRefund : customer physically sends item back → add stock back.
             // RefundOnly   : item was never received / partially missing → stock
             //                stays as-is (items were never returned to warehouse).
-            bool isReturnRefund = string.Equals(returnType, "ReturnRefund",
-                                    StringComparison.OrdinalIgnoreCase);
+            bool isReturnRefund = order.ReturnReason != null
+                ? order.ReturnReason.StartsWith("[Return & Refund]", StringComparison.OrdinalIgnoreCase)
+                : string.Equals(returnType, "ReturnRefund", StringComparison.OrdinalIgnoreCase);
 
             var orderItemMap = order.OrderItems.ToDictionary(oi => oi.OrderItemId);
-            var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
+
+            // ── Compute per-item discounted price ────────────────────────────
+            // TotalAmount stores the post-voucher MERCHANDISE total only
+            // (shipping/SST are excluded from TotalAmount in your checkout).
+            // So we never need to subtract shipping here.
+            decimal merchandiseSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+
+            // Voucher discount: use stored field (preferred), else derive from TotalAmount
+            decimal voucherDiscount = Math.Max(0m, merchandiseSubtotal - order.TotalAmount);
+
+            // Proportional discount ratio across all items
+            decimal discountRatio = merchandiseSubtotal > 0
+                ? voucherDiscount / merchandiseSubtotal
+                : 0m;
 
             // ── Calculate the actual approved refund amount ───────────────────
-            // Sum only approved items × approved qty × unit price.
-            // This is what shows in the notification — NOT the full order total.
             decimal approvedRefundAmount = 0;
             foreach (var (itemId, qty) in pairs)
             {
                 if (!orderItemMap.TryGetValue(itemId, out var orderItem)) continue;
                 if (qty <= 0 || qty > orderItem.Quantity) continue;
 
-                approvedRefundAmount += qty * orderItem.Price;
+                decimal discountedUnitPrice = Math.Round(orderItem.Price * (1 - discountRatio), 2);
+                approvedRefundAmount += qty * discountedUnitPrice;
 
                 if (isReturnRefund)
                 {
-                    // Physical return: restore the approved quantity to stock
                     var product = await _context.Products.FindAsync(orderItem.ProductId);
                     if (product != null)
                         product.StockQuantity += qty;
                 }
-                // RefundOnly: no stock change — items were not physically returned
             }
 
-            order.ReturnStatus     = EcommerceSystem.Enums.ReturnStatus.Approved;
-            order.ReturnApprovedAt = DateTime.UtcNow;
+                order.ReturnStatus         = EcommerceSystem.Enums.ReturnStatus.Approved;
+                order.ReturnApprovedAt     = DateTime.UtcNow;
+                order.ApprovedRefundAmount = approvedRefundAmount;
+                order.ReturnType           = isReturnRefund
+                                            ? EcommerceSystem.Enums.ReturnType.ReturnRefund
+                                            : EcommerceSystem.Enums.ReturnType.RefundOnly;
 
             await _context.SaveChangesAsync();
 

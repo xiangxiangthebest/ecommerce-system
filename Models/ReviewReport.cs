@@ -3,7 +3,7 @@ namespace EcommerceSystem.Models;
 public class ReviewReport
 {
     public int ReviewReportId { get; set; }
-    public int ReviewId { get; set; }
+    public int? ReviewId { get; set; }
     public Review? Review { get; set; }
     public int CustomerId { get; set; }
     public Customer? Customer { get; set; }
@@ -17,4 +17,10 @@ public class ReviewReport
     public DateTime ReportedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }
     public string AdminNotes { get; set; } = string.Empty;
+    
+    // Snapshot of review data (saved before deletion)
+    public string? SavedProductName { get; set; }
+    public int SavedRating { get; set; }
+    public string? SavedReviewText { get; set; }
+    public string? SavedReviewerName { get; set; }
 }
