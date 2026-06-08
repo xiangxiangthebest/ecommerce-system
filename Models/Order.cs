@@ -12,7 +12,7 @@ public class Order : OrderStatusSubject
     public OrderStatus CurrentStatus { get; set; } = OrderStatus.PENDING;
     public DateTime OrderTime { get; set; }
     public decimal TotalAmount { get; set; }
-    public decimal VoucherDiscountAmount { get; set; } = 0m;
+    public bool VoucherApplied { get; set; } = false;
     public decimal ApprovedRefundAmount { get; set; } = 0m;  
     public string PaymentMethod { get; set; } = string.Empty;
     public int? AddressId { get; set; }

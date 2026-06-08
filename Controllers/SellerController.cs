@@ -159,9 +159,7 @@ namespace EcommerceSystem.Controllers
                 {
                     // Voucher discount ratio for this order
                     decimal rawSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
-                    decimal voucherDiscount = order.VoucherDiscountAmount > 0
-                        ? order.VoucherDiscountAmount
-                        : Math.Max(0m, rawSubtotal - order.TotalAmount);
+                    decimal voucherDiscount = Math.Max(0m, rawSubtotal - order.TotalAmount);
                     decimal discountRatio = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
 
                     // Step 1: Add profit (revenue - cost) for every item in this order
@@ -828,9 +826,7 @@ var pairs = approveItemIds.Zip(approveQtys, (id, qty) => (id, qty)).ToList();
             decimal merchandiseSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
 
             // Voucher discount: use stored field (preferred), else derive from TotalAmount
-            decimal voucherDiscount = order.VoucherDiscountAmount > 0
-                ? order.VoucherDiscountAmount
-                : Math.Max(0m, merchandiseSubtotal - order.TotalAmount);
+            decimal voucherDiscount = Math.Max(0m, merchandiseSubtotal - order.TotalAmount);
 
             // Proportional discount ratio across all items
             decimal discountRatio = merchandiseSubtotal > 0

@@ -89,8 +89,8 @@ namespace EcommerceSystem.Services
             var existing = await _context.CustomerVouchers
                 .Include(cv => cv.Voucher)
                 .Where(cv => cv.CustomerId == customer.UserId)
-                .Where(cv => cv.Voucher.Type == "Birthday")
-                .Where(cv => cv.Voucher.StartDate.Month == startOfMonth.Month && cv.Voucher.StartDate.Year == startOfMonth.Year)
+                .Where(cv => cv.Voucher!.Type == "Birthday")
+                .Where(cv => cv.Voucher!.StartDate.Month == startOfMonth.Month && cv.Voucher!.StartDate.Year == startOfMonth.Year)
                 .Where(cv => !cv.IsUsed)
                 .FirstOrDefaultAsync();
 

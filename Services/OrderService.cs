@@ -232,11 +232,12 @@ namespace EcommerceSystem.Services
                     request.SellerMessages.TryGetValue(messageKey, out var customerMessage);
 
                     var orderTotal = group.Sum(i => i.Quantity * (decimal)i.Price);
+                    decimal discountApplied = 0m;                                       
                     if (voucherDiscountRemaining > 0)
                     {
-                        var discountToApply = Math.Min(voucherDiscountRemaining, orderTotal);
-                        orderTotal -= discountToApply;
-                        voucherDiscountRemaining -= discountToApply;
+                        discountApplied = Math.Min(voucherDiscountRemaining, orderTotal); 
+                        orderTotal -= discountApplied;
+                        voucherDiscountRemaining -= discountApplied;
                     }
 
                     var order = new Order
@@ -254,6 +255,7 @@ namespace EcommerceSystem.Services
                         DeliveryState = address.State,
 
                         TotalAmount = orderTotal,
+                        VoucherApplied = discountApplied > 0, 
                         PaymentMethod = request.PaymentMethod,
                         CurrentStatus = OrderStatus.PENDING,
                         OrderTime = DateTime.Now,

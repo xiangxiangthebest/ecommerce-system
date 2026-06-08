@@ -30,6 +30,8 @@
                 <ul class="sub-nav"><li class="sub-active">Edit Product</li></ul>
             </li>
             <li><a href="@Url.Action("Home", "Seller", new { tab = "Order" })">Order</a></li>
+            <li><a href="@Url.Action("Home", "Seller", new { tab = "Profile" })">Profile</a></li>
+            <li><a href="@Url.Action("Home", "Seller", new { tab = "Chat" })">Chat</a></li>
         </ul>
         <div class="sidebar-footer">
             <form asp-controller="Auth" asp-action="Logout" method="post">

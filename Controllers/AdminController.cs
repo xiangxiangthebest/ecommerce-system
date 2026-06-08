@@ -534,13 +534,13 @@ namespace EcommerceSystem.Controllers
             if (reportType == "review" || reportType == "all")
             {
                 var reviewReports = _context.ReviewReports
-                    .Include(r => r.Review)
-                        .ThenInclude(rev => rev.OrderItem)
-                            .ThenInclude(oi => oi.Order)
-                                .ThenInclude(o => o.Customer)
-                    .Include(r => r.Review)
-                        .ThenInclude(rev => rev.Product)
-                    .Include(r => r.Customer)
+                    .Include(r => r.Review!)
+                        .ThenInclude(rev => rev.OrderItem!)
+                            .ThenInclude(oi => oi.Order!)
+                                .ThenInclude(o => o.Customer!)
+                    .Include(r => r.Review!)
+                        .ThenInclude(rev => rev.Product!)
+                    .Include(r => r.Customer!)
                     .AsQueryable();
  
                 if (!string.IsNullOrEmpty(searchTerm))

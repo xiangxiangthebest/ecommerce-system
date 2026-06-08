@@ -62,6 +62,11 @@
                         <i class="fas fa-lock nav-lock-icon"></i> Profile
                     </span>
                 </li>
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Chat
+                    </span>
+                </li>
             }
         </ul>
         <div class="sidebar-footer">
@@ -805,9 +810,7 @@
             var useAllItems = requestedQtys.Count == 0;
             var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
             // TotalAmount is merchandise-only (no shipping/SST), so discount = rawSubtotal - TotalAmount
-            var vDiscount   = o.VoucherDiscountAmount > 0
-                                ? o.VoucherDiscountAmount
-                                : Math.Max(0m, rawSubtotal - o.TotalAmount);
+            var vDiscount   = Math.Max(0m, rawSubtotal - o.TotalAmount);
             var discRatio   = rawSubtotal > 0 ? vDiscount / rawSubtotal : 0m;
         
         return new {
