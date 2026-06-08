@@ -17,12 +17,12 @@ namespace EcommerceSystem.Observers
     ///   CANCELED       → Order cancelled
     ///   RETURN_REFUND  → Return / refund requested
     /// </summary>
-    public class AdminPanelObserver : OrderStatusObserver
+    public class AdminNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
         private readonly AppDbContext _context;
 
-        public AdminPanelObserver(INotificationService notificationService, AppDbContext context)
+        public AdminNotificationObserver(INotificationService notificationService, AppDbContext context)
         {
             _notificationService = notificationService;
             _context = context;
@@ -36,7 +36,7 @@ namespace EcommerceSystem.Observers
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[AdminPanelObserver] Notification failed: {ex.Message}");
+                Console.Error.WriteLine($"[AdminNotificationObserver] Notification failed: {ex.Message}");
             }
         }
 

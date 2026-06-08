@@ -77,35 +77,30 @@ namespace EcommerceSystem.Controllers
 
             return RedirectToAction("CustomerConversation", new { id = chatRoom.ChatRoomId, productId = productId });
         }
-
         [HttpPost]
-        public async Task<IActionResult> SendMessage(int chatRoomId, int sellerId, string message)
+        public async Task<IActionResult> SendMessage(int chatRoomId, int customerId, string messageText)
         {
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return BadRequest("消息不能为空");
-            }
+            if (string.IsNullOrWhiteSpace(messageText))
+                return BadRequest("Message cannot be empty");
 
-            var customer = await _customerContext.GetCurrentCustomerAsync(User);
-            if (customer == null) return Forbid();
-            var currentUserId = customer.UserId;
+            var seller = await _sellerContext.GetCurrentSellerAsync(User);
+            if (seller == null) return Forbid();
 
             if (chatRoomId == 0)
             {
                 var newRoom = new ChatRoom
                 {
-                    CustomerId = currentUserId,
-                    SellerId = sellerId
+                    SellerId   = seller.UserId,
+                    CustomerId = customerId
                 };
                 _context.ChatRoom.Add(newRoom);
                 await _context.SaveChangesAsync();
-
                 chatRoomId = newRoom.ChatRoomId;
             }
-            await _chatService.SendMessageAsync(chatRoomId, currentUserId, message);
-            return RedirectToAction("CustomerConversation", new { id = chatRoomId });
-        }
 
+            await _chatService.SendMessageAsync(chatRoomId, seller.UserId, messageText);
+            return RedirectToAction("SellerConversation", new { id = chatRoomId });
+        }
         [HttpPost]
         public async Task<IActionResult> SellerSendMessage(int chatRoomId, int sellerId, string message)
         {
@@ -225,17 +220,16 @@ namespace EcommerceSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetSellerProducts(int sellerId)
         {
-            // 从你的商品表查出属于该 sellerId 的前10条产品数据
             var products = await _context.Products
-                .Where(p => p.SellerId == sellerId)
+                .Where(p => p.SellerId == sellerId && !p.IsDeleted && !p.IsDraft)
+                .OrderBy(p => p.Name)
                 .Select(p => new
                 {
-                    p.ProductId,
-                    p.Name,
-                    p.Price,
-                    p.ImagePath
+                    productId = p.ProductId,
+                    name      = p.Name,
+                    price     = p.Price,
+                    imagePath = p.ImagePath ?? "/images/default-product.jpg"
                 })
-                .Take(10)
                 .ToListAsync();
 
             return Json(products);

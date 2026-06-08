@@ -5,42 +5,144 @@
 
 @{
     var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-
-    // Seller 视角：对方永远是 Customer
-    var chatPartnerName = Model.Seller?.ShopName ?? "Seller"; 
+    var chatPartnerName = Model.Seller?.ShopName ?? "Seller";
     var firstChar = !string.IsNullOrEmpty(chatPartnerName) ? chatPartnerName[0].ToString().ToUpper() : "C";
 }
 
+<style>
+    /* ── Attach panel ── */
+    .seller-attach-panel {
+        display: none;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+        padding: 12px 16px;
+    }
+    .seller-attach-panel.open { display: block; }
+    .attach-grid { display: flex; gap: 12px; }
+    .attach-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 8px;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #555;
+        transition: background .15s;
+        user-select: none;
+    }
+    .attach-item:hover { background: #f0f4ff; }
+    .attach-item i { font-size: 22px; }
+
+    /* ── Shared card style (product & order) ── */
+    .msg-chat-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        overflow: hidden;
+        width: 220px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.08);
+        text-decoration: none;
+        display: block;
+        color: inherit;
+    }
+    .msg-chat-card:hover { text-decoration: none; color: inherit; }
+    .msg-card-chip {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 7px 12px;
+        background: #f5f7fb;
+        border-bottom: 1px solid #eaeef4;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #444;
+    }
+    .chip-action { color: #185FA5; font-weight: 500; white-space: nowrap; }
+    .msg-card-body-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+    .msg-card-thumb {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #eee;
+        flex-shrink: 0;
+    }
+    .msg-card-info { flex: 1; min-width: 0; }
+    .msg-card-title {
+        font-weight: 700;
+        font-size: 13px;
+        margin: 0 0 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .msg-card-sub { font-size: 11px; color: #888; margin: 0; }
+    .msg-card-footer-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 12px 10px;
+    }
+    .msg-card-price { font-weight: 700; color: #e53e3e; font-size: 13px; }
+
+    /* ── Modal list items ── */
+    .modal-list-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background .15s;
+    }
+    .modal-list-item:hover { background: #f8faff; }
+    .modal-list-item img {
+        width: 50px; height: 50px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        flex-shrink: 0;
+    }
+    .modal-item-info { flex: 1; min-width: 0; }
+    .modal-item-name  { font-weight: 600; font-size: 13px; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .modal-item-price { font-size: 12px; color: #e53e3e; font-weight: 600; margin: 0; }
+    .modal-item-sub   { font-size: 11px; color: #888; margin: 0; }
+
+    /* ── Image bubble ── */
+    .msg-image-bubble { cursor: pointer; }
+    .msg-image-bubble img { max-width: 200px; border-radius: 10px; }
+</style>
+
 <div class="container mt-3">
     <div class="card shadow-sm border-0">
-        
+
         <!-- HEADER -->
-        <div class="card-header bg-white border-bottom p-3 d-flex align-items-center justify-content-between">
-            <div class="d-flex align-items-center">
-
-                <!-- Back to Seller Inbox -->
-                <a asp-controller="Seller" asp-action="Home" asp-route-tab="Chat" class="btn btn-link text-dark p-0 me-3">
-                    <i class="bi bi-arrow-left fs-4"></i>
-                </a>
-
-                <!-- Avatar -->
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
-                     style="width: 45px; height: 45px;">
-                    <span class="fw-bold">@firstChar</span>
-                </div>
-
-                <div class="text-truncate">
-                    <h6 class="mb-0 fw-bold text-dark">@chatPartnerName</h6>
-                </div>
-
+        <div class="card-header bg-white border-bottom p-3 d-flex align-items-center">
+            <a asp-controller="Seller" asp-action="Home" asp-route-tab="Chat" class="btn btn-link text-dark p-0 me-3">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </a>
+            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3"
+                 style="width:45px;height:45px;">
+                <span class="fw-bold">@firstChar</span>
             </div>
+            <h6 class="mb-0 fw-bold text-dark text-truncate">@chatPartnerName</h6>
         </div>
 
         <!-- BODY -->
-        <div class="card-body p-0 bg-light" style="height: 500px; display: flex; flex-direction: column;">
+        <div class="card-body p-0 bg-light" style="height:500px;display:flex;flex-direction:column;">
 
             <div id="messageBody" class="p-3 flex-grow-1 overflow-auto"
-                 style="display:flex; flex-direction:column; gap:15px;">
+                 style="display:flex;flex-direction:column;gap:15px;">
 
                 @if (Model.Messages != null && Model.Messages.Any())
                 {
@@ -48,60 +150,130 @@
                     {
                         var isMe = msg.SenderId == currentUserId;
 
-                        <div style="display:flex; flex-direction:column;
+                        <div style="display:flex;flex-direction:column;
                                     align-items:@(isMe ? "flex-end" : "flex-start");
-                                    max-width:80%; align-self:@(isMe ? "flex-end" : "flex-start");">
+                                    max-width:80%;align-self:@(isMe ? "flex-end" : "flex-start");">
 
+                            @* ── Image ── *@
                             @if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
                             {
-                                var cleanHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
-                                @Html.Raw(cleanHtml)
-                            }
-                            else if (msg.MessageText != null && msg.MessageText.StartsWith("[ORDER_TAG]"))
-                            {
-                                var parts = msg.MessageText.Split('|');
-                                var orderId = parts.Length > 1 ? parts[1] : "0";
-                                var totalPrice = parts.Length > 2 ? parts[2] : "0.00";
-                                var orderImg = parts.Length > 3 ? parts[3] : "/images/default-order.png";
-
-                                <div class="p-2 bg-white rounded shadow-sm border text-start" style="max-width:250px;">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <img src="@orderImg" class="rounded me-2 border"
-                                             style="width:45px;height:45px;object-fit:cover;" />
-
-                                        <div>
-                                            <span class="d-block fw-bold small">📋 Order</span>
-                                            <span class="text-danger fw-bold small">RM @totalPrice</span>
-                                        </div>
-                                    </div>
-
-                                    <hr class="my-1" style="opacity:0.15;" />
-
-                                    <div class="text-center">
-                                        <a href="/Order/Details/@orderId"
-                                           class="text-primary text-decoration-none fw-bold small">
-                                            View Order
-                                        </a>
-                                    </div>
+                                <div class="msg-image-bubble" onclick="previewChatImage(this)">
+                                    @Html.Raw(msg.MessageText.Replace("[IMAGE_CARD]", ""))
                                 </div>
                             }
+
+                            @* ── Order card ── *@
+                            else if (msg.MessageText != null && msg.MessageText.StartsWith("[ORDER_TAG]"))
+                            {
+                                var parts     = msg.MessageText.Split('|');
+                                var orderId   = parts.Length > 1 ? parts[1] : "0";
+                                var totalAmt  = parts.Length > 2 ? parts[2] : "0.00";
+                                var orderImg  = parts.Length > 3 ? parts[3] : "/images/default-order.png";
+                                var coverName = parts.Length > 4 ? parts[4] : "Ordered Item";
+
+                                <a href="/Order/Details/@orderId" class="msg-chat-card">
+                                    <div class="msg-card-chip">
+                                        <span><i class="bi bi-receipt" style="font-size:11px"></i> Order ID: #@orderId</span>
+                                        <span class="chip-action">Track Order &gt;</span>
+                                    </div>
+                                    <div class="msg-card-body-row">
+                                        <img src="@orderImg" class="msg-card-thumb"
+                                             onerror="this.src='/images/default-order.png'" />
+                                        <div class="msg-card-info">
+                                            <p class="msg-card-title">#@orderId</p>
+                                            <p class="msg-card-sub">@coverName</p>
+                                        </div>
+                                    </div>
+                                    <div class="msg-card-footer-row">
+                                        <span class="msg-card-price">RM @totalAmt</span>
+                                    </div>
+                                </a>
+                            }
+
+                            @* ── Product card — structured [PRODUCT_TAG] sent by seller via modal ── *@
+                            else if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_TAG]"))
+                            {
+                                var parts     = msg.MessageText.Split('|');
+                                var prodId    = parts.Length > 1 ? parts[1] : "0";
+                                var prodName  = parts.Length > 2 ? parts[2] : "Product";
+                                var prodPrice = parts.Length > 3 ? parts[3] : "0.00";
+                                var prodImg   = parts.Length > 4 ? parts[4] : "/images/default-product.jpg";
+
+                                <a href="/Customer/ProductDetail/@prodId" class="msg-chat-card">
+                                    <div class="msg-card-chip">
+                                        <span><i class="bi bi-bag" style="font-size:11px"></i> Product</span>
+                                        <span class="chip-action">View &gt;</span>
+                                    </div>
+                                    <div class="msg-card-body-row">
+                                        <img src="@prodImg" class="msg-card-thumb"
+                                             onerror="this.src='/images/default-product.jpg'" />
+                                        <div class="msg-card-info">
+                                            <p class="msg-card-title">@prodName</p>
+                                        </div>
+                                    </div>
+                                    <div class="msg-card-footer-row">
+                                        <span class="msg-card-price">RM @prodPrice</span>
+                                    </div>
+                                </a>
+                            }
+
+                            @* ── Product card — HTML blob [PRODUCT_CARD] sent from customer side ── *@
                             else if (msg.MessageText != null && msg.MessageText.StartsWith("[PRODUCT_CARD]"))
                             {
-                                var cleanHtml = msg.MessageText.Replace("[PRODUCT_CARD]", "");
-                                @Html.Raw(cleanHtml)
-                            }
-                               else if (msg.MessageText != null && msg.MessageText.StartsWith("[IMAGE_CARD]"))
-                                {
-                                    var cleanImgHtml = msg.MessageText.Replace("[IMAGE_CARD]", "");
-                                    // 💡 包装一层点击事件，点击时提取内部 img 的 src 并塞给预览模态框
-                                    <div class="image-bubble cursor-pointer" onclick="previewChatImage(this)">
-                                        @Html.Raw(cleanImgHtml)
-                                    </div>
+                                var rawCard = msg.MessageText.Replace("[PRODUCT_CARD]", "");
+
+                                // Extract image src
+                                var imgSrc = "/images/default-product.jpg";
+                                var srcIdx = rawCard.IndexOf("src='");
+                                if (srcIdx < 0) srcIdx = rawCard.IndexOf("src=\"");
+                                if (srcIdx >= 0) {
+                                    var q = rawCard[srcIdx + 4] == '\'' ? '\'' : '"';
+                                    var s = srcIdx + 5; var e = rawCard.IndexOf(q, s);
+                                    if (e > s) imgSrc = rawCard.Substring(s, e - s);
                                 }
+
+                                // Extract product name from <strong>
+                                var pName = "Product";
+                                var si = rawCard.IndexOf("<strong>");
+                                if (si >= 0) { var s = si + 8; var e = rawCard.IndexOf("</strong>", s); if (e > s) pName = rawCard.Substring(s, e - s); }
+
+                                // Extract price after "RM"
+                                var pPrice = "";
+                                var ri = rawCard.IndexOf("RM ");
+                                if (ri >= 0) pPrice = rawCard.Substring(ri, Math.Min(12, rawCard.Length - ri)).Split('<')[0].Trim();
+
+                                // Extract href link
+                                var pLink = "#";
+                                var hi = rawCard.IndexOf("href='");
+                                if (hi < 0) hi = rawCard.IndexOf("href=\"");
+                                if (hi >= 0) { var q = rawCard[hi + 5] == '\'' ? '\'' : '"'; var s = hi + 6; var e = rawCard.IndexOf(q, s); if (e > s) pLink = rawCard.Substring(s, e - s); }
+
+                                <a href="@pLink" class="msg-chat-card">
+                                    <div class="msg-card-chip">
+                                        <span><i class="bi bi-bag" style="font-size:11px"></i> Product</span>
+                                        <span class="chip-action">View &gt;</span>
+                                    </div>
+                                    <div class="msg-card-body-row">
+                                        <img src="@imgSrc" class="msg-card-thumb"
+                                             onerror="this.src='/images/default-product.jpg'" />
+                                        <div class="msg-card-info">
+                                            <p class="msg-card-title">@pName</p>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(pPrice))
+                                    {
+                                        <div class="msg-card-footer-row">
+                                            <span class="msg-card-price">@pPrice</span>
+                                        </div>
+                                    }
+                                </a>
+                            }
+
+                            @* ── Plain text ── *@
                             else
                             {
                                 <div class="p-3 rounded-3 shadow-sm @(isMe ? "bg-primary text-white" : "bg-white text-dark border")"
-                                     style="word-break:break-word; font-size:14px;
+                                     style="word-break:break-word;font-size:14px;
                                             border-radius:@(isMe ? "16px 16px 2px 16px" : "16px 16px 16px 2px") !important;">
                                     @msg.MessageText
                                 </div>
@@ -117,241 +289,360 @@
                 {
                     <div class="text-center text-muted my-auto">
                         <i class="bi bi-chat-dots fs-1 opacity-25 d-block mb-2"></i>
-                        <span class="small">No messages yet. Reply to customer to start conversation.</span>
+                        <span class="small">No messages yet.</span>
                     </div>
                 }
-
             </div>
 
             <!-- FOOTER -->
-            <div class="card-footer bg-white border-top p-3">
+            <div class="card-footer bg-white border-top p-0">
 
+                @* Order initiate box *@
                 @if (ViewBag.IsOrderInitiated == true && ViewBag.InitiatedOrder != null)
                 {
-                    var initOrder = ViewBag.InitiatedOrder as EcommerceSystem.Models.Order;
+                    var initOrder    = ViewBag.InitiatedOrder as EcommerceSystem.Models.Order;
                     if (initOrder != null)
                     {
-                        var orderCoverImg = initOrder.OrderItems?.FirstOrDefault()?.Product?.ImagePath ?? "/images/default-order.png";
-
-                        <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded border"
-                             style="background:#fff8e1; border-color:#ffe082;" id="orderInitiateBox">
-
-                        <div class="d-flex align-items-center">
-                            <img src="@orderCoverImg" class="rounded me-2 border"
-                                 style="width:50px;height:50px;object-fit:cover;" />
-
-                            <div>
-                                <span class="fw-bold small d-block">Send order information to customer?</span>
-                                <span class="text-muted small">
-                                    Order #@initOrder.OrderId |
-                                    <span class="text-danger fw-bold">RM @initOrder.TotalAmount.ToString("F2")</span>
-                                </span>
+                        var coverImg  = initOrder.OrderItems?.FirstOrDefault()?.Product?.ImagePath ?? "/images/default-order.png";
+                        var coverName = initOrder.OrderItems?.FirstOrDefault()?.Product?.Name     ?? "Ordered Item";
+                        <div class="d-flex align-items-center justify-content-between p-3 border-bottom"
+                             style="background:#fff8e1;" id="orderInitiateBox">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="@coverImg" class="rounded border" style="width:50px;height:50px;object-fit:cover;" />
+                                <div>
+                                    <span class="fw-bold small d-block">Send order to customer?</span>
+                                    <span class="text-muted small">Order #@initOrder.OrderId |
+                                        <span class="text-danger fw-bold">RM @initOrder.TotalAmount.ToString("F2")</span>
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-
-                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                            @{
+                                var initAmtStr = initOrder.TotalAmount.ToString("F2");
+                                var safeImg    = coverImg.Replace("'", "\\'");
+                                var safeName   = coverName.Replace("'", "\\'");
+                            }
                             <button type="button" class="btn btn-warning btn-sm fw-bold"
-                                    onclick="sendCustomCard('ORDER','','@initOrder.OrderId','@initOrder.TotalAmount.ToString("F2")','@orderCoverImg');
-                                             document.getElementById('orderInitiateBox')?.remove();">
+                                    onclick="sendCard('ORDER','','@initOrder.OrderId','@initAmtStr','@safeImg','@safeName'); document.getElementById('orderInitiateBox')?.remove();">
                                 Send
                             </button>
+                                <button type="button" class="btn-close"
+                                        onclick="document.getElementById('orderInitiateBox').remove()"></button>
+                            </div>
+                        </div>
+                    }
+                }
 
-                            <button type="button" class="btn-close ms-2"
-                                    onclick="document.getElementById('orderInitiateBox').remove()"></button>
+                @* Attach panel *@
+                <div class="seller-attach-panel" id="attachPanel">
+                    <div class="attach-grid">
+                        <div class="attach-item" id="attachImageBtn">
+                            <i class="bi bi-image" style="color:#1D9E75"></i>
+                            <span>Send image</span>
+                        </div>
+                        <div class="attach-item" id="openProductModal">
+                            <i class="bi bi-bag-heart" style="color:#BA7517"></i>
+                            <span>Send Product</span>
+                        </div>
+                        <div class="attach-item" id="openOrderModal">
+                            <i class="bi bi-receipt" style="color:#185FA5"></i>
+                            <span>Send Order</span>
                         </div>
                     </div>
-                }
-                }
+                    <input type="file" id="photoFileInput" accept="image/*" class="d-none" />
+                </div>
 
-                <form id="chatForm"
-                      asp-controller="Chat"
-                      asp-action="SendMessage"
-                      method="post"
-                      class="d-flex align-items-center"
-                      onsubmit="return handleFormSubmit(event)">
+                @* Input row *@
+                <div class="p-3">
+                    <form id="chatForm"
+                          asp-controller="Chat"
+                          asp-action="SendMessage"
+                          method="post"
+                          class="d-flex align-items-center gap-2"
+                          onsubmit="return handleFormSubmit(event)">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
+                        <input type="hidden" name="customerId" value="@Model.CustomerId" />
 
-                    <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
-                    <input type="hidden" name="customerId" value="@Model.CustomerId" />
+                        <button type="button" class="btn btn-light border rounded-circle"
+                                style="width:40px;height:40px;flex-shrink:0;"
+                                id="attachToggleBtn">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
 
-                    <input type="file"
-                    id="photoFileInput"
-                    accept="image/*"
-                    class="d-none" />
+                        <input type="text"
+                               id="messageInput"
+                               name="messageText"
+                               class="form-control rounded-pill"
+                               placeholder="Reply to customer..."
+                               required />
 
-                    <button type="button"
-                            class="btn btn-light border"
-                            onclick="document.getElementById('photoFileInput').click()">
-                        <i class="bi bi-image"></i>
-                    </button>
-
-                    <input type="text"
-                           id="messageInput"
-                           name="messageText"
-                           class="form-control rounded-pill me-2"
-                           placeholder="Reply to customer..."
-                           required />
-
-                    <button type="submit" class="btn btn-primary rounded-circle"
-                            style="width:40px;height:40px;">
-                        <i class="bi bi-send-fill"></i>
-                    </button>
-                </form>
-
+                        <button type="submit" class="btn btn-primary rounded-circle"
+                                style="width:40px;height:40px;flex-shrink:0;">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ═══ MODAL: Store Products ═══ -->
+<div class="modal fade" id="sellerProductsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-bag-heart me-1"></i> Store products</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="sellerProductsContainer">
+                <div class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    Loading store products...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL: Orders ═══ -->
+<div class="modal fade" id="sellerOrdersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title"><i class="bi bi-receipt me-1"></i> Orders</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" id="sellerOrdersContainer">
+                <div class="text-center text-muted py-4">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    Loading orders...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL: Image Preview ═══ -->
 <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content bg-transparent border-0">
             <div class="modal-body p-0 text-center position-relative">
-                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
-                <img id="previewModalImage" src="" class="img-fluid rounded shadow" style="max-height: 85vh; object-fit: contain;" />
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3"
+                        data-bs-dismiss="modal"></button>
+                <img id="previewModalImage" src="" class="img-fluid rounded shadow"
+                     style="max-height:85vh;object-fit:contain;" />
             </div>
         </div>
     </div>
 </div>
 
-@section Scripts {
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        var messageBody = document.getElementById("messageBody");
-        if (messageBody) messageBody.scrollTop = messageBody.scrollHeight;
+    // Razor values injected once so JS can use them safely
+    var SELLER_ID   = @Model.SellerId;
+    var CUSTOMER_ID = @Model.CustomerId;
 
-        initImageUpload();
+    document.addEventListener("DOMContentLoaded", function () {
+        // Scroll to bottom
+        var body = document.getElementById("messageBody");
+        if (body) body.scrollTop = body.scrollHeight;
+
+        // Toggle attach panel
+        document.getElementById("attachToggleBtn").addEventListener("click", function () {
+            document.getElementById("attachPanel").classList.toggle("open");
+        });
+
+        // Image pick
+        document.getElementById("attachImageBtn").addEventListener("click", function () {
+            document.getElementById("photoFileInput").click();
+        });
+
+        document.getElementById("photoFileInput").addEventListener("change", function () {
+            var file = this.files[0];
+            if (!file) return;
+            if (!file.type.startsWith("image/")) { alert("Please select an image."); return; }
+            if (file.size > 5 * 1024 * 1024) { alert("Image too large (max 5 MB)."); return; }
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var input = document.getElementById("messageInput");
+                input.value = "[IMAGE_CARD]<div class='p-1 bg-white rounded shadow-sm border text-center'>" +
+                    "<img src='" + e.target.result + "' style='max-width:200px;border-radius:8px'/></div>";
+                input.removeAttribute("required");
+                document.getElementById("chatForm").submit();
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Open product modal → load products
+        document.getElementById("openProductModal").addEventListener("click", function () {
+            loadSellerProducts();
+            new bootstrap.Modal(document.getElementById("sellerProductsModal")).show();
+        });
+
+        // Open order modal → load orders
+        document.getElementById("openOrderModal").addEventListener("click", function () {
+            loadSellerOrders();
+            new bootstrap.Modal(document.getElementById("sellerOrdersModal")).show();
+        });
     });
 
+    // ── Form submit ──────────────────────────────────────────────────────────
     async function handleFormSubmit(event) {
         event.preventDefault();
-
         var input = document.getElementById("messageInput");
         if (!input.value.trim()) return false;
-
         var ready = await ensureChatRoomActivated();
         if (ready) document.getElementById("chatForm").submit();
-
         return false;
     }
 
-    async function sendCustomCard(type, title, id, price, img) {
+    // ── Send a card message ──────────────────────────────────────────────────
+    async function sendCard(type, name, id, price, img, sub) {
         var input = document.getElementById("messageInput");
-
         var ready = await ensureChatRoomActivated();
         if (!ready) return;
-
-        if (type === 'ORDER') {
-            input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img;
+        if (type === 'PRODUCT') {
+            input.value = "[PRODUCT_TAG]|" + id + "|" + name + "|" + price + "|" + img;
+        } else if (type === 'ORDER') {
+            input.value = "[ORDER_TAG]|" + id + "|" + price + "|" + img + "|" + (sub || "Ordered Item");
         }
-
         input.removeAttribute("required");
         document.getElementById("chatForm").submit();
     }
 
+    // ── Ensure chat room exists before sending ───────────────────────────────
     async function ensureChatRoomActivated() {
         var roomIdInput = document.querySelector('input[name="chatRoomId"]');
-
         if (roomIdInput && roomIdInput.value === "0") {
-            var customerId = "@Model.CustomerId";
-
             const res = await fetch('/Chat/CreateChatRoom', {
                 method: 'POST',
-                headers: {'Content-Type':'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({ customerId: customerId })
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ customerId: CUSTOMER_ID })
             });
-
             if (res.ok) {
                 const data = await res.json();
                 roomIdInput.value = data.chatRoomId;
                 return true;
             }
-
-            alert("Failed to start conversation with customer.");
+            alert("Failed to start conversation.");
             return false;
         }
-
         return true;
     }
 
-    function initImageUpload() {
-        var fileInput = document.getElementById("imageFileInput");
-
-        fileInput.addEventListener("change", async function () {
-            if (!fileInput.files.length) return;
-
-            var file = fileInput.files[0];
-
-            if (!file.type.startsWith("image/")) {
-                alert("Invalid image file");
-                return;
-            }
-
-            var ready = await ensureChatRoomActivated();
-            if (!ready) return;
-
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var input = document.getElementById("messageInput");
-                var form = document.getElementById("chatForm");
-
-                input.value = "[IMAGE_CARD]<div><img src='" + e.target.result + "' style='max-width:200px;border-radius:8px'/></div>";
-
-                input.removeAttribute("required");
-                form.submit();
-            };
-
-            reader.readAsDataURL(file);
-        });
-    }
-
+    // ── Image preview ────────────────────────────────────────────────────────
     function previewChatImage(element) {
-        // 找到当前气泡里的 img 标签
         var img = element.querySelector('img');
         if (img) {
-            var src = img.getAttribute('src');
-            // 将大图模态框的 src 替换为当前图片的路径
-            document.getElementById('previewModalImage').src = src;
-            
-            // 弹出 Bootstrap 模态框
-            var myModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
-            myModal.show();
+            document.getElementById('previewModalImage').src = img.getAttribute('src');
+            new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
         }
     }
 
-    var attachPhotoBtn = document.getElementById("attachPhotoBtn");
-    var photoFileInput = document.getElementById("photoFileInput");
-
-if (photoFileInput) {
-    photoFileInput.addEventListener("change", function () {
-        var file = this.files[0];
-        if (!file) return;
-
-        if (!file.type.startsWith("image/")) {
-            alert("Please select an image");
-            return;
+    // ── Load THIS seller's active products ───────────────────────────────────
+    async function loadSellerProducts() {
+        var c = document.getElementById("sellerProductsContainer");
+        c.innerHTML = spinner("Loading store products...");
+        console.log("[Chat] loadSellerProducts — SELLER_ID=" + SELLER_ID + " CUSTOMER_ID=" + CUSTOMER_ID);
+        try {
+            const url = '/Chat/GetSellerProducts?sellerId=' + SELLER_ID;
+            console.log("[Chat] fetching: " + url);
+            const res = await fetch(url);
+            console.log("[Chat] GetSellerProducts status: " + res.status);
+            if (!res.ok) {
+                const txt = await res.text();
+                console.error("[Chat] GetSellerProducts error body: " + txt);
+                c.innerHTML = error("Server error " + res.status + " — check console.");
+                return;
+            }
+            const items = await res.json();
+            console.log("[Chat] products received:", items);
+            if (!items.length) {
+                c.innerHTML = empty("No products in your store.");
+                return;
+            }
+            c.innerHTML = items.map(p => `
+                <div class="modal-list-item"
+                     onclick="pickProduct(${p.productId},'${ej(p.name)}','${p.price}','${ej(p.imagePath)}')">
+                    <img src="${eh(p.imagePath)}" onerror="this.src='/images/default-product.jpg'" />
+                    <div class="modal-item-info">
+                        <p class="modal-item-name">${eh(p.name)}</p>
+                        <p class="modal-item-price">RM ${parseFloat(p.price).toFixed(2)}</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary ms-2">Send</button>
+                </div>`).join('');
+        } catch (err) {
+            console.error("[Chat] loadSellerProducts exception:", err);
+            c.innerHTML = error("Failed to load products — check console.");
         }
+    }
 
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Image too large");
-            return;
+    function pickProduct(id, name, price, img) {
+        bootstrap.Modal.getInstance(document.getElementById('sellerProductsModal'))?.hide();
+        sendCard('PRODUCT', name, id, price, img, '');
+    }
+
+    // ── Load orders this customer placed with this seller ────────────────────
+    async function loadSellerOrders() {
+        var c = document.getElementById("sellerOrdersContainer");
+        c.innerHTML = spinner("Loading orders...");
+        console.log("[Chat] loadSellerOrders — SELLER_ID=" + SELLER_ID + " CUSTOMER_ID=" + CUSTOMER_ID);
+        try {
+            const url = '/Chat/SellerGetTheCustomerOrders?customerId=' + CUSTOMER_ID;
+            console.log("[Chat] fetching: " + url);
+            const res = await fetch(url);
+            console.log("[Chat] SellerGetTheCustomerOrders status: " + res.status);
+            if (!res.ok) {
+                const txt = await res.text();
+                console.error("[Chat] SellerGetTheCustomerOrders error body: " + txt);
+                c.innerHTML = error("Server error " + res.status + " — check console.");
+                return;
+            }
+            const items = await res.json();
+            console.log("[Chat] orders received:", items);
+            if (!items.length) {
+                c.innerHTML = empty("No orders from this customer yet.");
+                return;
+            }
+            c.innerHTML = items.map(o => `
+                <div class="modal-list-item"
+                     onclick="pickOrder('${o.OrderId}','${o.TotalAmount}','${ej(o.CoverImage)}','${ej(o.CoverName)}')">
+                    <img src="${eh(o.CoverImage)}" onerror="this.src='/images/default-order.png'" />
+                    <div class="modal-item-info">
+                        <p class="modal-item-name">Order #${o.OrderId}</p>
+                        <p class="modal-item-sub">${eh(o.CoverName)}</p>
+                        <p class="modal-item-price">RM ${parseFloat(o.TotalAmount).toFixed(2)}</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary ms-2">Send</button>
+                </div>`).join('');
+        } catch (err) {
+            console.error("[Chat] loadSellerOrders exception:", err);
+            c.innerHTML = error("Failed to load orders — check console.");
         }
+    }
 
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            var input = document.getElementById("messageInput");
-            var form = document.getElementById("chatForm");
+    function pickOrder(id, price, img, sub) {
+        bootstrap.Modal.getInstance(document.getElementById('sellerOrdersModal'))?.hide();
+        sendCard('ORDER', '', id, price, img, sub);
+    }
 
-            input.value =
-                "[IMAGE_CARD]<div class='p-1 bg-white rounded shadow-sm border text-center'>" +
-                "<img src='" + e.target.result + "' style='max-width:200px;border-radius:8px'/>" +
-                "</div>";
-
-            input.removeAttribute("required");
-            form.submit();
-        };
-
-        reader.readAsDataURL(file);
-    });
-}
+    // ── UI helpers ───────────────────────────────────────────────────────────
+    function spinner(msg) {
+        return '<div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2" role="status"></div>' + msg + '</div>';
+    }
+    function empty(msg) {
+        return '<div class="text-center text-muted py-4">' + msg + '</div>';
+    }
+    function error(msg) {
+        return '<div class="text-center text-danger py-4">' + msg + '</div>';
+    }
+    function eh(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function ej(s) {
+        if (!s) return '';
+        return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    }
 </script>
-}

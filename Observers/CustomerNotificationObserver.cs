@@ -15,11 +15,11 @@ namespace EcommerceSystem.Observers
     ///   CANCELED       → "Order Cancelled"
     ///   RETURN_REFUND  → "Return & Refund Requested"
     /// </summary>
-    public class CustomerDashboardObserver : OrderStatusObserver
+    public class CustomerNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
 
-        public CustomerDashboardObserver(INotificationService notificationService)
+        public CustomerNotificationObserver(INotificationService notificationService)
         {
             _notificationService = notificationService;
         }
@@ -32,7 +32,7 @@ namespace EcommerceSystem.Observers
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[CustomerDashboardObserver] Notification failed: {ex.Message}");
+                Console.Error.WriteLine($"[CustomerNotificationObserver] Notification failed: {ex.Message}");
             }
         }
 

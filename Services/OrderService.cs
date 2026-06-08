@@ -1,9 +1,9 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.Interfaces;
+using EcommerceSystem.Observers;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Enums;
-using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Services
@@ -126,9 +126,9 @@ namespace EcommerceSystem.Services
         // Call this before order.SetStatus() so all parties are notified.
         private void AttachObservers(Order order)
         {
-            order.Attach(new CustomerDashboardObserver(_notificationService));
-            order.Attach(new SellerDashboardObserver(_notificationService));
-            order.Attach(new AdminPanelObserver(_notificationService, _context));
+            order.Attach(new CustomerNotificationObserver(_notificationService));
+            order.Attach(new SellerNotificationObserver(_notificationService));
+            order.Attach(new AdminNotificationObserver(_notificationService, _context));
         }
 
         public async Task<OperationResult> PlaceOrderAsync(PlaceOrderRequest request)
