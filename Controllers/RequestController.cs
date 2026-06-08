@@ -4,7 +4,8 @@ using EcommerceSystem.Interfaces;
 using EcommerceSystem.Data;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;         
+using System.Security.Claims;
+using System.Text.Json;         
 
 
 namespace EcommerceSystem.Controllers
@@ -31,6 +32,8 @@ namespace EcommerceSystem.Controllers
             string requestServiceType,
             string requestIssueType,
             string description,
+            List<int> requestItemIds,
+            List<int> requestItemQtys,
             List<IFormFile>? images)
         {
             var user = await _customerContext.GetCurrentCustomerAsync(User);
@@ -46,6 +49,10 @@ namespace EcommerceSystem.Controllers
                 || !Enum.IsDefined(typeof(RequestIssueType), issueType))
                 return Json(new { success = false, message = "Invalid issue type" });
 
+            var requestedItems = requestItemIds
+                .Zip(requestItemQtys, (id, qty) => new { orderItemId = id, qty })
+                .ToList();
+
             var request = new Request
             {
                 RequestUserId = user.UserId,
@@ -53,6 +60,7 @@ namespace EcommerceSystem.Controllers
                 RequestServiceType = serviceType,  
                 RequestIssueType = issueType,
                 Description = description,
+                RequestedItemsJson = JsonSerializer.Serialize(requestedItems),
             };
 
             _context.Request.Add(request);
@@ -99,6 +107,22 @@ namespace EcommerceSystem.Controllers
 
             if (order == null)
                 return Json(new { success = false, message = "Order not found" });
+
+            var requestedQtyMap = new Dictionary<int, int>(); // orderItemId -> requestedQty
+            if (!string.IsNullOrWhiteSpace(request.RequestedItemsJson))
+            {
+                try
+                {
+                    var selections = System.Text.Json.JsonSerializer
+                        .Deserialize<List<System.Text.Json.JsonElement>>(request.RequestedItemsJson);
+                    if (selections != null)
+                        foreach (var s in selections)
+                            if (s.TryGetProperty("orderItemId", out var idEl)
+                                && s.TryGetProperty("qty", out var qtyEl)) 
+                                requestedQtyMap[idEl.GetInt32()] = qtyEl.GetInt32();
+                }
+                catch { /* fallback to full qty below */ }
+            }
 
             return Json(new
             {

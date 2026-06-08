@@ -14,10 +14,20 @@ namespace EcommerceSystem.Observers
     ///   RECEIVED       → "Order Received"       (customer confirmed receipt)
     ///   CANCELED       → "Order Cancelled"      (customer cancelled)
     ///   RETURN_REFUND  → "Return & Refund Requested"
+    ///     - Seller-handled reasons  : WrongItemReceived, ChangeOfMind, ItemNotAsDescribed
+    ///     - CS-handled reasons      : ItemNotDelivered, DamagedDefective, MissingPartsAccessories, Other
     /// </summary>
     public class SellerNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
+
+        // Reasons that the SELLER approves directly.
+        private static readonly HashSet<string> SellerHandledReasons = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "WrongItemReceived",
+            "ChangeOfMind",
+            "ItemNotAsDescribed"
+        };
 
         public SellerNotificationObserver(INotificationService notificationService)
         {
@@ -104,12 +114,31 @@ namespace EcommerceSystem.Observers
                         break;
 
                     // ── Return / refund requested ──────────────────────────────────
-                    // case OrderStatus.RETURN_REFUND:
-                    //     title = "Return & Refund Requested";
-                    //     message =
-                    //         $"Customer #{customerId} ({customerName}) has requested a " +
-                    //         $"return/refund for Order #{orderId}. Awaiting for Customer Service's response.";
-                    //     break;
+                    case OrderStatus.RETURN_REFUND:
+                    case OrderStatus.REFUND:
+                    {
+                        // Extract the issue-type token from ReturnReason.
+                        // ReturnReason is stored as  "<IssueType>||<description>"  or just "<IssueType>".
+                        var issueType = ExtractIssueType(order.ReturnReason);
+
+                        title = "Return & Refund Requested";
+
+                        if (SellerHandledReasons.Contains(issueType))
+                        {
+                            // Seller approves: WrongItemReceived, ChangeOfMind, ItemNotAsDescribed
+                            message =
+                                $"Customer #{customerId} ({customerName}) has requested a " +
+                                $"return/refund for Order #{orderId}. Awaiting for Seller approval.";
+                        }
+                        else
+                        {
+                            // CS approves: ItemNotDelivered, DamagedDefective, MissingPartsAccessories, Other
+                            message =
+                                $"Customer #{customerId} ({customerName}) has requested a " +
+                                $"return/refund for Order #{orderId}. Awaiting for Customer Service approval.";
+                        }
+                        break;
+                    }
 
                     default:
                         return;
@@ -130,6 +159,22 @@ namespace EcommerceSystem.Observers
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Extracts the issue-type token from a ReturnReason string.
+        /// ReturnReason format: "WrongItemReceived||Some description" or just "WrongItemReceived".
+        /// Returns an empty string if null / unparseable.
+        /// </summary>
+        private static string ExtractIssueType(string? returnReason)
+        {
+            if (string.IsNullOrWhiteSpace(returnReason))
+                return string.Empty;
+
+            var separatorIndex = returnReason.IndexOf("||", StringComparison.Ordinal);
+            return separatorIndex >= 0
+                ? returnReason[..separatorIndex].Trim()
+                : returnReason.Trim();
+        }
 
         // ── Builds a product list with variation details ─────────────────────
         // Example output: "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
