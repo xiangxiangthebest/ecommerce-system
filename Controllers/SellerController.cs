@@ -246,7 +246,6 @@ double actualProfit = 0;
                     .OrderByDescending(o => o.OrderTime)
                     .ToList();
 
-                // ✅ 加这行
                 ViewBag.Requests = await _context.Request
                     .Where(r => r.OrderId != null && orders.Select(o => o.OrderId).Contains(r.OrderId.Value))
                     .ToListAsync();
@@ -285,6 +284,26 @@ double actualProfit = 0;
                     .ToListAsync();
 
                 return View("Home", chatList);
+            }
+
+            // ─────────────────────────────────────────────
+            // TAB: REVIEWS
+            // ─────────────────────────────────────────────
+            if (tab == "Reviews")
+            {
+                var productIds = products.Select(p => p.ProductId).ToList();
+
+                var reviews = await _context.Reviews
+                    .Include(r => r.OrderItem!)
+                        .ThenInclude(oi => oi.Order!)
+                            .ThenInclude(o => o.Customer)
+                    .Where(r => productIds.Contains(r.ProductId))
+                    .OrderByDescending(r => r.CreatedAt)
+                    .ToListAsync();
+
+                ViewBag.ReviewsByProduct = reviews
+                    .GroupBy(r => r.ProductId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
             }
 
             return View();

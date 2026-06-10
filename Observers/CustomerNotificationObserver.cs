@@ -11,7 +11,7 @@ namespace EcommerceSystem.Observers
     ///   PREPARING      → "Processing Order"
     ///   SHIPPED        → "Order Shipped"
     ///   DELIVERED      → "Order Delivered"
-    ///   RECEIVED       → (no customer notification — they triggered it)
+    ///   RECEIVED       → "Order Completed" (thank you + prompt to leave a review)
     ///   CANCELED       → "Order Cancelled"
     ///   RETURN_REFUND  → "Return & Refund Request Submitted" (pending CS approval)
     /// </summary>
@@ -106,7 +106,14 @@ namespace EcommerceSystem.Observers
                         $"has been submitted and is pending Customer Service approval.";
                     break;
 
-                // RECEIVED — customer triggered this themselves; skip notification.
+                // ── Customer confirms they received the order ──────────────
+                case OrderStatus.RECEIVED:
+                    title = "Order Completed";
+                    message =
+                        $"Order #{orderId} from {shopName} has been marked as completed. " +
+                        $"Thank you for your purchase! You can now rate and review the product.";
+                    break;
+
                 default:
                     return;
             }

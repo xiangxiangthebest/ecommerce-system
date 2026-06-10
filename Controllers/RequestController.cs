@@ -215,15 +215,18 @@ namespace EcommerceSystem.Controllers
             {
                 success = true,
                 customerName = order.Customer?.FullName ?? "Customer",
-                orderItems = order.OrderItems.Select(oi => new
-                {
-                    productName     = oi.Product?.Name,
-                    quantity        = oi.Quantity,
-                    requestedQty    = requestedQtyMap.TryGetValue(oi.OrderItemId, out var rq) ? rq : oi.Quantity,
-                    price           = oi.Price,
-                    discountedPrice = Math.Round(oi.Price * (1 - discRatio), 2),  // voucher-adjusted unit price
-                    imageUrl        = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null
-                }).ToList(),
+                orderItems = order.OrderItems
+                    .Where(oi => requestedQtyMap.ContainsKey(oi.OrderItemId))   // only items the customer selected
+                    .Select(oi => new
+                    {
+                        productName       = oi.Product?.Name,
+                        quantity          = oi.Quantity,
+                        requestedQty      = requestedQtyMap[oi.OrderItemId],    // safe — key guaranteed by Where
+                        price             = oi.Price,
+                        discountedPrice   = Math.Round(oi.Price * (1 - discRatio), 2),
+                        imageUrl          = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null,
+                        selectedVariation = oi.SelectedVariation ?? ""          // e.g. {"Flavour":"Honey Tapioca","Size":"120g"}
+                    }).ToList(),
                 serviceType = request.RequestServiceType switch
                 {
                     RequestServiceType.RETURN_REFUND => "Return & Refund",
