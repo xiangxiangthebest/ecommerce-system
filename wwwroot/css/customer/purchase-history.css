@@ -316,6 +316,10 @@
 .ph-s-RECEIVED    .ph-status-dot { background: var(--c-received); }
 .ph-s-RETURN_REFUND { background: #fee2e2; color: #991b1b; }
 .ph-s-RETURN_REFUND .ph-status-dot { background: var(--c-return); }
+.ph-s-RETURN_REFUND_APPROVED { background: #dcfce7; color: #15803d; }
+.ph-s-RETURN_REFUND_APPROVED .ph-status-dot { background: #16a34a; }
+.ph-s-RETURN_REFUND_REJECTED { background: #fff1f2; color: #b91c1c; }
+.ph-s-RETURN_REFUND_REJECTED .ph-status-dot { background: #ef4444; }
 .ph-s-CANCELED    { background: #f3f4f6; color: #374151; }
 .ph-s-CANCELED    .ph-status-dot { background: var(--c-canceled); }
 

@@ -272,9 +272,31 @@
                                 @order.OrderTime.ToString("dd MMM yyyy")&nbsp;·&nbsp;@order.OrderTime.ToString("hh:mm tt")
                             </span>
                         </div>
-                        <span class="ph-status-pill ph-s-@statusKey">
+                        @{
+                            var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
+                            var pillApproved = (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
+                                               && requestForPill != null && requestForPill.ApprovedAt.HasValue;
+                            var pillRejected = !pillApproved
+                                               && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
+                                               && order.ReturnStatus.ToString() == "Rejected";
+                            var pillClass = pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
+                                          : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
+                                          : "ph-s-" + statusKey;
+                        }
+                        <span class="ph-status-pill @pillClass">
                             <span class="ph-status-dot"></span>
-                            @StatusLabel(order.CurrentStatus)
+                            @if (pillApproved)
+                            {
+                                @:Return/Refund Approved
+                            }
+                            else if (pillRejected)
+                            {
+                                @:Return/Refund Rejected
+                            }
+                            else
+                            {
+                                @StatusLabel(order.CurrentStatus)
+                            }
                         </span>
                     </div>
 
@@ -341,25 +363,67 @@
                         </div>
                     }
 
-                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
+                          || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
                     {
-                        
-                        <div class="ph-notice ph-notice-warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
-                            <i class="ti ti-hourglass" style="color: #d97706; font-size: 20px; margin-top: 2px;"></i>
-                            <div>
-                                @if (request != null)
+                        var isApprovedBanner = request != null && request.ApprovedAt.HasValue;
+                        var isRejectedBanner = !isApprovedBanner && order.ReturnStatus.ToString() == "Rejected";
+
+                        if (isApprovedBanner)
+                        {
+                            <div class="ph-notice" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
+                                <i class="ti ti-circle-check" style="color: #16a34a; font-size: 20px; margin-top: 2px;"></i>
+                                <div>
+                                    <strong style="color: #15803d; display: block;">
+                                        @(request!.RequestServiceType switch {
+                                            RequestServiceType.RETURN_REFUND => "Return & Refund",
+                                            RequestServiceType.REFUND => "Refund Only",
+                                            _ => request.RequestServiceType.ToString()
+                                        }) Request Approved
+                                    </strong>
+                                    <span style="color: #166534;">
+                                        @(request.RequestIssueType switch {
+                                            RequestIssueType.WrongItemReceived => "Wrong item received",
+                                            RequestIssueType.ChangeOfMind => "Change of mind",
+                                            RequestIssueType.ItemNotAsDescribed => "Item not as described",
+                                            RequestIssueType.ItemNotDelivered => "Item not delivered",
+                                            RequestIssueType.DamagedDefective => "Damaged / defective",
+                                            RequestIssueType.MissingPartsAccessories => "Missing parts / accessories",
+                                            _ => "Other"
+                                        })
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                        else if (isRejectedBanner)
+                        {
+                            <div class="ph-notice" style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
+                                <i class="ti ti-circle-x" style="color: #dc2626; font-size: 20px; margin-top: 2px;"></i>
+                                <div>
+                                    <strong style="color: #b91c1c; display: block;">
+                                        @(request != null ? (request.RequestServiceType switch {
+                                            RequestServiceType.RETURN_REFUND => "Return & Refund",
+                                            RequestServiceType.REFUND => "Refund Only",
+                                            _ => request.RequestServiceType.ToString()
+                                        }) : "Request") Rejected
+                                    </strong>
+                                    <span style="color: #991b1b;">Your request was not approved by customer service.</span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="ph-notice ph-notice-warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
+                                <i class="ti ti-hourglass" style="color: #d97706; font-size: 20px; margin-top: 2px;"></i>
+                                <div>
+                                    @if (request != null)
                                     {
                                         <strong style="color: #b45309; display: block;">
                                             Require @(request.RequestServiceType switch {
                                                 RequestServiceType.RETURN_REFUND => "Return & Refund",
                                                 RequestServiceType.REFUND => "Refund Only",
                                                 _ => request.RequestServiceType.ToString()
-                                            }). Waiting for @(request.RequestIssueType switch {
-                                                RequestIssueType.WrongItemReceived => "seller",
-                                                RequestIssueType.ChangeOfMind => "seller",
-                                                RequestIssueType.ItemNotAsDescribed => "seller",
-                                                _ => "customer service"
-                                            })'s response.
+                                            }). Waiting for customer service's response.
                                         </strong>
                                         <span>
                                             @(request.RequestIssueType switch {
@@ -373,11 +437,13 @@
                                             })
                                         </span>
                                     }
+                                </div>
                             </div>
-                        </div>
+                        }
                     }
 
-                    @if (isReturn && !string.IsNullOrWhiteSpace(order.ReturnReason))
+                    @* Legacy ReturnReason banner — only for old-style returns with no Request record *@
+                    @if (isReturn && request == null && !string.IsNullOrWhiteSpace(order.ReturnReason))
                     {
                         var returnImgs = ParseImageList(order.ReturnImagePathsJson);
 
@@ -563,6 +629,14 @@
                                 <button class="ph-btn ph-btn-return-trigger" onclick="console.log('clicked', @order.OrderId); openRequestModal(@order.OrderId)">
                                     <i class="ti ti-package-off"></i> Your Request
                                 </button>
+
+                                @* If approved → let customer confirm receipt so they can write a review *@
+                                @if (request != null && request.ApprovedAt.HasValue)
+                                {
+                                    <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
+                                        <i class="ti ti-circle-check"></i> Order Received
+                                    </button>
+                                }
                             }
 
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED)

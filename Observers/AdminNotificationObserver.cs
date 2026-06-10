@@ -15,7 +15,8 @@ namespace EcommerceSystem.Observers
     ///   DELIVERED      → Order delivered
     ///   RECEIVED       → Customer confirmed receipt
     ///   CANCELED       → Order cancelled
-    ///   RETURN_REFUND  → Return / refund requested
+    ///   RETURN_REFUND  → Return / refund requested (pending CS approval)
+    ///   REFUND         → Refund-only requested (pending CS approval)
     /// </summary>
     public class AdminNotificationObserver : OrderStatusObserver
     {
@@ -106,13 +107,14 @@ namespace EcommerceSystem.Observers
                     break;
 
                 // ── Return / refund requested ──────────────────────────────────
-                // case OrderStatus.RETURN_REFUND:
-                //     title = "Return & Refund Requested";
-                //     message =
-                //         $"Order #{orderId} — Customer #{customerId} ({customerName}) " +
-                //         $"has requested a return/refund from {shopName} (Seller #{sellerId}). " +
-                //         $"Total: RM{total:F2}";
-                //     break;
+                case OrderStatus.RETURN_REFUND:
+                case OrderStatus.REFUND:
+                    title = "Return & Refund Request — Pending CS Approval";
+                    message =
+                        $"Order #{orderId} — Customer #{customerId} ({customerName}) " +
+                        $"has submitted a return/refund request from {shopName} (Seller #{sellerId}). " +
+                        $"Total: RM{total:F2}. Awaiting Customer Service approval.";
+                    break;
 
                 default:
                     return;

@@ -13,7 +13,7 @@ namespace EcommerceSystem.Observers
     ///   DELIVERED      → "Order Delivered"
     ///   RECEIVED       → (no customer notification — they triggered it)
     ///   CANCELED       → "Order Cancelled"
-    ///   RETURN_REFUND  → "Return & Refund Requested"
+    ///   RETURN_REFUND  → "Return & Refund Request Submitted" (pending CS approval)
     /// </summary>
     public class CustomerNotificationObserver : OrderStatusObserver
     {
@@ -98,12 +98,13 @@ namespace EcommerceSystem.Observers
                     break;
 
                 // ── Return / refund requested ──────────────────────────────────
-                // case OrderStatus.RETURN_REFUND:
-                //     title = "Return & Refund Requested";
-                //     message =
-                //         $"Your return/refund request for Order #{orderId} from {shopName} " +
-                //         $"has been submitted and is awaiting seller approval.";
-                //     break;
+                case OrderStatus.RETURN_REFUND:
+                case OrderStatus.REFUND:
+                    title = "Return & Refund Request Submitted";
+                    message =
+                        $"Your return/refund request for Order #{orderId} from {shopName} " +
+                        $"has been submitted and is pending Customer Service approval.";
+                    break;
 
                 // RECEIVED — customer triggered this themselves; skip notification.
                 default:

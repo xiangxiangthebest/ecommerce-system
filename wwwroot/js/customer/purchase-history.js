@@ -598,20 +598,38 @@ async function openRequestModal(orderId) {
         return;
     }
 
-    const itemsHtml = result.orderItems.map(item => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #ebebf5;">
+    // Build per-item rows and accumulate total refund amount
+    let totalRefund = 0;
+    const itemsHtml = result.orderItems.map(item => {
+        const unitPrice  = parseFloat(item.discountedPrice ?? item.price);
+        const reqQty     = item.requestedQty ?? item.quantity;
+        const lineTotal  = unitPrice * reqQty;
+        totalRefund     += lineTotal;
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #ebebf5;">
             <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
                 ${item.imageUrl
                     ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover;">`
                     : `<i class="ti ti-box" style="font-size:20px;color:#9a98b6;"></i>`}
             </div>
-            <div style="flex:1;">
-                <p style="margin:0;font-size:13px;font-weight:500;">${item.productName}</p>
-                <p style="margin:0;font-size:11px;color:#9a98b6;">x${item.quantity}</p>
+            <div style="flex:1;min-width:0;">
+                <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#1e1b4b;">${item.productName}</p>
+                <p style="margin:0;font-size:11px;color:#9a98b6;">
+                    Qty ordered: <strong style="color:#6b6b8a;">${item.quantity}</strong>
+                    &nbsp;·&nbsp;
+                    Requested: <strong style="color:#f97316;">${reqQty}</strong>
+                    &nbsp;·&nbsp;
+                    RM ${unitPrice.toFixed(2)} / unit
+                </p>
             </div>
-            <p style="margin:0;font-size:13px;font-weight:500;">RM ${parseFloat(item.price).toFixed(2)}</p>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
+
+    const refundSummaryHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;margin-top:4px;border-top:1.5px solid #e8eaf6;">
+        <p style="margin:0;font-size:12px;font-weight:700;color:#6b6b8a;text-transform:uppercase;letter-spacing:0.05em;">Total Refund Amount</p>
+        <p style="margin:0;font-size:16px;font-weight:800;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+    </div>`;
 
     const imagesHtml = result.images?.length
         ? result.images.map(url => `<img src="${url}" style="width:68px;height:68px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
@@ -626,9 +644,33 @@ async function openRequestModal(orderId) {
         <i class="ti ti-clock" style="font-size:20px;color:#9a98b6;"></i>
     </div>
 
+    ${result.approvedAt ? `
+    <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #bbf7d0;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
+        </div>
+        <i class="ti ti-circle-check" style="font-size:20px;color:#22c55e;"></i>
+    </div>` : result.rejectedAt ? `
+    <div style="background:#fff1f2;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #fecdd3;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Request Rejected</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${result.rejectedAt}${result.rejectionReason ? ' · ' + result.rejectionReason : ''}</p>
+        </div>
+        <i class="ti ti-circle-x" style="font-size:20px;color:#ef4444;"></i>
+    </div>` : `
+    <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #fde68a;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#92400e;">Pending — awaiting customer service</p>
+        </div>
+        <i class="ti ti-hourglass" style="font-size:20px;color:#f59e0b;"></i>
+    </div>`}
+
     <div style="background:#f8f8fc;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
         <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order items</p>
         ${itemsHtml}
+        ${refundSummaryHtml}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1087,4 +1129,3 @@ function showToast(msg, type = 'success') {
     setTimeout(() => t.classList.add('ph-toast-hide'), 3500);
     setTimeout(() => t.remove(), 4200);
 }
-

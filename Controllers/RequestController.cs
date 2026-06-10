@@ -14,10 +14,16 @@ namespace EcommerceSystem.Controllers
     {
         private readonly ICustomerContext _customerContext;
         private readonly AppDbContext _context;
-        public RequestController(ICustomerContext customerContext, AppDbContext context)
+        private readonly INotificationService _notificationService;
+
+        public RequestController(
+            ICustomerContext customerContext,
+            AppDbContext context,
+            INotificationService notificationService)
         {
             _customerContext = customerContext;
             _context = context;
+            _notificationService = notificationService;
         }
 
         private async Task<Seller?> GetCurrentSellerAsync()
@@ -40,10 +46,15 @@ namespace EcommerceSystem.Controllers
             if (user == null) return Json(new { success = false, message = "User not found" });
             var order = await _context.Order.FirstOrDefaultAsync(o => o.OrderId == orderId);
             if (order == null) return Json(new { success = false, message = "Order not found" });
-            order.CurrentStatus = OrderStatus.AFTER_SALES_REQUESTED;
 
             if (!Enum.TryParse<RequestServiceType>(requestServiceType, out var serviceType))
                 return Json(new { success = false, message = "Invalid service type" });
+
+            // RETURN_REFUND and REFUND go straight to customer service → use RETURN_REFUND status
+            // so the customer service dashboard (which filters on RETURN_REFUND) picks them up.
+            order.CurrentStatus = (serviceType == RequestServiceType.RETURN_REFUND || serviceType == RequestServiceType.REFUND)
+                ? OrderStatus.RETURN_REFUND
+                : OrderStatus.AFTER_SALES_REQUESTED;
 
             if (!Enum.TryParse<RequestIssueType>(requestIssueType, true, out var issueType)
                 || !Enum.IsDefined(typeof(RequestIssueType), issueType))
@@ -86,6 +97,77 @@ namespace EcommerceSystem.Controllers
                 await _context.SaveChangesAsync();
             }
 
+            // ── Notify all parties about the new after-sales request ──────────
+            try
+            {
+                var orderWithDetails = await _context.Order
+                    .Include(o => o.Customer)
+                    .Include(o => o.Seller)
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
+                    .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+                if (orderWithDetails != null)
+                {
+                    var shopName     = orderWithDetails.Seller?.ShopName ?? "the seller";
+                    var customerId   = orderWithDetails.Customer?.UserId;
+                    var customerName = orderWithDetails.Customer?.FullName ?? "Customer";
+                    var sellerId     = orderWithDetails.Seller?.UserId;
+                    var total        = orderWithDetails.TotalAmount;
+                    var serviceLabel = serviceType == RequestServiceType.RETURN_REFUND
+                        ? "Return & Refund" : "Refund Only";
+
+                    // 1. Notify Customer — confirmation that their request was submitted
+                    if (customerId.HasValue)
+                        await _notificationService.CreateAsync(
+                            userId:  customerId.Value,
+                            title:   "After-Sales Request Submitted",
+                            message: $"Your {serviceLabel} request for Order #{orderId} from {shopName} " +
+                                     $"has been submitted and is pending Customer Service approval."
+                        );
+
+                    // 2. Notify Seller — their order has an after-sales request pending
+                    if (sellerId.HasValue)
+                        await _notificationService.CreateAsync(
+                            userId:  sellerId.Value,
+                            title:   "After-Sales Request — Pending CS Approval",
+                            message: $"Customer {customerName} has submitted a {serviceLabel} request " +
+                                     $"for Order #{orderId}. Awaiting Customer Service approval."
+                        );
+
+                    // 3. Notify all Admins
+                    var adminIds = await _context.Users
+                        .Where(u => u.Role == "Admin" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+                    foreach (var adminId in adminIds)
+                        await _notificationService.CreateAsync(
+                            userId:  adminId,
+                            title:   "After-Sales Request — Pending CS Approval",
+                            message: $"Order #{orderId} — {customerName} submitted a {serviceLabel} request " +
+                                     $"from {shopName}. Total: RM{total:F2}. Awaiting Customer Service approval."
+                        );
+
+                    // 4. Notify all CustomerService users — action required
+                    var csUserIds = await _context.Users
+                        .Where(u => u.Role == "CustomerService" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+                    foreach (var csUserId in csUserIds)
+                        await _notificationService.CreateAsync(
+                            userId:  csUserId,
+                            title:   $"New {serviceLabel} Request — Action Required",
+                            message: $"Customer {customerName} has submitted a {serviceLabel} request " +
+                                     $"for Order #{orderId} at {shopName}. " +
+                                     $"Total: RM{total:F2}. Please review and approve or reject."
+                        );
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[RequestController] Submission notification failed for order #{orderId}: {ex.Message}");
+            }
+
             return Json(new { success = true });
         }
 
@@ -107,6 +189,11 @@ namespace EcommerceSystem.Controllers
 
             if (order == null)
                 return Json(new { success = false, message = "Order not found" });
+
+            // Calculate voucher discount ratio (same logic as seller dashboard)
+            var rawSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+            var voucherDiscount = Math.Max(0m, rawSubtotal - order.TotalAmount);
+            var discRatio = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
 
             var requestedQtyMap = new Dictionary<int, int>(); // orderItemId -> requestedQty
             if (!string.IsNullOrWhiteSpace(request.RequestedItemsJson))
@@ -130,10 +217,12 @@ namespace EcommerceSystem.Controllers
                 customerName = order.Customer?.FullName ?? "Customer",
                 orderItems = order.OrderItems.Select(oi => new
                 {
-                    productName = oi.Product?.Name,
-                    quantity = oi.Quantity,
-                    price = oi.Price,
-                    imageUrl = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null
+                    productName     = oi.Product?.Name,
+                    quantity        = oi.Quantity,
+                    requestedQty    = requestedQtyMap.TryGetValue(oi.OrderItemId, out var rq) ? rq : oi.Quantity,
+                    price           = oi.Price,
+                    discountedPrice = Math.Round(oi.Price * (1 - discRatio), 2),  // voucher-adjusted unit price
+                    imageUrl        = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null
                 }).ToList(),
                 serviceType = request.RequestServiceType switch
                 {
@@ -152,10 +241,21 @@ namespace EcommerceSystem.Controllers
                     RequestIssueType.MissingPartsAccessories => "Missing parts / accessories",
                     _ => "Other"
                 },
-                description = request.Description,
-                createdAt = request.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
-                images = request.Images.Select(img => "/uploads/" + img.ImagePath).ToList(),
-                requestId = request.RequestId
+                description          = request.Description,
+                createdAt            = request.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
+                approvedAt           = request.ApprovedAt.HasValue
+                                        ? request.ApprovedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                        : (string?)null,
+                approvedRefundAmount = order.ApprovedRefundAmount > 0
+                                        ? order.ApprovedRefundAmount.ToString("F2")
+                                        : (string?)null,
+                returnType           = order.ReturnType.HasValue
+                                        ? (order.ReturnType == EcommerceSystem.Enums.ReturnType.ReturnRefund
+                                            ? "Return & Refund"
+                                            : "Refund Only")
+                                        : (string?)null,
+                images               = request.Images.Select(img => "/uploads/" + img.ImagePath).ToList(),
+                requestId            = request.RequestId
             });
         }
 
@@ -209,6 +309,7 @@ namespace EcommerceSystem.Controllers
 
             var order = await _context.Order
                 .Include(o => o.Customer)
+                .Include(o => o.Seller)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
@@ -218,8 +319,33 @@ namespace EcommerceSystem.Controllers
             order.CurrentStatus = OrderStatus.DELIVERED;
 
             await _context.SaveChangesAsync();
+
+            // ── Notify Customer that their after-sales request was rejected ────
+            try
+            {
+                var rejectedRequest = await _context.Request
+                    .FirstOrDefaultAsync(r => r.RequestId == requestId);
+
+                var shopName     = order.Seller?.ShopName ?? "the seller";
+                var customerId   = order.Customer?.UserId;
+                var serviceLabel = rejectedRequest?.RequestServiceType == RequestServiceType.RETURN_REFUND
+                    ? "Return & Refund" : "Refund Only";
+
+                if (customerId.HasValue)
+                    await _notificationService.CreateAsync(
+                        userId:  customerId.Value,
+                        title:   "After-Sales Request Rejected",
+                        message: $"Your {serviceLabel} request for Order #{orderId} from {shopName} " +
+                                 $"has been reviewed and rejected by Customer Service. " +
+                                 $"Your order status has been restored to Delivered."
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[RequestController] Rejection notification failed for order #{orderId}: {ex.Message}");
+            }
+
             return Json(new { success = true });
         }
     }
 }
-

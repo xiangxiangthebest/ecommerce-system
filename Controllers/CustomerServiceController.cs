@@ -8,20 +8,12 @@ using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Controllers
 {
-    // Customer Service only handles two things:
-    //   1. Approving the after-sales (Return / Refund) requests ROUTED to it
-    //   2. Receiving / reading notifications (the bell)
+    // Customer Service handles ALL after-sales requests (Return / Refund).
     //
     // ── ROUTING ──────────────────────────────────────────────────────────────
     // When a customer raises an after-sales request the order goes to
-    // OrderStatus.AFTER_SALES_REQUESTED and an AfterSalesRequest row is created
-    // in _context.Request. PurchaseHistory.cshtml routes by RequestIssueType:
-    //     SELLER  handles : WrongItemReceived, ChangeOfMind, ItemNotAsDescribed
-    //     CS      handles : ItemNotDelivered, DamagedDefective,
-    //                       MissingPartsAccessories, Other
-    //
-    // NOTE: change the role string below if your CustomerService accounts
-    // use a different Role value in the Users table.
+    // OrderStatus.RETURN_REFUND and a Request row is created in _context.Request.
+    // ALL RequestIssueTypes are routed to Customer Service for approval.
     [Authorize(Roles = "CustomerService")]
     public class CustomerServiceController : Controller
     {
@@ -37,10 +29,13 @@ namespace EcommerceSystem.Controllers
         private int GetCurrentUserId()
             => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
-        // Issue types Customer Service is responsible for (everything the seller
-        // does NOT handle). Keep this in sync with PurchaseHistory.cshtml.
+        // ALL issue types route to Customer Service.
+        // ALL issue types route to Customer Service.
         private static readonly EcommerceSystem.Enums.RequestIssueType[] CsIssueTypes =
         {
+            EcommerceSystem.Enums.RequestIssueType.WrongItemReceived,
+            EcommerceSystem.Enums.RequestIssueType.ChangeOfMind,
+            EcommerceSystem.Enums.RequestIssueType.ItemNotAsDescribed,
             EcommerceSystem.Enums.RequestIssueType.ItemNotDelivered,
             EcommerceSystem.Enums.RequestIssueType.DamagedDefective,
             EcommerceSystem.Enums.RequestIssueType.MissingPartsAccessories,
@@ -114,9 +109,38 @@ namespace EcommerceSystem.Controllers
                 serviceToken[oid] = isRR ? "ReturnRefund"    : "RefundOnly";
             }
 
-            ViewBag.IssueLabel   = issueLabel;
-            ViewBag.ServiceLabel = serviceLabel;
-            ViewBag.ServiceToken = serviceToken;
+            // Per-order requested qty map: orderId -> { orderItemId -> requestedQty }
+            // Built by parsing RequestedItemsJson so the approve modal pre-fills
+            // exactly what the customer asked for instead of the full order qty.
+            var requestedQtyMap = new Dictionary<int, Dictionary<int, int>>();
+
+            foreach (var r2 in csRequests)
+            {
+                var oid2 = r2.OrderId!.Value;
+                if (!shownOrderIds.Contains(oid2) || requestedQtyMap.ContainsKey(oid2)) continue;
+
+                var itemQtyMap = new Dictionary<int, int>();
+                if (!string.IsNullOrWhiteSpace(r2.RequestedItemsJson))
+                {
+                    try
+                    {
+                        var selections = System.Text.Json.JsonSerializer
+                            .Deserialize<List<System.Text.Json.JsonElement>>(r2.RequestedItemsJson);
+                        if (selections != null)
+                            foreach (var s in selections)
+                                if (s.TryGetProperty("orderItemId", out var idEl)
+                                    && s.TryGetProperty("qty", out var qtyEl))
+                                    itemQtyMap[idEl.GetInt32()] = qtyEl.GetInt32();
+                    }
+                    catch { /* fallback: empty map → view falls back to full order qty */ }
+                }
+                requestedQtyMap[oid2] = itemQtyMap;
+            }
+
+            ViewBag.IssueLabel      = issueLabel;
+            ViewBag.ServiceLabel    = serviceLabel;
+            ViewBag.ServiceToken    = serviceToken;
+            ViewBag.RequestedQtyMap = requestedQtyMap;
 
             return View();
         }
@@ -146,25 +170,17 @@ namespace EcommerceSystem.Controllers
             var order = await _context.Order
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                     && o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED);
+                    && (o.CurrentStatus == OrderStatus.RETURN_REFUND
+                        || o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED));
 
             if (order == null)
-            {
-                TempData["OrderError"] = "Request not found or no longer pending.";
-                return RedirectToAction("Home");
-            }
+                return Json(new { success = false, message = "Request not found or no longer pending." });
 
             if (order.ReturnApprovedAt.HasValue)
-            {
-                TempData["OrderError"] = "This request has already been approved.";
-                return RedirectToAction("Home");
-            }
+                return Json(new { success = false, message = "This request has already been approved." });
 
             if (approveItemIds == null || approveItemIds.Count == 0)
-            {
-                TempData["OrderError"] = "Please select at least one item to approve.";
-                return RedirectToAction("Home");
-            }
+                return Json(new { success = false, message = "Please select at least one item to approve." });
 
             // Authoritative return type comes from the AfterSalesRequest row.
             var request = await _context.Request
@@ -210,6 +226,13 @@ namespace EcommerceSystem.Controllers
 
             // Move to RETURN_REFUND so the seller revenue calc picks it up.
             order.CurrentStatus = OrderStatus.RETURN_REFUND;
+
+            // Stamp the Request row so ApprovedAt is no longer NULL.
+            if (request != null)
+            {
+                request.ApprovedAt  = DateTime.UtcNow;
+                request.ReviewedBy  = "CustomerService";
+            }
 
             await _context.SaveChangesAsync();
 
@@ -266,6 +289,22 @@ namespace EcommerceSystem.Controllers
                                      $"request from {customerName} ({shopName}). Total: RM{total:F2}"
                         );
                     }
+
+                    // Notify all CustomerService users (confirmation that the case was resolved)
+                    var csUserIds = await _context.Users
+                        .Where(u => u.Role == "CustomerService" && u.IsActive)
+                        .Select(u => u.UserId)
+                        .ToListAsync();
+
+                    foreach (var csUserId in csUserIds)
+                    {
+                        await _notificationService.CreateAsync(
+                            userId:  csUserId,
+                            title:   "Return & Refund Approved",
+                            message: $"Order #{orderId} — {returnTypeLabel} request from {customerName} " +
+                                     $"({shopName}) has been approved. Refund: RM{total:F2}"
+                        );
+                    }
                 }
             }
             catch (Exception ex)
@@ -277,8 +316,7 @@ namespace EcommerceSystem.Controllers
                 ? "Stock has been restored."
                 : "Stock unchanged (Refund Only — items not physically returned).";
 
-            TempData["OrderSuccess"] = $"Return approved for Order #{orderId}. {stockMsg}";
-            return RedirectToAction("Home");
+            return Json(new { success = true, message = $"Return approved for Order #{orderId}. {stockMsg}" });
         }
     }
 }
