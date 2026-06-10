@@ -486,22 +486,26 @@
 .pd-variation-btn {
     padding: 7px 16px;
     border-radius: 8px;
-    border: 1.5px solid rgba(0, 0, 0, 0.12);
-    background: #fff;
+    border: 2px solid transparent;
+    background: #f5f4f0;
     font-family: 'DM Sans', sans-serif;
     font-size: 13px;
     color: #1a1a2e;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    transition: border-color 0.15s, transform 0.15s;
 }
-.pd-variation-btn:hover  { border-color: #1a1a2e; }
-.pd-variation-btn.active { border-color: #1a1a2e; background: #1a1a2e; color: #fff; }
+.pd-variation-btn:hover  { transform: translateY(-2px); border-color: #ccc; }
+.pd-variation-btn.active { border-color: rgba(26, 26, 46, 0.4); }
 .pd-variation-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .pd-variation-btn.unavailable {
     opacity: 0.35;
     cursor: not-allowed;
     filter: grayscale(100%);
-    text-decoration: line-through;
+}
+.pd-variation-btn.unavailable:hover {
+    transform: none;
+    cursor:default;
+    border-color: transparent;
 }
 
 /* Image swatch variation (image + label side by side) */

@@ -23,13 +23,10 @@
     bool hasDiscount = Model.DiscountPercentage > 0;
 
     string stockClass, stockLabel;
-    if (!hasVariations) {
-        if (Model.StockQuantity <= 0)      { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
-        else if (Model.StockQuantity <= 5) { stockClass = "low-stock";    stockLabel = "Low Stock"; }
-        else                               { stockClass = "in-stock";      stockLabel = "In Stock"; }
-    } else {
-        stockClass = "select-options"; stockLabel = "Select Options";
-    }
+    if (Model.StockQuantity <= 0) { stockClass = "out-of-stock"; stockLabel = "Out of Stock"; }
+    else if (hasVariations) { stockClass = "select-options"; stockLabel = "Select Options"; }
+    else if (Model.StockQuantity <= 5) { stockClass = "low-stock"; stockLabel = "Low Stock"; }
+    else  { stockClass = "in-stock"; stockLabel = "In Stock"; }
 
     int fullStars  = (int)Math.Floor(Model.AverageRating);
     int emptyStars = 5 - fullStars;
