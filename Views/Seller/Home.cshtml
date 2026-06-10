@@ -44,6 +44,12 @@
                                 <span class="nav-text">Chat</span>
                             </a>
                         </li>
+
+                        <li class="@(ViewBag.ActiveTab == "Reviews" ? "active" : "")">
+                            <a href="@Url.Action("Home", "Seller", new { tab = "Reviews" })">
+                                <span class="nav-text">Reviews</span>
+                            </a>
+                        </li>
                     }
             else
             {
@@ -65,6 +71,11 @@
                 <li class="nav-locked" title="Pending admin approval">
                     <span class="nav-text nav-text-locked">
                         <i class="fas fa-lock nav-lock-icon"></i> Chat
+                    </span>
+                </li>
+                <li class="nav-locked" title="Pending admin approval">
+                    <span class="nav-text nav-text-locked">
+                        <i class="fas fa-lock nav-lock-icon"></i> Reviews
                     </span>
                 </li>
             }
@@ -638,6 +649,211 @@
                 <partial name="~/Views/Seller/ChatRoom.cshtml" model="Model" />
             </div>
         }
+        else if (ViewBag.ActiveTab == "Reviews")
+        {
+            var allProductsRv    = ViewBag.Products as List<EcommerceSystem.Models.Product> ?? new List<EcommerceSystem.Models.Product>();
+            var reviewsByProduct = ViewBag.ReviewsByProduct as Dictionary<int, List<EcommerceSystem.Models.Review>>
+                                   ?? new Dictionary<int, List<EcommerceSystem.Models.Review>>();
+
+            var productsWithReviews = allProductsRv
+                .Where(p => !p.IsDeleted && reviewsByProduct.ContainsKey(p.ProductId) && reviewsByProduct[p.ProductId].Any())
+                .OrderByDescending(p => reviewsByProduct[p.ProductId].Count)
+                .ToList();
+
+            int totalAllReviews = productsWithReviews.Sum(p => reviewsByProduct[p.ProductId].Count);
+
+            <div class="product-header" style="margin-bottom: 20px;">
+                <h2 class="section-title">Customer Reviews</h2>
+                @if (totalAllReviews > 0)
+                {
+                    <span style="font-size:13px;color:#9a98b6;font-weight:600;">@totalAllReviews review@(totalAllReviews == 1 ? "" : "s") across @productsWithReviews.Count product@(productsWithReviews.Count == 1 ? "" : "s")</span>
+                }
+            </div>
+
+            @if (!productsWithReviews.Any())
+            {
+                <div class="empty-state-panel">
+                    <i class="fas fa-star empty-icon"></i>
+                    <p>No reviews yet. Reviews will appear here once customers rate your products.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var prod in productsWithReviews)
+                {
+                    var prodReviews   = reviewsByProduct[prod.ProductId].OrderByDescending(r => r.CreatedAt).ToList();
+                    var avgRating     = prodReviews.Average(r => r.Rating);
+                    var totalProdRevs = prodReviews.Count;
+                    var starCounts    = Enumerable.Range(1, 5).Reverse()
+                                        .ToDictionary(s => s, s => prodReviews.Count(r => r.Rating == s));
+
+                    <div class="rv-product-block">
+                        <!-- Product header -->
+                        <div class="rv-prod-header">
+                            <div class="rv-prod-img-wrap">
+                                <img src="@prod.ImagePath" alt="@prod.Name" onerror="this.src='/images/placeholder.png'" />
+                            </div>
+                            <div class="rv-prod-meta">
+                                <span class="rv-prod-category">@(prod.Category?.Name ?? "—")</span>
+                                <h3 class="rv-prod-name">@prod.Name</h3>
+                                <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                                    <div class="rv-prod-stars">
+                                        @for (int s = 1; s <= 5; s++)
+                                        {
+                                            if (s <= Math.Floor(avgRating))
+                                            {
+                                                <i class="fas fa-star rv-star filled"></i>
+                                            }
+                                            else if (s - avgRating < 1 && s - avgRating > 0)
+                                            {
+                                                <i class="fas fa-star-half-alt rv-star filled"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="far fa-star rv-star"></i>
+                                            }
+                                        }
+                                    </div>
+                                    <span class="rv-prod-avg">@avgRating.ToString("F1")</span>
+                                    <span style="font-size:12px;color:#9a98b6;">· @totalProdRevs review@(totalProdRevs == 1 ? "" : "s")</span>
+                                </div>
+                            </div>
+                            <!-- Rating bar breakdown -->
+                            <div class="rv-bars-compact">
+                                @foreach (var kv in starCounts)
+                                {
+                                    double pct = totalProdRevs > 0 ? Math.Round((double)kv.Value / totalProdRevs * 100) : 0;
+                                    <div class="rv-bar-row">
+                                        <span class="rv-bar-label">@kv.Key</span>
+                                        <div class="rv-bar-track">
+                                            <div class="rv-bar-fill" style="width:@pct%"></div>
+                                        </div>
+                                        <span class="rv-bar-pct">@pct%</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Review cards -->
+                        <div class="rv-cards-list">
+                            @foreach (var r in prodReviews)
+                            {
+                                var customerName  = r.OrderItem?.Order?.Customer?.FullName ?? "Customer";
+                                var customerInit  = customerName.Substring(0, 1).ToUpper();
+                                var reviewImgList = new List<string>();
+                                if (!string.IsNullOrWhiteSpace(r.ReviewImagePathsJson))
+                                {
+                                    try { reviewImgList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ReviewImagePathsJson) ?? new List<string>(); } catch { }
+                                }
+
+                                <div class="rv-card-seller">
+                                    <div class="rv-card-author">
+                                        <div class="rv-avatar">@customerInit</div>
+                                        <div class="rv-author-info">
+                                            <span class="rv-author-name">@customerName</span>
+                                            <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
+                                        </div>
+                                    </div>
+                                    <div class="rv-card-stars-seller">
+                                        @for (int i = 0; i < r.Rating; i++) { <span class="rv-star-gold">★</span> }
+                                        @for (int i = 0; i < (5 - r.Rating); i++) { <span class="rv-star-empty">★</span> }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(r.ReviewText))
+                                    {
+                                        <p class="rv-card-text-seller">@r.ReviewText</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="rv-card-text-seller muted">No comment left.</p>
+                                    }
+                                    @if (reviewImgList.Any())
+                                    {
+                                        <div class="rv-photos-seller">
+                                            @foreach (var img in reviewImgList.Take(4))
+                                            {
+                                                <a href="@img" target="_blank" class="rv-photo-thumb-seller">
+                                                    <img src="@img" alt="Review photo" onerror="this.style.display='none'" />
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            <style>
+                /* ── Reviews Tab ─────────────────────────────── */
+                .rv-product-block {
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 2px 14px rgba(30,27,75,0.07);
+                    border: 1.5px solid #f0f0f8;
+                    margin-bottom: 28px;
+                    overflow: hidden;
+                }
+                .rv-prod-header {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 18px;
+                    padding: 20px 22px;
+                    border-bottom: 1.5px solid #f0f0f8;
+                    background: #f8f8ff;
+                }
+                .rv-prod-img-wrap {
+                    width: 72px; height: 72px;
+                    border-radius: 10px; overflow: hidden;
+                    flex-shrink: 0; background: #eee;
+                    border: 1px solid #e8eaf6;
+                }
+                .rv-prod-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+                .rv-prod-meta { flex: 1; min-width: 0; }
+                .rv-prod-category { font-size: 11px; color: #9a98b6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+                .rv-prod-name { font-size: 15px; font-weight: 700; color: #1e1b4b; margin: 4px 0 0; }
+                .rv-prod-stars { display: flex; gap: 2px; }
+                .rv-prod-avg { font-size: 15px; font-weight: 800; color: #1e1b4b; }
+                .rv-star { font-size: 14px; color: #d1d5db; }
+                .rv-star.filled { color: #f59e0b; }
+                .rv-bars-compact { display: flex; flex-direction: column; gap: 5px; min-width: 200px; }
+                .rv-bar-row { display: flex; align-items: center; gap: 8px; }
+                .rv-bar-label { font-size: 12px; color: #6b6b8a; font-weight: 600; width: 10px; text-align: right; }
+                .rv-bar-track { flex: 1; height: 8px; background: #e8eaf6; border-radius: 6px; overflow: hidden; }
+                .rv-bar-fill { height: 100%; background: #f59e0b; border-radius: 6px; transition: width 0.3s; }
+                .rv-bar-pct { font-size: 11px; color: #9a98b6; width: 32px; text-align: right; }
+                /* Review cards */
+                .rv-cards-list { padding: 0 22px 8px; }
+                .rv-card-seller {
+                    padding: 16px 0;
+                    border-bottom: 1px solid #f0f0f8;
+                }
+                .rv-card-seller:last-child { border-bottom: none; }
+                .rv-card-author { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+                .rv-avatar {
+                    width: 34px; height: 34px; border-radius: 50%;
+                    background: #1e1b4b; color: #fff;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 14px; font-weight: 700; flex-shrink: 0;
+                }
+                .rv-author-info { display: flex; flex-direction: column; gap: 2px; }
+                .rv-author-name { font-size: 14px; font-weight: 700; color: #1e1b4b; }
+                .rv-card-date { font-size: 12px; color: #9a98b6; }
+                .rv-card-stars-seller { display: flex; gap: 2px; margin-bottom: 8px; }
+                .rv-star-gold  { color: #f59e0b; font-size: 16px; }
+                .rv-star-empty { color: #d1d5db; font-size: 16px; }
+                .rv-card-text-seller { font-size: 13.5px; color: #1e1b4b; margin: 0 0 10px; line-height: 1.5; }
+                .rv-card-text-seller.muted { color: #9a98b6; font-style: italic; }
+                .rv-photos-seller { display: flex; gap: 8px; flex-wrap: wrap; }
+                .rv-photo-thumb-seller {
+                    width: 64px; height: 64px;
+                    border-radius: 8px; overflow: hidden;
+                    display: block; flex-shrink: 0;
+                    border: 1.5px solid #e8eaf6;
+                }
+                .rv-photo-thumb-seller img { width: 100%; height: 100%; object-fit: cover; display: block; }
+            </style>
+        }
         else
         {
             <div class="details-container">
@@ -838,12 +1054,13 @@
             customerEmail     = o.Customer?.Email ?? "—",
             customerName      = o.Customer?.FullName ?? "",
             items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
-                orderItemId  = oi.OrderItemId,
-                name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                sku          = oi.Product?.SKU ?? "—",
-                orderedQty   = oi.Quantity,
-                requestedQty = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
-                unitPrice    = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2")  // ← discounted price
+                orderItemId       = oi.OrderItemId,
+                name              = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                sku               = oi.Product?.SKU ?? "—",
+                orderedQty        = oi.Quantity,
+                requestedQty      = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
+                unitPrice         = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
+                selectedVariation = oi.SelectedVariation ?? ""   // e.g. {"Flavour":"Honey Tapioca","Size":"120g"}
             }).ToList()
         };
         }).ToList();
@@ -890,6 +1107,15 @@
     <script>
     const _sellerReturnOrders = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ordersForJs));
     const _allOrderDetails    = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(allOrdersForDetails));
+
+    // ── Variation JSON → readable tag line ──────────────────────────────────
+    function parseVariation(json) {
+        if (!json || json === '{}' || json === '[]' || json === '') return '';
+        try {
+            const obj = typeof json === 'string' ? JSON.parse(json) : json;
+            return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(' · ');
+        } catch { return ''; }
+    }
 
     function openApproveReturnModal(orderId) {
         const order = _sellerReturnOrders.find(o => o.orderId === orderId);
@@ -938,11 +1164,13 @@
             html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">No return items found.</div>`;
         } else {
             order.items.forEach(item => {
+                const varLine = parseVariation(item.selectedVariation);
                 html += `
                 <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
                     <input type="checkbox" class="approve-item-chk" data-order-item-id="${item.orderItemId}" data-max="${item.requestedQty}" data-unit-price="${item.unitPrice}" data-name="${item.name}" onchange="syncApproveQty(this);updateRefundBreakdown()" style="width:16px;height:16px;cursor:pointer" />
                     <label style="flex:1">
                         <div style="font-weight:600;font-size:13px">${item.name}</div>
+                        ${varLine ? `<div style="font-size:11px;color:#6366f1;margin-bottom:2px"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</div>` : ''}
                         <div style="font-size:12px;color:#9a98b6">Qty in order: ${item.orderedQty} &nbsp;|&nbsp; <span style="color:#f97316;font-weight:600">Requested: ${item.requestedQty}</span> &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span></div>
                     </label>
                     <div style="display:flex;align-items:center;gap:6px">
@@ -1127,6 +1355,7 @@
                 const itemsHtml = result.orderItems.map(item => {
                     const unitPrice = parseFloat(item.discountedPrice ?? item.price);
                     const reqQty    = item.requestedQty ?? item.quantity;
+                    const varLine   = parseVariation(item.selectedVariation);
                     totalRefund    += unitPrice * reqQty;
                     return `
                     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #ebebf5;">
@@ -1137,6 +1366,7 @@
                         </div>
                         <div style="flex:1;min-width:0;">
                             <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#1e1b4b;">${item.productName}</p>
+                            ${varLine ? `<p style="margin:0 0 2px;font-size:11px;color:#6366f1;"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</p>` : ''}
                             <p style="margin:0;font-size:11px;color:#9a98b6;">
                                 Qty ordered: <strong style="color:#6b6b8a;">${item.quantity}</strong>
                                 &nbsp;·&nbsp;

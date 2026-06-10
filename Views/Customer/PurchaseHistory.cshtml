@@ -605,12 +605,6 @@
                                 </button>
                             }
 
-                            else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.PREPARING)
-                            {
-                                <button class="ph-btn ph-btn-danger" onclick="openCancelModal(@order.OrderId, true)">
-                                    <i class="ti ti-x"></i> Request Cancel Order
-                                </button>
-                            }
 
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED)
                             {

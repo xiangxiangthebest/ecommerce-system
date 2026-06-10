@@ -196,17 +196,23 @@
                 returnImages  = new List<string>(),
                 customerEmail = o.Customer?.Email ?? "—",
                 customerName  = o.Customer?.FullName ?? "",
-                items = o.OrderItems.Select(oi => {
-                    requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
-                    var reqQty = (itemQtyMap != null && itemQtyMap.TryGetValue(oi.OrderItemId, out var rq)) ? rq : oi.Quantity;
-                    return new {
-                        orderItemId  = oi.OrderItemId,
-                        name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                        orderedQty   = oi.Quantity,
-                        requestedQty = reqQty,
-                        unitPrice    = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2")
-                    };
-                }).ToList()
+                items = o.OrderItems
+                    .Where(oi => {                                                      // only items the customer selected
+                        requestedQtyMap.TryGetValue(o.OrderId, out var m);
+                        return m != null && m.ContainsKey(oi.OrderItemId);
+                    })
+                    .Select(oi => {
+                        requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
+                        var reqQty = itemQtyMap![oi.OrderItemId];                       // safe — key guaranteed by Where
+                        return new {
+                            orderItemId       = oi.OrderItemId,
+                            name              = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                            orderedQty        = oi.Quantity,
+                            requestedQty      = reqQty,
+                            unitPrice         = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
+                            selectedVariation = oi.SelectedVariation ?? ""
+                        };
+                    }).ToList()
             };
         }).ToList();
 }
@@ -244,6 +250,15 @@
             noRes.style.display = visible === 0 ? 'flex' : 'none';
             table.style.display = visible === 0 ? 'none' : '';
         }
+    }
+
+    // ── Variation JSON → readable tag line ──────────────────────────────────
+    function parseVariation(json) {
+        if (!json || json === '{}' || json === '[]' || json === '') return '';
+        try {
+            const obj = typeof json === 'string' ? JSON.parse(json) : json;
+            return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(' · ');
+        } catch { return ''; }
     }
 
     // ── Approve Return modal ─────────────────────────────────────────────
@@ -284,11 +299,13 @@
             html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">No items found on this order.</div>`;
         } else {
             order.items.forEach(item => {
+                const varLine = parseVariation(item.selectedVariation);
                 html += `
                 <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
                     <input type="checkbox" class="approve-item-chk" data-order-item-id="${item.orderItemId}" data-max="${item.orderedQty}" data-unit-price="${item.unitPrice}" data-name="${item.name}" onchange="syncApproveQty(this);updateRefundBreakdown()" style="width:16px;height:16px;cursor:pointer" />
                     <label style="flex:1">
                         <div style="font-weight:600;font-size:13px">${item.name}</div>
+                        ${varLine ? `<div style="font-size:11px;color:#6366f1;margin-bottom:2px"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</div>` : ''}
                         <div style="font-size:12px;color:#9a98b6">Qty in order: ${item.orderedQty} &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span></div>
                     </label>
                     <div style="display:flex;align-items:center;gap:6px">
