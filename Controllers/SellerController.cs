@@ -909,6 +909,7 @@ double actualProfit = 0;
             order.Attach(new CustomerNotificationObserver(_notificationService));
             order.Attach(new SellerNotificationObserver(_notificationService));
             order.Attach(new AdminNotificationObserver(_notificationService, _context));
+            order.Attach(new CustomerServiceNotificationObserver(_notificationService, _context));
 
             // SetStatusAsync does the final validation, stamps timestamps, notifies observers
             await order.SetStatusAsync(newStatus);

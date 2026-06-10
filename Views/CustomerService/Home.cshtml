@@ -4,7 +4,8 @@
     var allOrders    = ViewBag.Orders       as List<EcommerceSystem.Models.Order> ?? new List<EcommerceSystem.Models.Order>();
     var issueLabel   = ViewBag.IssueLabel   as Dictionary<int, string> ?? new Dictionary<int, string>();
     var serviceLabel = ViewBag.ServiceLabel as Dictionary<int, string> ?? new Dictionary<int, string>();
-    var serviceToken = ViewBag.ServiceToken as Dictionary<int, string> ?? new Dictionary<int, string>();
+    var serviceToken    = ViewBag.ServiceToken    as Dictionary<int, string>                          ?? new Dictionary<int, string>();
+    var requestedQtyMap = ViewBag.RequestedQtyMap as Dictionary<int, Dictionary<int, int>> ?? new Dictionary<int, Dictionary<int, int>>();
 
     int cntAll      = allOrders.Count;
     int cntPending  = allOrders.Count(o => !o.ReturnApprovedAt.HasValue);
@@ -81,7 +82,7 @@
                             else
                             {
                                 <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
-                                    <i class="fas fa-check-circle"></i> Approved (RM@order.ApprovedRefundAmount.ToString("F2"))
+                                    <i class="fas fa-check-circle"></i> Approved (RM@(order.ApprovedRefundAmount.ToString("F2")))
                                 </span>
                             }
                         </td>
@@ -136,7 +137,7 @@
 @* Hidden anti-forgery token for the JS fetch POSTs *@
 <form id="csAntiForgeryForm" style="display:none">@Html.AntiForgeryToken()</form>
 
-<!-- ── Approve Return Modal (same layout as image 3) ── -->
+<!-- ── Approve Return Modal ── -->
 <div id="approveReturnBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000" onclick="closeApproveReturnModal()" class="approve-return-backdrop"></div>
 <div id="approveReturnModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)" class="approve-return-modal">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -169,6 +170,10 @@
         </table>
     </div>
     <input type="hidden" id="approveReturnOrderId" />
+    <!-- Error message area inside modal -->
+    <div id="approveReturnError" style="display:none;margin-top:12px;padding:10px 14px;background:#ffebee;border-radius:8px;color:#c62828;font-size:13px;font-weight:600;">
+        <i class="fas fa-exclamation-circle"></i> <span id="approveReturnErrorMsg"></span>
+    </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
         <button onclick="closeApproveReturnModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #e0e0f0;background:#fff;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
         <button id="approveReturnBtn" onclick="submitApproveReturn()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i> Approve &amp; Process</button>
@@ -176,8 +181,6 @@
 </div>
 
 @{
-    // Build the modal model. Items come straight from the order; refund uses the
-    // same proportional voucher-discounted unit price the seller logic used.
     var ordersForJs = allOrders
         .Where(o => !o.ReturnApprovedAt.HasValue)
         .Select(o => {
@@ -193,11 +196,16 @@
                 returnImages  = new List<string>(),
                 customerEmail = o.Customer?.Email ?? "—",
                 customerName  = o.Customer?.FullName ?? "",
-                items = o.OrderItems.Select(oi => new {
-                    orderItemId = oi.OrderItemId,
-                    name        = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                    orderedQty  = oi.Quantity,
-                    unitPrice   = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2")
+                items = o.OrderItems.Select(oi => {
+                    requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
+                    var reqQty = (itemQtyMap != null && itemQtyMap.TryGetValue(oi.OrderItemId, out var rq)) ? rq : oi.Quantity;
+                    return new {
+                        orderItemId  = oi.OrderItemId,
+                        name         = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+                        orderedQty   = oi.Quantity,
+                        requestedQty = reqQty,
+                        unitPrice    = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2")
+                    };
                 }).ToList()
             };
         }).ToList();
@@ -244,6 +252,10 @@
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
 
+        // Clear any previous error
+        document.getElementById('approveReturnError').style.display = 'none';
+        document.getElementById('approveReturnErrorMsg').textContent = '';
+
         const icon = (order.returnToken === 'ReturnRefund') ? '📦' : '💰';
         const custName = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
 
@@ -281,7 +293,7 @@
                     </label>
                     <div style="display:flex;align-items:center;gap:6px">
                         <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
-                        <input type="number" class="approve-item-qty" min="1" max="${item.orderedQty}" value="${item.orderedQty}" disabled oninput="updateRefundBreakdown()" style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+                        <input type="number" class="approve-item-qty" min="1" max="${item.orderedQty}" value="${item.requestedQty}" disabled oninput="updateRefundBreakdown()" style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
                     </div>
                 </div>`;
             });
@@ -360,16 +372,50 @@
         if (!valid) { alert('Invalid quantity for one or more items.'); return; }
 
         const btn = document.getElementById('approveReturnBtn');
-        btn.disabled = true; btn.textContent = 'Approving…';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving…';
 
-        const res = await fetch('/CustomerService/ApproveReturn', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        });
+        // Hide any previous error
+        document.getElementById('approveReturnError').style.display = 'none';
 
-        if (res.ok) { location.reload(); }
-        else { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Approve &amp; Process'; alert('Failed to approve return.'); }
+        try {
+            const res = await fetch('/CustomerService/ApproveReturn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+
+            if (res.status === 403) {
+                showModalError('Session expired. Please refresh the page and try again.');
+                resetApproveBtn();
+                return;
+            }
+
+            const data = await res.json();
+            if (data.success) {
+                closeApproveReturnModal();
+                location.reload();
+            } else {
+                showModalError(data.message || 'Approval failed. Please try again.');
+                resetApproveBtn();
+            }
+        } catch (err) {
+            console.error('ApproveReturn fetch error:', err);
+            showModalError('Network error. Please check your connection and try again.');
+            resetApproveBtn();
+        }
+    }
+
+    function showModalError(msg) {
+        const errDiv = document.getElementById('approveReturnError');
+        document.getElementById('approveReturnErrorMsg').textContent = msg;
+        errDiv.style.display = 'block';
+    }
+
+    function resetApproveBtn() {
+        const btn = document.getElementById('approveReturnBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Approve &amp; Process';
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeApproveReturnModal(); });

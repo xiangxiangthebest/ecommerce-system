@@ -342,7 +342,8 @@
             int cntDelivered    = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.DELIVERED);
             int cntReceived     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
             int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
-            int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND);
+            int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
+                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED);
 
             <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
@@ -391,7 +392,9 @@
                     <tbody id="ordersTableBody">
                         @foreach (var order in allOrders)
                         {
-                            var statusKey  = order.CurrentStatus.ToString().ToUpper();
+                            // Map AFTER_SALES_REQUESTED → RETURN_REFUND so it appears under the Return/Refund tab
+                            var rawStatusKey = order.CurrentStatus.ToString().ToUpper();
+                            var statusKey    = rawStatusKey == "AFTER_SALES_REQUESTED" ? "RETURN_REFUND" : rawStatusKey;
                             var skuList    = string.Join(" ", order.OrderItems.Select(oi => oi.Product?.SKU ?? "")).ToLower();
                             var searchHint = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                             
@@ -402,9 +405,31 @@
                                 <td>@order.TotalAmount.ToString("F2")</td>
                                 <td>@order.PaymentMethod</td>
                                 <td>
-                                    <span class="status-badge status-@order.CurrentStatus.ToString().ToLower()">
-                                        @order.CurrentStatus
-                                    </span>
+                                    @{
+                                        var isReturnApproved  = (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
+                                                               || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                                                               && order.ReturnApprovedAt.HasValue;
+                                        var isPendingCS       = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
+                                                               && !order.ReturnApprovedAt.HasValue;
+                                    }
+                                    @if (isReturnApproved)
+                                    {
+                                        <span class="status-badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;">
+                                            RETURN/REFUND APPROVED
+                                        </span>
+                                    }
+                                    else if (isPendingCS)
+                                    {
+                                        <span class="status-badge" style="background:#fffbeb;color:#b45309;border:1px solid #fcd34d;">
+                                            PENDING CS APPROVAL
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-badge status-@order.CurrentStatus.ToString().ToLower()">
+                                            @order.CurrentStatus
+                                        </span>
+                                    }
                                 </td>
                                 <td>
                                     <button class="btn-view-details" onclick="openOrderDetails(@order.OrderId)">
@@ -792,7 +817,9 @@
     }
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
-        .Where(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && !o.ReturnApprovedAt.HasValue)
+        .Where(o => (o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
+                  || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                 && !o.ReturnApprovedAt.HasValue)
         .Select(o => {
             var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
             var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
@@ -1018,10 +1045,12 @@
         'DELIVERED':     { label: 'Delivered',      color: '#2e7d32', bg: '#e8f5e9' },
         'RECEIVED':      { label: 'Received',       color: '#2e7d32', bg: '#e8f5e9' },
         'RETURN_REFUND': { label: 'Return / Refund',color: '#c62828', bg: '#ffebee' },
+        'RETURN_REFUND_APPROVED': { label: 'Return / Refund Approved', color: '#2e7d32', bg: '#e8f5e9' },
+        'AFTER_SALES_REQUESTED': { label: 'After-Sale Request', color: '#b45309', bg: '#fffbeb' },
         'CANCELED':      { label: 'Canceled',       color: '#c62828', bg: '#ffebee' },
     };
 
-    function openOrderDetails(orderId) {
+    async function openOrderDetails(orderId) {
         const o = _allOrderDetails.find(x => x.orderId === orderId);
         if (!o) return;
 
@@ -1067,6 +1096,154 @@
         document.getElementById('od-payment').textContent = o.paymentMethod;
 
         const notesEl = document.getElementById('od-notes-section');
+
+        // ── After-sale / Return statuses: fetch full request details ──────────
+        const isAfterSale = o.status === 'AFTER_SALES_REQUESTED' || o.status === 'RETURN_REFUND';
+        if (isAfterSale) {
+            notesEl.style.display = 'block';
+            notesEl.innerHTML = `
+                <div class="od-section-label">Notes &amp; Remarks</div>
+                <div style="text-align:center;padding:24px 0;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:22px;color:#9a98b6;"></i>
+                </div>`;
+
+            // Open modal first so the user sees the spinner immediately
+            document.getElementById('od-backdrop').classList.add('active');
+            document.getElementById('od-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const res    = await fetch(`/Request/GetRequest?orderId=${orderId}`);
+                const result = await res.json();
+
+                if (!result.success) {
+                    // Fallback to simple notes if no request record
+                    _renderSimpleNotes(notesEl, o);
+                    return;
+                }
+
+                // Build per-item rows + total
+                let totalRefund = 0;
+                const itemsHtml = result.orderItems.map(item => {
+                    const unitPrice = parseFloat(item.discountedPrice ?? item.price);
+                    const reqQty    = item.requestedQty ?? item.quantity;
+                    totalRefund    += unitPrice * reqQty;
+                    return `
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #ebebf5;">
+                        <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
+                            ${item.imageUrl
+                                ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover;">`
+                                : `<i class="fas fa-box" style="font-size:18px;color:#9a98b6;"></i>`}
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#1e1b4b;">${item.productName}</p>
+                            <p style="margin:0;font-size:11px;color:#9a98b6;">
+                                Qty ordered: <strong style="color:#6b6b8a;">${item.quantity}</strong>
+                                &nbsp;·&nbsp;
+                                Requested: <strong style="color:#f97316;">${reqQty}</strong>
+                                &nbsp;·&nbsp;
+                                RM ${unitPrice.toFixed(2)} / unit
+                            </p>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const imagesHtml = result.images?.length
+                    ? result.images.map(url => `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
+                    : '<span style="font-size:13px;color:#9a98b6;">No photos attached</span>';
+
+                const approvalBlock = result.approvedAt ? `
+                <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #bbf7d0;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
+                    </div>
+                    <i class="fas fa-check-circle" style="font-size:20px;color:#22c55e;"></i>
+                </div>` : `
+                <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fde68a;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#92400e;">Pending — awaiting customer service</p>
+                    </div>
+                    <i class="fas fa-hourglass-half" style="font-size:20px;color:#f59e0b;"></i>
+                </div>`;
+
+                // Update the modal header badge to green if approved
+                if (result.approvedAt) {
+                    const stEl = document.getElementById('od-status');
+                    if (stEl) {
+                        stEl.textContent = 'Return / Refund Approved';
+                        stEl.style.background = '#dcfce7';
+                        stEl.style.color = '#15803d';
+                    }
+                }
+
+                notesEl.innerHTML = `
+                <div class="od-section-label">Notes &amp; Remarks</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                    <i class="fas fa-exchange-alt" style="color:#f97316;font-size:13px;"></i>
+                    <span style="font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.05em;">Return type</span>
+                    <span style="font-size:13px;font-weight:600;color:#1e1b4b;">${result.serviceType ?? '—'}</span>
+                </div>
+
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request Submitted</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.createdAt}</p>
+                    </div>
+                    <i class="fas fa-clock" style="font-size:20px;color:#9a98b6;"></i>
+                </div>
+
+                ${approvalBlock}
+
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order Items</p>
+                    ${itemsHtml}
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;margin-top:4px;border-top:1.5px solid #e8eaf6;">
+                        <p style="margin:0;font-size:12px;font-weight:700;color:#6b6b8a;text-transform:uppercase;letter-spacing:0.05em;">Total Refund Amount</p>
+                        <p style="margin:0;font-size:16px;font-weight:800;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Requested Amount</p>
+                        <p style="margin:0;font-size:13px;font-weight:600;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+                    </div>
+                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.issueType ?? '—'}</p>
+                    </div>
+                </div>
+
+                ${result.description ? `
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;margin-bottom:8px;">
+                    <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
+                    <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.5;">${result.description}</p>
+                </div>` : ''}
+
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Photos</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">${imagesHtml}</div>
+                </div>`;
+
+            } catch (err) {
+                console.error('Failed to load request details:', err);
+                _renderSimpleNotes(notesEl, o);
+            }
+
+            return; // modal already opened above
+        }
+
+        // ── Normal notes (customer message, cancel reason, legacy return) ─────
+        _renderSimpleNotes(notesEl, o);
+
+        document.getElementById('od-backdrop').classList.add('active');
+        document.getElementById('od-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function _renderSimpleNotes(notesEl, o) {
         const noteLines = [];
         if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
         if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
@@ -1075,15 +1252,11 @@
 
         if (noteLines.length) {
             let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
-            notesEl.innerHTML = `<div class=\"od-section-label\">Notes \u0026 Remarks</div>${noteHtml}`;
+            notesEl.innerHTML = `<div class="od-section-label">Notes &amp; Remarks</div>${noteHtml}`;
             notesEl.style.display = 'block';
         } else {
             notesEl.style.display = 'none';
         }
-
-        document.getElementById('od-backdrop').classList.add('active');
-        document.getElementById('od-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
     }
 
     function closeOrderDetails() {

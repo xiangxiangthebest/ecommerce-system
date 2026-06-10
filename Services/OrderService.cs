@@ -553,17 +553,36 @@ namespace EcommerceSystem.Services
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                       && o.CustomerUserId == customerId
-                                       && o.CurrentStatus == OrderStatus.DELIVERED);
+                    && o.CustomerUserId == customerId
+                    && (o.CurrentStatus == OrderStatus.DELIVERED
+                        || o.CurrentStatus == OrderStatus.RETURN_REFUND
+                        || o.CurrentStatus == OrderStatus.REFUND));
 
             if (order == null)
                 return OperationResult.Fail("Order not found or already confirmed.");
-
             order.ReceivedAt = DateTime.UtcNow;
 
             // ── Notify all parties then persist ──
-            AttachObservers(order);
-            await order.SetStatusAsync(OrderStatus.RECEIVED);
+            // For RETURN_REFUND / REFUND orders we set the status directly because
+            // the state machine (Order.SetStatusAsync) may not define that transition.
+            // Notifications are sent manually so Customer/Seller/Admin are still informed.
+            if (order.CurrentStatus == OrderStatus.RETURN_REFUND
+                || order.CurrentStatus == OrderStatus.REFUND)
+            {
+                order.CurrentStatus = OrderStatus.RECEIVED;
+                // Send notifications directly (bypassing state machine)
+                var customerObs = new CustomerNotificationObserver(_notificationService);
+                var sellerObs   = new SellerNotificationObserver(_notificationService);
+                var adminObs    = new AdminNotificationObserver(_notificationService, _context);
+                await customerObs.Update(order);
+                await sellerObs.Update(order);
+                await adminObs.Update(order);
+            }
+            else
+            {
+                AttachObservers(order);
+                await order.SetStatusAsync(OrderStatus.RECEIVED);
+            }
 
             await _context.SaveChangesAsync();
 
