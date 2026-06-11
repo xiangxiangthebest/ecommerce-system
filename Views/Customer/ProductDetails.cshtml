@@ -28,18 +28,26 @@
     else if (Model.StockQuantity <= 5) { stockClass = "low-stock"; stockLabel = "Low Stock"; }
     else  { stockClass = "in-stock"; stockLabel = "In Stock"; }
 
-    int fullStars  = (int)Math.Floor(Model.AverageRating);
-    int emptyStars = 5 - fullStars;
-
     int totalVariationStock = hasVariations ? combos.Sum(c => c.Stock) : Model.StockQuantity;
 
     var variationGroupNamesJson = JsonSerializer.Serialize(variations.Select(v => v.Name).ToList());
 
+    var deduplicatedReviews = reviews
+        .GroupBy(r => new {
+            OrderId   = r.OrderItem?.OrderId,
+            ProductId = r.OrderItem?.ProductId
+        })
+        .Select(g => g.OrderByDescending(r => r.CreatedAt).First())
+        .ToList();
+
     var breakdown = Enumerable.Range(1, 5).OrderByDescending(s => s).ToDictionary(
         s => s,
-        s => reviews.Count(r => r.Rating == s)
+        s => deduplicatedReviews.Count(r => r.Rating == s)
     );
-    int totalReviews = reviews.Count;
+    int totalReviews = deduplicatedReviews.Count;
+    double averageRating = totalReviews > 0 ? deduplicatedReviews.Average(r => r.Rating) : 0;
+    int fullStars = (int)Math.Floor(averageRating);
+    int emptyStars = 5 - fullStars;
 }
 
 @functions {
@@ -105,7 +113,7 @@
                     @for (int s = 0; s < fullStars;  s++) { <span class="star">★</span> }
                     @for (int s = 0; s < emptyStars; s++) { <span class="star empty">★</span> }
                 </div>
-                <span class="pd-rating-text">@Model.AverageRating.ToString("0.0")</span>
+                <span class="pd-rating-text">@averageRating.ToString("0.0")</span>
                 <div class="pd-rating-sep"></div>
                 <button class="pd-review-trigger"
                         id="reviewTriggerBtn"
@@ -113,7 +121,7 @@
                         aria-haspopup="dialog"
                         aria-expanded="false"
                         @(totalReviews == 0 ? "disabled" : "")>
-                    @Model.ReviewCount review@(Model.ReviewCount == 1 ? "" : "s")
+                    @totalReviews review@(totalReviews == 1 ? "" : "s")
                     @if (totalReviews > 0)
                     {
                         <i class="ti ti-chevron-right" aria-hidden="true"></i>
@@ -418,7 +426,7 @@
 
                 <div class="rv-summary">
                     <div class="rv-big-score">
-                        <span class="rv-score-num">@Model.AverageRating.ToString("0.0")</span>
+                        <span class="rv-score-num">@averageRating.ToString("0.0")</span>
                         <div class="rv-score-stars" aria-label="@fullStars out of 5 stars">
                             @for (int s = 0; s < fullStars;  s++) { <span>★</span> }
                             @for (int s = 0; s < emptyStars; s++) { <span class="empty">★</span> }
@@ -452,65 +460,121 @@
             </div>
 
             <div class="rv-body" id="rvBody">
-                @foreach (var r in reviews)
+            @{
+                var reviewGroups = reviews
+                    .GroupBy(r => new {
+                        OrderId   = r.OrderItem?.OrderId,
+                        ProductId = r.OrderItem?.ProductId
+                    })
+                    .ToList();
+            }
+
+            @foreach (var group in reviewGroups)
+            {
+                var first      = group.First();
+                var allRatings = group.Select(r => r.Rating).ToList();
+                var avgRating  = (int)Math.Round(allRatings.Average());
+                var fullS      = avgRating;
+                var emptyS     = 5 - fullS;
+
+                var allVarTags = new List<string>();
+                foreach (var r in group)
                 {
-                    <div class="rv-card" data-rating="@r.Rating">
-                        <div class="rv-card-author">
-                            <div class="rv-avatar">@(r.OrderItem?.Order?.Customer?.FullName?.Substring(0, 1).ToUpper() ?? "C")</div>
-                            <div class="rv-author-info" style="width: 100%;">
-                                <span class="rv-author-name">@(r.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-                                    <span class="rv-card-date">@r.CreatedAt.ToString("dd MMM yyyy")</span>
-                                    <button type="button"
-                                            class="pd-btn-report-review"
-                                            title="Report this review"
-                                            data-review-id="@r.ReviewId">
-                                        <i class="ti ti-flag" aria-hidden="true"></i> Report
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="rv-card-stars" aria-label="@r.Rating out of 5 stars">
-                            @for (int i = 0; i < r.Rating; i++) { <span>★</span> }
-                            @for (int i = 0; i < (5 - r.Rating); i++) { <span class="empty">★</span> }
-                        </div>
-
-                        @if (!string.IsNullOrWhiteSpace(r.ReviewText))
-                        {
-                            <p class="rv-card-text">@r.ReviewText</p>
-                        }
-                        else
-                        {
-                            <p class="rv-card-text muted">No comment left.</p>
-                        }
-
-                        @{
-                            var reviewImgs = ParseReviewImages(r.ReviewImagePathsJson);
-                        }
-                        @if (reviewImgs.Any())
-                        {
-                            <div class="rv-photos">
-                                @foreach (var img in reviewImgs.Take(4))
-                                {
-                                    <div class="rv-photo-thumb"
-                                         onclick="rvOpenLightbox('@img')"
-                                         title="View image">
-                                        <img src="@img" alt="Review photo" onerror="this.style.display='none'" />
-                                        <div class="rv-photo-overlay">
-                                            <i class="ti ti-zoom-in"></i>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
+                    var varJson = r.OrderItem?.SelectedVariation;
+                    if (!string.IsNullOrWhiteSpace(varJson) && varJson != "{}" && varJson != "[]")
+                    {
+                        try {
+                            using var varDoc = System.Text.Json.JsonDocument.Parse(varJson);
+                            if (varDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                            {
+                                var parts = new List<string>();
+                                foreach (var prop in varDoc.RootElement.EnumerateObject())
+                                    parts.Add($"{prop.Name}: {prop.Value}");
+                                var varLine = string.Join(" · ", parts);
+                                if (!string.IsNullOrWhiteSpace(varLine) && !allVarTags.Contains(varLine))
+                                    allVarTags.Add(varLine);
+                            }
+                        } catch { }
+                    }
                 }
-                <div class="rv-empty" id="rvEmpty" style="display:none;">
-                    <i class="ti ti-message-off" aria-hidden="true"></i>
-                    No reviews for this rating.
+
+                var displayReview = group.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.ReviewText)) ?? first;
+                var allReviewImgs = group
+                    .SelectMany(r => ParseReviewImages(r.ReviewImagePathsJson))
+                    .Distinct()
+                    .Take(4)
+                    .ToList();
+
+                <div class="rv-card" data-rating="@avgRating">
+                    <div class="rv-card-author">
+                        <div class="rv-avatar">@(first.OrderItem?.Order?.Customer?.FullName?.Substring(0, 1).ToUpper() ?? "C")</div>
+                        <div class="rv-author-info" style="width: 100%;">
+                            <span class="rv-author-name">@(first.OrderItem?.Order?.Customer?.FullName ?? "Customer")</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                                <span class="rv-card-date">@first.CreatedAt.ToString("dd MMM yyyy")</span>
+                                <button type="button"
+                                        class="pd-btn-report-review"
+                                        title="Report this review"
+                                        data-review-id="@first.ReviewId">
+                                    <i class="ti ti-flag" aria-hidden="true"></i> Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rv-card-stars" aria-label="@avgRating out of 5 stars">
+                        @for (int i = 0; i < fullS;  i++) { <span>★</span> }
+                        @for (int i = 0; i < emptyS; i++) { <span class="empty">★</span> }
+                    </div>
+
+                    @if (allVarTags.Any())
+                    {
+                        <div class="rv-card-variation">
+                            @foreach (var tag in allVarTags)
+                            {
+                                <div class="rv-var-row">
+                                    @foreach (var part in tag.Split(" · "))
+                                    {
+                                        <span class="rv-var-tag">@part</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(displayReview.ReviewText))
+                    {
+                        <p class="rv-card-text">@displayReview.ReviewText</p>
+                    }
+                    else
+                    {
+                        <p class="rv-card-text muted">No comment left.</p>
+                    }
+
+                    @if (allReviewImgs.Any())
+                    {
+                        <div class="rv-photos">
+                            @foreach (var img in allReviewImgs)
+                            {
+                                <div class="rv-photo-thumb"
+                                    onclick="rvOpenLightbox('@img')"
+                                    title="View image">
+                                    <img src="@img" alt="Review photo" onerror="this.style.display='none'" />
+                                    <div class="rv-photo-overlay">
+                                        <i class="ti ti-zoom-in"></i>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
+            }
+
+            <div class="rv-empty" id="rvEmpty" style="display:none;">
+                <i class="ti ti-message-off" aria-hidden="true"></i>
+                No reviews for this rating.
             </div>
+        </div>
 
         </div>
     </div>

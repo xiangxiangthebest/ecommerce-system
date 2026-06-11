@@ -17,6 +17,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     });
 
+    document.querySelectorAll('input[name="City"]').forEach(input => {
+        input.addEventListener("input", function () {
+            this.value = this.value.replace(/[^A-Za-z\s]/g, '');
+        });
+    });
+
+    document.querySelectorAll('input[name="Postcode"]').forEach(input => {
+        input.addEventListener("input", function () {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    });
+
     // Address UI
     const slot          = document.getElementById("addressInlineSlot");
     const showBtn       = document.getElementById("showAddressFormBtn");
