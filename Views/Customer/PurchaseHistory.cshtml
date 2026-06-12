@@ -1,4 +1,3 @@
-@* @model List<EcommerceSystem.Models.Order> *@
 @using EcommerceSystem.Interfaces;
 @using EcommerceSystem.Models
 @using EcommerceSystem.Enums
@@ -656,8 +655,12 @@
         </div>
 
         <div id="phNoResults" class="ph-no-results" style="display:none">
-            <i class="ti ti-search-off"></i>
-            <p>No orders match your search.</p>
+            <div class="ph-no-results-icon"><i class="ti ti-search-off"></i></div>
+            <p class="ph-no-results-title">No orders found</p>
+            <p class="ph-no-results-sub">No orders match your search or filter. Try a different keyword or clear the search.</p>
+            <button class="ph-no-results-clear" onclick="clearSearch()">
+                <i class="ti ti-x"></i> Clear search
+            </button>
         </div>
     }
 
@@ -843,7 +846,6 @@
     <img id="rtnLightboxImg" src="" alt="Preview" onclick="event.stopPropagation()" />
 </div>
 
-<!-- ✅ Keep the anti-forgery token in DOM so JS can read it -->
 <form id="phAntiForgeryForm" style="display:none">
     @Html.AntiForgeryToken()
 </form>

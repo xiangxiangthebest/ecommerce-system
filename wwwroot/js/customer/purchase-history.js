@@ -1,9 +1,4 @@
-/* ============================================================
-   purchase-history.js
-   Customer Purchase History – all interactive logic
-   ============================================================ */
 'use strict';
-
 
 // ── Order data (injected by Razor via window.PH_ORDERS) ────
 const _orders = window.PH_ORDERS || [];
@@ -49,7 +44,7 @@ const searchInput = document.getElementById("phSearchInput"); // 确保 I 大写
         });
 
         if (noResults) {
-            noResults.style.display = hasVisible ? "none" : "block";
+            noResults.style.display = hasVisible ? 'none' : 'flex';
         }
     }
 
@@ -170,7 +165,17 @@ function applyFilters() {
     // C. 如果过滤完了发现一笔都没有，展示原本的 phNoResults 空白提示块
     const noResults = document.getElementById('phNoResults');
     if (noResults) {
-        noResults.style.display = (visibleCount === 0) ? 'block' : 'none';
+        noResults.style.display = visibleCount === 0 ? 'flex' : 'none';
+    }
+}
+
+function clearSearch() {
+    const input = document.getElementById('phSearchInput');
+    if (input) {
+        input.value = '';
+        currentSearch = '';
+        applyFilters();
+        input.focus();
     }
 }
 
@@ -219,12 +224,9 @@ function openDrawer(orderId) {
 function buildDrawerHTML(order) {
     let html = '';
 
-    // Return/Refund notice
     if (order.status === 'RETURN_REFUND' && order.returnReason) {
         html += buildReturnNoticeHTML(order);
     }
-
-    // Cancel notice
     if (order.status === 'CANCELED' && order.cancelReason) {
         html += `
         <div class="od-notice od-notice-canceled">
@@ -232,19 +234,48 @@ function buildDrawerHTML(order) {
             <div><strong>Cancellation Reason</strong><span>${esc(order.cancelReason)}</span></div>
         </div>`;
     }
-
-    // Review summary
     if (order.reviewSubmitted) {
         html += buildReviewSummaryHTML(order);
     }
 
-    // Items
-    order.items.forEach((item, idx) => {
-        if (idx > 0) html += `<div class="od-sep"></div>`;
-        html += buildItemHTML(order, item);
-    });
+    // ── Items ──────────────────────────────────────────────────
+    if (order.items.length === 1) {
+        html += `<div class="od-item-detail-panel" id="odActivePanel">`;
+        html += buildItemHTML(order, order.items[0]);
+        html += `</div>`;
+    } else {
+        const summaryRows = order.items.map((item, idx) => {
+            const thumb  = item.images?.[0] || item.image || '';
+            const varStr = item.selectedVariation ? esc(item.selectedVariation) : '';
+            return `
+            <div class="od-summary-item${idx === 0 ? ' od-sum-active' : ''}"
+                 onclick="odSelectItem(this, ${idx}, ${order.orderId})"
+                 data-item-idx="${idx}">
+                <div class="od-sum-thumb">
+                    <img src="${esc(thumb)}" onerror="this.src='/images/placeholder.png'" />
+                </div>
+                <div class="od-sum-info">
+                    <span class="od-sum-name">${esc(item.name)}</span>
+                    ${varStr ? `<span class="od-sum-var"><i class="ti ti-tag" style="font-size:10px;margin-right:2px"></i>${varStr}</span>` : ''}
+                </div>
+                <span class="od-sum-price">RM ${esc(item.subtotal)}</span>
+            </div>`;
+        }).join('');
 
-    // Customer note
+        html += `
+        <div class="od-items-summary">
+            <div class="od-items-summary-header">
+                Items in order
+                <span class="od-items-summary-count">${order.items.length} items</span>
+            </div>
+            ${summaryRows}
+        </div>`;
+
+        html += `<div class="od-item-detail-panel" id="odActivePanel">`;
+        html += buildItemHTML(order, order.items[0]);
+        html += `</div>`;
+    }
+
     if (order.customerMessage) {
         html += `
         <div class="od-customer-msg">
@@ -252,8 +283,6 @@ function buildDrawerHTML(order) {
             <div class="od-customer-msg-text">${esc(order.customerMessage)}</div>
         </div>`;
     }
-
-    // Address
     if (order.address) {
         const a = order.address;
         html += `
@@ -267,7 +296,6 @@ function buildDrawerHTML(order) {
             </div>
         </div>`;
     }
-
     html += `
     <div class="od-total-bar">
         <span>Order Total</span>
@@ -275,6 +303,23 @@ function buildDrawerHTML(order) {
     </div>`;
 
     return html;
+}
+
+function odSelectItem(el, itemIdx, orderId) {
+    el.closest('.od-items-summary')
+      .querySelectorAll('.od-summary-item')
+      .forEach(r => r.classList.remove('od-sum-active'));
+    el.classList.add('od-sum-active');
+
+    const order = _orders.find(o => o.orderId === orderId);
+    const panel = document.getElementById('odActivePanel');
+    if (!order || !panel) return;
+
+    // Trigger re-animation
+    panel.style.animation = 'none';
+    panel.offsetHeight;
+    panel.style.animation = '';
+    panel.innerHTML = buildItemHTML(order, order.items[itemIdx]);
 }
 
 function buildReturnNoticeHTML(order) {
@@ -332,41 +377,71 @@ function buildReturnNoticeHTML(order) {
 }
 
 function buildReviewSummaryHTML(order) {
-    const reviewLines = order.items
+    // Group reviewed items by productId — one review block per unique product
+    const byProduct = new Map();
+    order.items
         .filter(item => item.reviewRating > 0)
-        .map(item => {
-            const labels   = ['','Poor','Fair','Good','Very Good','Excellent'];
-            const filled   = '★'.repeat(item.reviewRating);
-            const unfilled = '☆'.repeat(5 - item.reviewRating);
-            const label    = labels[item.reviewRating] ?? '';
-            const textLine = item.reviewText
-                ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>` : '';
+        .forEach(item => {
+            if (!byProduct.has(item.productId)) {
+                byProduct.set(item.productId, {
+                    representative: item,
+                    varLines: [],
+                    allImages: [...(item.reviewImages || [])],
+                });
+            } else {
+                const g = byProduct.get(item.productId);
+                (item.reviewImages || []).forEach(img => {
+                    if (img && !g.allImages.includes(img)) g.allImages.push(img);
+                });
+            }
 
-            const imgs = (item.reviewImages || []).filter(Boolean);
-            const photoStrip = imgs.length ? `
-                <div class="rn-photo-strip" style="margin-top:10px">
-                    <div class="rn-reason-label">Review photos</div>
-                    <div class="rn-photo-row">
-                        ${imgs.map(src => `
-                        <div class="rw-strip-thumb" onclick="rtnOpenLightbox('${String(src).replace(/'/g,"\\'")}')">
-                            <img src="${esc(src)}" alt="Review photo" onerror="this.closest('.rw-strip-thumb').style.display='none'" />
-                            <div class="rw-img-badge"><i class="ti ti-zoom-in"></i></div>
-                        </div>`).join('')}
-                    </div>
-                </div>` : '';
+            // Collect variation line for this item
+            const g = byProduct.get(item.productId);
+            if (item.selectedVariation && item.selectedVariation.trim()) {
+                const tags = item.selectedVariation.split(' · ').filter(Boolean)
+                    .map(p => `<span class="ph-var-tag">${esc(p)}</span>`).join('');
+                if (tags) g.varLines.push(`<div class="ph-item-vars" style="margin:2px 0">${tags}</div>`);
+            }
+        });
 
-            return `
-            <div class="od-reviewed-item">
-                <span class="od-reviewed-item-name">${esc(item.name)}</span>
-                <span class="od-reviewed-stars">
-                    <span class="od-reviewed-filled">${filled}</span>
-                    <span class="od-reviewed-unfilled">${unfilled}</span>
-                    <span class="od-reviewed-label">${label}</span>
-                </span>
-                ${textLine}
-                ${photoStrip}
-            </div>`;
-        }).join('');
+    const reviewLines = Array.from(byProduct.values()).map(({ representative: item, varLines, allImages }) => {
+        const labels   = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+        const filled   = '★'.repeat(item.reviewRating);
+        const unfilled = '☆'.repeat(5 - item.reviewRating);
+        const label    = labels[item.reviewRating] ?? '';
+
+        const textLine = item.reviewText
+            ? `<span class="od-reviewed-text">${esc(item.reviewText)}</span>` : '';
+
+        const varBlock = varLines.length
+            ? `<div class="od-reviewed-variations">${varLines.join('')}</div>` : '';
+
+        const imgs = allImages.filter(Boolean).slice(0, 4);
+        const photoStrip = imgs.length ? `
+            <div class="rn-photo-strip" style="margin-top:10px">
+                <div class="rn-reason-label">Review photos</div>
+                <div class="rn-photo-row">
+                    ${imgs.map(src => `
+                    <div class="rw-strip-thumb" onclick="rtnOpenLightbox('${String(src).replace(/'/g, "\\'")}')">
+                        <img src="${esc(src)}" alt="Review photo" onerror="this.closest('.rw-strip-thumb').style.display='none'" />
+                        <div class="rw-img-badge"><i class="ti ti-zoom-in"></i></div>
+                    </div>`).join('')}
+                </div>
+            </div>` : '';
+
+        return `
+        <div class="od-reviewed-item">
+            <span class="od-reviewed-item-name">${esc(item.name)}</span>
+            <span class="od-reviewed-stars">
+                <span class="od-reviewed-filled">${filled}</span>
+                <span class="od-reviewed-unfilled">${unfilled}</span>
+                <span class="od-reviewed-label">${label}</span>
+            </span>
+            ${varBlock}
+            ${textLine}
+            ${photoStrip}
+        </div>`;
+    }).join('');
 
     return `
     <div class="od-reviewed-sent">
@@ -604,6 +679,33 @@ function parseVariation(json) {
     } catch { return ''; }
 }
 
+// Builds the full variation block for a deduplicated product group.
+// groups = [{ item, totalQty }] — all line items for the same productId
+function buildProductVariationBlockHTML(itemGroups) {
+    const hasAnyVar = itemGroups.some(g =>
+        g.item.selectedVariation && g.item.selectedVariation.trim() !== ''
+    );
+
+    if (!hasAnyVar) {
+        // No variations at all — just total qty badge if > 1
+        const totalQty = itemGroups.reduce((s, g) => s + g.totalQty, 0);
+        return totalQty > 1
+            ? `<div style="margin-top:3px"><span class="ph-rating-qty-badge">×${totalQty}</span></div>`
+            : '';
+    }
+
+    const rows = itemGroups.map(g => {
+        const pairs = (g.item.selectedVariation || '').split(' · ').filter(Boolean);
+        const tags  = pairs.map(p => `<span class="ph-var-tag">${esc(p)}</span>`).join('');
+        const qty   = g.totalQty > 1
+            ? `<span class="ph-rating-qty-badge">×${g.totalQty}</span>`
+            : '';
+        return `<div class="ph-item-vars" style="margin-top:4px">${tags}${qty}</div>`;
+    }).join('');
+
+    return rows;
+}
+
 async function openRequestModal(orderId) {
     showModal('requestDetailBackdrop', 'requestDetailModal'); // ✅ 改用 showModal
     document.getElementById('requestDetailBody').innerHTML = `
@@ -725,7 +827,15 @@ function closeRequestModal() {
 function rtnRenderItemList() {
     const container = document.getElementById('rtnItemList');
     if (!container) return;
-    container.innerHTML = _rtnOrderItems.map((item, idx) => `
+    container.innerHTML = _rtnOrderItems.map((item, idx) => {
+
+        // Parse variation string into individual tags
+        const varTagsHtml = item.selectedVariation
+            ? item.selectedVariation.split(' · ').filter(Boolean)
+                .map(p => `<span class="ph-var-tag">${esc(p)}</span>`).join('')
+            : '';
+
+        return `
         <div class="rtn-item-row" data-idx="${idx}">
             <label class="rtn-item-check-wrap">
                 <input type="checkbox" class="rtn-item-checkbox"
@@ -735,9 +845,9 @@ function rtnRenderItemList() {
                      onerror="this.src='/images/placeholder.png'" />
                 <div class="rtn-item-info">
                     <div class="rtn-item-name">${esc(item.name)}</div>
-                    ${item.selectedVariation ? `<div class="rtn-item-variation"><i class="ti ti-tag"></i> ${esc(item.selectedVariation)}</div>` : ''}
-                    ${item.sku ? `<div class="rtn-item-sku"><i class="ti ti-barcode"></i> ${esc(item.sku)}</div>` : ''}
-                    <div class="rtn-item-ordered">Qty ordered: ${item.qty}</div>
+                    ${varTagsHtml ? `<div class="ph-item-vars" style="margin-top:3px">${varTagsHtml}</div>` : ''}
+                    ${item.sku ? `<div class="rtn-item-sku"><i class="ti ti-barcode" style="font-size:10px;margin-right:3px"></i>${esc(item.sku)}</div>` : ''}
+                    <div class="rtn-item-ordered">Quantity: <strong>${item.qty}</strong></div>
                 </div>
             </label>
             <div class="rtn-item-qty-wrap">
@@ -746,8 +856,8 @@ function rtnRenderItemList() {
                        data-order-item-id="${item.orderItemId}"
                        min="1" max="${item.qty}" value="1" />
             </div>
-        </div>`
-    ).join('');
+        </div>`;
+    }).join('');
 }
 
 function rtnToggleItemRow(checkbox) {
@@ -919,20 +1029,49 @@ function openRatingModal(orderId) {
     document.getElementById('ratingOrderId').value = orderId;
     _ratingFilesByOrderItem = {};
 
-    document.getElementById('ratingItemsWrap').innerHTML = order.items.map((item, idx) => {
-        _ratingFilesByOrderItem[item.orderItemId] = [];
+    // Step 1: group by productId → then within each product, group by selectedVariation
+    const byProduct = new Map(); // productId → { representative item, varGroups: Map<variation, { item, allOrderItemIds[], totalQty }> }
+    order.items.forEach(item => {
+        if (!byProduct.has(item.productId)) {
+            byProduct.set(item.productId, { item, varGroups: new Map() });
+        }
+        const prod   = byProduct.get(item.productId);
+        const varKey = item.selectedVariation || '';
+        if (!prod.varGroups.has(varKey)) {
+            prod.varGroups.set(varKey, { item, allOrderItemIds: [item.orderItemId], totalQty: item.qty });
+        } else {
+            const vg = prod.varGroups.get(varKey);
+            vg.allOrderItemIds.push(item.orderItemId);
+            vg.totalQty += item.qty;
+        }
+    });
+
+    const productGroups = Array.from(byProduct.values());
+
+    document.getElementById('ratingItemsWrap').innerHTML = productGroups.map((prod, idx) => {
+        // Collect ALL orderItemIds across all variation sub-groups for this product
+        const allOrderItemIds = Array.from(prod.varGroups.values())
+            .flatMap(vg => vg.allOrderItemIds);
+        const primaryId = allOrderItemIds[0];
+        _ratingFilesByOrderItem[primaryId] = [];
+
+        const groupJson   = esc(JSON.stringify(allOrderItemIds));
+        const varGroups   = Array.from(prod.varGroups.values());
+        const varBlockHTML = buildProductVariationBlockHTML(varGroups);
+
         return `
         <div class="ph-rating-item"
              data-item-idx="${idx}"
-             data-product-id="${item.productId}"
-             data-order-item-id="${item.orderItemId}">
+             data-product-id="${prod.item.productId}"
+             data-primary-order-item-id="${primaryId}"
+             data-all-order-item-ids="${groupJson}">
 
             <div class="ph-rating-item-top">
-                <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
+                <img src="${esc(prod.item.image)}" onerror="this.src='/images/placeholder.png'" />
                 <div class="ph-rating-item-meta">
-                    <span class="ph-rating-item-name">${esc(item.name)}</span>
-                    ${item.selectedVariation ? `<span class="ph-rating-item-var"><i class="ti ti-tag"></i> ${esc(item.selectedVariation)}</span>` : ''}
-                    ${item.sku ? `<span class="ph-rating-item-sku"><i class="ti ti-barcode"></i> ${esc(item.sku)}</span>` : ''}
+                    <span class="ph-rating-item-name">${esc(prod.item.name)}</span>
+                    ${varBlockHTML}
+                    ${prod.item.sku ? `<span class="ph-rating-item-sku" style="margin-top:3px"><i class="ti ti-barcode" style="margin-right:2px"></i>${esc(prod.item.sku)}</span>` : ''}
                 </div>
             </div>
 
@@ -944,31 +1083,27 @@ function openRatingModal(orderId) {
             </div>
 
             <div class="ph-textarea-wrap" style="margin-top:10px">
-                <textarea class="ph-review-text"
-                          placeholder="Share your experience (optional)…"
-                          rows="2"></textarea>
+                <textarea class="ph-review-text" placeholder="Share your experience (optional)…" rows="2"></textarea>
             </div>
 
             <div class="ph-review-upload" style="margin-top:12px">
-                <label class="rtn-field-label" style="display:block;margin-bottom:6px">
-                    Review photos (optional)
-                </label>
+                <label class="rtn-field-label" style="display:block;margin-bottom:6px">Review photos (optional)</label>
                 <div class="rw-upload-zone"
                      ondragover="event.preventDefault();this.classList.add('drag-over')"
                      ondragleave="this.classList.remove('drag-over')"
-                     ondrop="ratingHandleDrop(event,${item.orderItemId})">
+                     ondrop="ratingHandleDrop(event,${primaryId})">
                     <input type="file" class="ph-review-images" accept="image/*" multiple
-                           onchange="ratingHandleFiles(this.files,${item.orderItemId});this.value='';" />
+                           onchange="ratingHandleFiles(this.files,${primaryId});this.value='';" />
                     <div class="rw-upload-inner">
                         <div class="rw-upload-icon"><i class="ti ti-camera"></i></div>
                         <div class="rw-upload-text"><strong>Click to upload</strong> or drag photos here</div>
                         <div class="rw-upload-hint">JPG, PNG, WEBP · Max 5 MB each · Up to 4 photos</div>
                     </div>
                 </div>
-                <div class="rw-preview-row" id="ratingPreviewRow_${item.orderItemId}"></div>
+                <div class="rw-preview-row" id="ratingPreviewRow_${primaryId}"></div>
             </div>
         </div>
-        ${idx < order.items.length - 1 ? '<div class="od-sep"></div>' : ''}`;
+        ${idx < productGroups.length - 1 ? '<div class="od-sep"></div>' : ''}`;
     }).join('');
 
     showModal('ratingBackdrop', 'ratingModal');
@@ -1026,42 +1161,46 @@ function ratingRenderPreviews(orderItemId) {
 function closeRatingModal() { hideModal('ratingBackdrop', 'ratingModal'); }
 
 async function submitRating() {
-    const orderId   = document.getElementById('ratingOrderId').value;
-    const items     = document.querySelectorAll('.ph-rating-item');
-    let   hasError  = false;
-    let   allOk     = true;
+    const orderId  = document.getElementById('ratingOrderId').value;
+    const items    = document.querySelectorAll('.ph-rating-item');
+    let   hasError = false;
+    let   allOk    = true;
     const submitted = [];
 
     for (const item of items) {
         const rating      = parseInt(item.querySelector('.ph-star-picker').dataset.selected);
         const reviewText  = item.querySelector('.ph-review-text').value.trim();
-        const orderItemId = parseInt(item.dataset.orderItemId);
+        const primaryId   = parseInt(item.dataset.primaryOrderItemId);
+        const allIds      = JSON.parse(item.dataset.allOrderItemIds || `[${primaryId}]`);
 
         if (!rating) { hasError = true; continue; }
 
-        try {
-            const formData = new FormData();
-            formData.append('orderItemId', orderItemId);
-            formData.append('rating', rating);
-            formData.append('reviewText', reviewText);
-            (_ratingFilesByOrderItem[orderItemId] ?? []).slice(0, 4)
-                .forEach(f => formData.append('images', f));
-            formData.append('__RequestVerificationToken',
-                document.querySelector('input[name="__RequestVerificationToken"]').value);
+        for (const orderItemId of allIds) {
+            try {
+                const formData = new FormData();
+                formData.append('orderItemId', orderItemId);
+                formData.append('rating', rating);
+                formData.append('reviewText', reviewText);
+                if (orderItemId === primaryId) {
+                    (_ratingFilesByOrderItem[primaryId] ?? []).slice(0, 4)
+                        .forEach(f => formData.append('images', f));
+                }
+                formData.append('__RequestVerificationToken',
+                    document.querySelector('input[name="__RequestVerificationToken"]').value);
 
-            const res  = await fetch('/Customer/SubmitRating', { method: 'POST', body: formData });
-            const data = await res.json();
+                const res  = await fetch('/Customer/SubmitRating', { method: 'POST', body: formData });
+                const data = await res.json();
 
-            if (data.success) {
-                submitted.push({ orderItemId, rating, reviewText });
-            } else {
+                if (!data.success) {
+                    allOk = false;
+                    showInlineError('ratingModal', data.message || 'Could not save review.');
+                }
+            } catch {
                 allOk = false;
-                showInlineError('ratingModal', data.message || 'Could not save review.');
+                showInlineError('ratingModal', 'Network error — please try again.');
             }
-        } catch {
-            allOk = false;
-            showInlineError('ratingModal', 'Network error — please try again.');
         }
+        submitted.push({ primaryId, allIds, rating, reviewText });
     }
 
     if (hasError) {
@@ -1069,17 +1208,17 @@ async function submitRating() {
         return;
     }
 
-    // Update in-memory data so the drawer shows review photos immediately (no reload needed)
     const order = _orders.find(o => o.orderId === parseInt(orderId));
     if (order) {
-        submitted.forEach(({ orderItemId, rating, reviewText }) => {
-            const it = order.items.find(i => i.orderItemId === orderItemId);
-            if (it) {
-                it.reviewRating = rating;
-                it.reviewText   = reviewText;
-                // Attach blob URLs so review photos render immediately in the drawer
-                const files = _ratingFilesByOrderItem[orderItemId] ?? [];
-                it.reviewImages = files.map(f => URL.createObjectURL(f));
+        submitted.forEach(({ primaryId, allIds, rating, reviewText }) => {
+            allIds.forEach(id => {
+                const it = order.items.find(i => i.orderItemId === id);
+                if (it) { it.reviewRating = rating; it.reviewText = reviewText; }
+            });
+            const primary = order.items.find(i => i.orderItemId === primaryId);
+            if (primary) {
+                const files = _ratingFilesByOrderItem[primaryId] ?? [];
+                primary.reviewImages = files.map(f => URL.createObjectURL(f));
             }
         });
         order.reviewSubmitted = true;
