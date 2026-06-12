@@ -6,7 +6,7 @@ using System.Security.Claims;
 using EcommerceSystem.Models;
 using EcommerceSystem.Interfaces;
 using Microsoft.AspNetCore.Mvc.Rendering;
-
+using EcommerceSystem.Enums;
 namespace EcommerceSystem.Controllers
 {
     [Authorize(Roles = "CustomerService")]
@@ -30,13 +30,13 @@ namespace EcommerceSystem.Controllers
             => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
         private async Task LoadNavbarAsync()
-            {
-                var customer = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
-                if (customer == null) return;
+        {
+            var customer = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
+            if (customer == null) return;
 
-                var notifications = await _notificationService.GetForUserAsync(customer.UserId);
-                ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
-            }
+            var notifications = await _notificationService.GetForUserAsync(customer.UserId);
+            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
+        }
 
         public async Task<IActionResult> Home()
         {
@@ -44,15 +44,29 @@ namespace EcommerceSystem.Controllers
 
             var requests = await _context.Request
                 .Include(r => r.RequestUser)
+                .Include(r => r.ReportedUser)
+                .Include(r => r.ReviewByCS)
+                .Include(r => r.Images)
+                .Include(r => r.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
                 .ToListAsync();
 
+            ViewBag.RequestServiceType = Enum.GetValues(typeof(EcommerceSystem.Enums.RequestServiceType))
+                .Cast<EcommerceSystem.Enums.RequestServiceType>()
+                .Select(e => new SelectListItem
+                {
+                    Value = e.ToString(),
+                    Text = e.ToString()
+                }).ToList();
+
             ViewBag.RequestIssueType = Enum.GetValues(typeof(EcommerceSystem.Enums.RequestIssueType))
-            .Cast<EcommerceSystem.Enums.RequestIssueType>()
-            .Select(e => new SelectListItem
-            {
-                Value = e.ToString(),
-                Text = e.ToString()
-            }).ToList();
+                .Cast<EcommerceSystem.Enums.RequestIssueType>()
+                .Select(e => new SelectListItem
+                {
+                    Value = e.ToString(),
+                    Text = e.ToString()
+                }).ToList();
 
             return View(requests);
         }
@@ -64,7 +78,7 @@ namespace EcommerceSystem.Controllers
             if (cs == null) return NotFound();
             return View(cs);
         }
-        
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateProfile(EcommerceSystem.Models.CustomerService model)
@@ -72,7 +86,7 @@ namespace EcommerceSystem.Controllers
             var cs = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
 
             if (cs == null) return NotFound();
-            
+
             cs.FullName = model.FullName;
             cs.PhoneNumber = model.PhoneNumber;
 
@@ -137,10 +151,10 @@ namespace EcommerceSystem.Controllers
                 }
             }
 
-            order.ReturnStatus         = EcommerceSystem.Enums.ReturnStatus.Approved;
-            order.ReturnApprovedAt     = DateTime.UtcNow;
+            order.ReturnStatus = EcommerceSystem.Enums.ReturnStatus.Approved;
+            order.ReturnApprovedAt = DateTime.UtcNow;
             order.ApprovedRefundAmount = approvedRefundAmount;
-            order.ReturnType           = isReturnRefund
+            order.ReturnType = isReturnRefund
                                         ? EcommerceSystem.Enums.ReturnType.ReturnRefund
                                         : EcommerceSystem.Enums.ReturnType.RefundOnly;
 
@@ -150,7 +164,7 @@ namespace EcommerceSystem.Controllers
             // Stamp the Request row so ApprovedAt is no longer NULL.
             if (request != null)
             {
-                request.ApprovedAt  = DateTime.UtcNow;
+                request.SolvedAt = DateTime.UtcNow;
             }
 
             await _context.SaveChangesAsync();
@@ -168,17 +182,17 @@ namespace EcommerceSystem.Controllers
                 if (orderWithDetails != null)
                 {
                     var returnTypeLabel = isReturnRefund ? "Return & Refund" : "Refund Only";
-                    var customerName    = orderWithDetails.Customer?.FullName ?? "Customer";
-                    var customerId      = orderWithDetails.Customer?.UserId;
-                    var sellerId        = orderWithDetails.Seller?.UserId;
-                    var shopName        = orderWithDetails.Seller?.ShopName   ?? "the seller";
-                    var total           = approvedRefundAmount;
+                    var customerName = orderWithDetails.Customer?.FullName ?? "Customer";
+                    var customerId = orderWithDetails.Customer?.UserId;
+                    var sellerId = orderWithDetails.Seller?.UserId;
+                    var shopName = orderWithDetails.Seller?.ShopName ?? "the seller";
+                    var total = approvedRefundAmount;
 
                     if (customerId.HasValue)
                     {
                         await _notificationService.CreateAsync(
-                            userId:  customerId.Value,
-                            title:   "Return & Refund Approved",
+                            userId: customerId.Value,
+                            title: "Return & Refund Approved",
                             message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
                                     $"has been approved by Customer Service. Total: RM{total:F2}"
                         );
@@ -187,8 +201,8 @@ namespace EcommerceSystem.Controllers
                     if (sellerId.HasValue)
                     {
                         await _notificationService.CreateAsync(
-                            userId:  sellerId.Value,
-                            title:   "Return & Refund Approved",
+                            userId: sellerId.Value,
+                            title: "Return & Refund Approved",
                             message: $"Customer Service approved a {returnTypeLabel} request for Order #{orderId} " +
                                     $"from {customerName}. Refund total: RM{total:F2}"
                         );
@@ -202,8 +216,8 @@ namespace EcommerceSystem.Controllers
                     foreach (var adminId in adminIds)
                     {
                         await _notificationService.CreateAsync(
-                            userId:  adminId,
-                            title:   "Return & Refund Approved",
+                            userId: adminId,
+                            title: "Return & Refund Approved",
                             message: $"Order #{orderId} — Customer Service approved a {returnTypeLabel} " +
                                     $"request from {customerName} ({shopName}). Total: RM{total:F2}"
                         );
@@ -218,8 +232,8 @@ namespace EcommerceSystem.Controllers
                     foreach (var csUserId in csUserIds)
                     {
                         await _notificationService.CreateAsync(
-                            userId:  csUserId,
-                            title:   "Return & Refund Approved",
+                            userId: csUserId,
+                            title: "Return & Refund Approved",
                             message: $"Order #{orderId} — {returnTypeLabel} request from {customerName} " +
                                     $"({shopName}) has been approved. Refund: RM{total:F2}"
                         );
@@ -236,6 +250,103 @@ namespace EcommerceSystem.Controllers
                 : "Stock unchanged (Refund Only — items not physically returned).";
 
             return Json(new { success = true, message = $"Return approved for Order #{orderId}. {stockMsg}" });
+        }
+    
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveRequest(int requestId, string approveItemsJson)
+        {
+            var csId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            
+            var request = await _context.Request.FindAsync(requestId);
+            if (request == null) return NotFound();
+
+            IRequestStrategy strategy;
+
+            if (request.RequestServiceType == RequestServiceType.RETURN_REFUND)
+            {
+                strategy = new ReturnRefundStrategy();
+            }
+            else if (request.RequestServiceType == RequestServiceType.REFUND)
+            {
+                strategy = new RefundStrategy();
+            }
+            else if (request.RequestServiceType == RequestServiceType.SUSPEND_ACCOUNT)
+            {
+                strategy = new SuspendAccountStrategy();
+            }
+            else if (request.RequestServiceType == RequestServiceType.ACTIVE_ACCOUNT)
+            {
+                strategy = new ActivateAccountStrategy();
+            }
+            else
+            {
+                return BadRequest("Invalid request type for approval.");
+            }
+
+            strategy.Solve(request);
+            request.ReviewByCsId = csId;
+            request.SolvedAt = DateTime.UtcNow;
+            request.ApproveItemsJson = approveItemsJson;
+
+            await _context.SaveChangesAsync();
+
+            TempData["ActionSuccess"] = "Request approved.";
+            return RedirectToAction("Home");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectRequest(int requestId)
+        {
+            var csId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+            var request = await _context.Request.FindAsync(requestId);
+            if (request == null) return NotFound();
+
+            var order = await _context.Order
+                .Include(o => o.Customer)
+                .Include(o => o.Seller)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == request.OrderId);
+            
+            if (order == null) return NotFound();
+            order.CurrentStatus = OrderStatus.DELIVERED;
+
+            request.ReviewByCsId = csId;
+            request.SolvedAt = DateTime.UtcNow; // 视为已处理，需要的话可加 IsRejected 字段
+
+            await _context.SaveChangesAsync();
+
+            // ── Notify Customer that their after-sales request was rejected ────
+            try
+            {
+                var rejectedRequest = await _context.Request
+                    .FirstOrDefaultAsync(r => r.RequestId == requestId);
+
+                var shopName     = order.Seller?.ShopName ?? "the seller";
+                var customerId   = order.Customer?.UserId;
+                var serviceLabel = rejectedRequest?.RequestServiceType == RequestServiceType.RETURN_REFUND
+                    ? "Return & Refund" : "Refund Only";
+
+                if (customerId.HasValue)
+                    await _notificationService.CreateAsync(
+                        userId:  customerId.Value,
+                        title:   "After-Sales Request Rejected",
+                        message: $"Your {serviceLabel} request for Order #{request.OrderId} from {shopName} " +
+                                $"has been reviewed and rejected by Customer Service. " +
+                                $"Your order status has been restored to Delivered."
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[RequestController] Rejection notification failed for order #{request.OrderId}: {ex.Message}");
+            }
+
+            TempData["ActionSuccess"] = "Request rejected.";
+            return RedirectToAction("Home");
         }
     }
 }

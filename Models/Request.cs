@@ -25,7 +25,10 @@ public class Request
     [Column(TypeName = "nvarchar(50)")]
     public RequestIssueType RequestIssueType { get; set; }
     public string? RequestedItemsJson { get; set; }
-    public DateTime? ApprovedAt { get; set; }
+    public string? ApproveItemsJson { get; set; }
+    // public DateTime? ApprovedAt { get; set; }
+    public DateTime? SolvedAt { get; set; }
+    
     public string Description { get; set; } = string.Empty;
     public List<RequestImage> Images { get; set; } = new();
     // public string? ReviewedBy { get; set; }

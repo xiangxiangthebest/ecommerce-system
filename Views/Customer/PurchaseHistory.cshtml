@@ -275,7 +275,7 @@
                         @{
                             var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
                             var pillApproved = (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                               && requestForPill != null && requestForPill.ApprovedAt.HasValue;
+                                               && requestForPill != null && requestForPill.SolvedAt.HasValue;
                             var pillRejected = !pillApproved
                                                && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
                                                && order.ReturnStatus.ToString() == "Rejected";
@@ -355,7 +355,7 @@
                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
                           || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
                     {
-                        var isApprovedBanner = request != null && request.ApprovedAt.HasValue;
+                        var isApprovedBanner = request != null && request.SolvedAt.HasValue;
                         var isRejectedBanner = !isApprovedBanner && order.ReturnStatus.ToString() == "Rejected";
 
                         if (isApprovedBanner)
@@ -614,7 +614,7 @@
                                 </button>
 
                                 @* If approved → let customer confirm receipt so they can write a review *@
-                                @if (request != null && request.ApprovedAt.HasValue)
+                                @if (request != null && request.SolvedAt.HasValue)
                                 {
                                     <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
                                         <i class="ti ti-circle-check"></i> Order Received

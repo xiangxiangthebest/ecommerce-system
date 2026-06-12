@@ -1,4 +1,5 @@
 @model IEnumerable<EcommerceSystem.Models.Request>
+@using EcommerceSystem.DTOs
 
 <link rel="stylesheet" href="~/css/customer/home.css" asp-append-version="true" />
 
@@ -11,7 +12,7 @@
             <span class="home-eyebrow">Review and resolve requests raised by customers.</span>
         </div>
         <div class="home-hero-count">
-            <span class="hero-count-number">@Model.Count(r => r.ApprovedAt == null)</span>
+            <span class="hero-count-number">@Model.Count(r => r.SolvedAt == null)</span>
             <span class="hero-count-label">Requests awaiting action</span>
         </div>
     </div>
@@ -93,7 +94,7 @@
         <div class="request-list">
             @foreach (var item in Model)
             {
-                <div class="request-card @(item.ApprovedAt != null ? "resolved" : "")">
+                <div class="request-card @(item.SolvedAt != null ? "resolved" : "")">
 
                     <div class="request-card-body">
 
@@ -133,6 +134,56 @@
 
                         <p class="request-desc">@item.Description</p>
 
+                @if (!string.IsNullOrEmpty(item.RequestedItemsJson) && item.Order != null)
+                        {
+                            var requestedItems = System.Text.Json.JsonSerializer.Deserialize<List<RequestedItemDto>>(
+                                item.RequestedItemsJson,
+                                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                            ) ?? new();
+
+                            <div class="requested-items">
+                                <p class="requested-items-label">
+                                    <i class="ti ti-package"></i> Requested items
+                                </p>
+                                <ul class="requested-items-list">
+                                    @foreach (var reqItem in requestedItems)
+                                    {
+                                        var orderItem = item.Order.OrderItems
+                                            .FirstOrDefault(oi => oi.OrderItemId == reqItem.OrderItemId);
+
+                                        if (orderItem != null)
+                                        {
+                                            <li class="ri-row">
+                                                @if (item.SolvedAt == null)
+                                                {
+                                                    <input type="checkbox"
+                                                        class="ri-check"
+                                                        data-order-item-id="@reqItem.OrderItemId"
+                                                        data-max-qty="@reqItem.Qty"
+                                                        form="approve-form-@item.RequestId"
+                                                        checked />
+                                                }
+                                                <span class="ri-name">@orderItem.Product?.Name</span>
+                                                @if (item.SolvedAt == null)
+                                                {
+                                                    <input type="number"
+                                                        class="ri-qty-input"
+                                                        min="0"
+                                                        max="@reqItem.Qty"
+                                                        value="@reqItem.Qty"
+                                                        form="approve-form-@item.RequestId" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="ri-qty">x@reqItem.Qty</span>
+                                                }
+                                            </li>
+                                        }
+                                    }
+                                </ul>
+                            </div>
+                        }
+
                         @if (item.Images.Any())
                         {
                             <div class="request-images">
@@ -148,11 +199,13 @@
                     </div>
 
                     <div class="request-card-footer">
-                        @if (item.ApprovedAt == null)
+                        @if (item.SolvedAt == null)
                         {
-                            <form asp-controller="CustomerService" asp-action="ApproveRequest" method="post" class="action-form">
+                            <form id="approve-form-@item.RequestId"
+                                asp-controller="CustomerService" asp-action="ApproveRequest" method="post" class="action-form">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="requestId" value="@item.RequestId" />
+                                <input type="hidden" name="approveItemsJson" class="approve-items-json" />
                                 <button type="submit" class="action-btn approve-btn">
                                     <i class="ti ti-check"></i> Approve
                                 </button>
@@ -181,7 +234,7 @@
             }
         </div>
     }
-
 </div>
+
 
 <script src="~/js/customerservice/home.js" asp-append-version="true"></script>
