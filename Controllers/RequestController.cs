@@ -66,12 +66,13 @@ namespace EcommerceSystem.Controllers
 
             var request = new Request
             {
-                RequestUserId = user.UserId,
+                CustomerId = user.UserId,
                 OrderId = orderId,
-                RequestServiceType = serviceType,  
+                RequestServiceType = serviceType,
                 RequestIssueType = issueType,
                 Description = description,
                 RequestedItemsJson = JsonSerializer.Serialize(requestedItems),
+                Status = "Pending"
             };
 
             _context.Request.Add(request);
@@ -87,7 +88,7 @@ namespace EcommerceSystem.Controllers
                     using var stream = new FileStream(path, FileMode.Create);
                     await file.CopyToAsync(stream);
 
-                    _context.RequestImage.Add(new RequestImage
+                    _context.RequestImages.Add(new RequestImage
                     {
                         RequestId = request.RequestId,
                         ImagePath = fileName
@@ -231,7 +232,6 @@ namespace EcommerceSystem.Controllers
                 {
                     RequestServiceType.RETURN_REFUND => "Return & Refund",
                     RequestServiceType.REFUND => "Refund Only",
-                    RequestServiceType.SUSPEND_ACCOUNT => "Suspend Account",
                     _ => "Other"
                 },
                 issueType = request.RequestIssueType switch
@@ -249,14 +249,12 @@ namespace EcommerceSystem.Controllers
                 approvedAt = request.SolvedAt.HasValue
                                         ? request.SolvedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                                         : (string?)null,
-                approvedRefundAmount = order.ApprovedRefundAmount > 0
-                                        ? order.ApprovedRefundAmount.ToString("F2")
-                                        : (string?)null,
-                returnType = order.ReturnType.HasValue
-                                        ? (order.ReturnType == EcommerceSystem.Enums.ReturnType.ReturnRefund
-                                            ? "Return & Refund"
-                                            : "Refund Only")
-                                        : (string?)null,
+                approvedRefundAmount = request.ApprovedRefundAmount.HasValue
+                ? request.ApprovedRefundAmount.Value.ToString("F2")
+                : "0.00",
+                returnType = request.RequestServiceType == EcommerceSystem.Enums.RequestServiceType.RETURN_REFUND
+                    ? "Return & Refund"
+                    : "Refund Only",
                 images = request.Images.Select(img => "/uploads/" + img.ImagePath).ToList(),
                 requestId = request.RequestId
             });

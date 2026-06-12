@@ -36,19 +36,19 @@
         cancelReason    = o.CancelReason ?? "",
 
         // Strip "||<json>" suffix and legacy bracket wrapping to avoid weird characters in UI
-        returnReason    = StripReturnReasonBrackets(
+        @* returnReason    = StripReturnReasonBrackets(
                             (o.ReturnReason != null && o.ReturnReason.Contains("||"))
                                 ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
                                 : (o.ReturnReason ?? "")
-                ),
+                ), *@
 
         // If approved timestamp exists, show Approved even if enum didn’t update
-        returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
+        @* returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
                             ? "Approved"
                             : o.ReturnStatus.ToString(),
 
         returnApproved  = o.ReturnApprovedAt.HasValue,
-        returnImagePath = ParseImageList(o.ReturnImagePathsJson),
+        returnImagePath = ParseImageList(o.ReturnImagePathsJson), *@
 
         reviewSubmitted = o.ReviewSubmitted,
 
@@ -275,10 +275,10 @@
                         @{
                             var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
                             var pillApproved = (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                               && requestForPill != null && requestForPill.SolvedAt.HasValue;
+                                            && requestForPill != null && requestForPill.SolvedAt.HasValue;
                             var pillRejected = !pillApproved
-                                               && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                               && order.ReturnStatus.ToString() == "Rejected";
+                                            && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
+                                            && request.Status.ToString() == "Rejected";
                             var pillClass = pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
                                           : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
                                           : "ph-s-" + statusKey;
@@ -353,10 +353,10 @@
                     }
 
                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
-                          || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
+                        || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
                     {
                         var isApprovedBanner = request != null && request.SolvedAt.HasValue;
-                        var isRejectedBanner = !isApprovedBanner && order.ReturnStatus.ToString() == "Rejected";
+                        var isRejectedBanner = !isApprovedBanner && request.Status.ToString() == "Rejected";
 
                         if (isApprovedBanner)
                         {
@@ -432,16 +432,28 @@
                     }
 
                     @* Legacy ReturnReason banner — only for old-style returns with no Request record *@
-                    @if (isReturn && request == null && !string.IsNullOrWhiteSpace(order.ReturnReason))
-                    {
-                        var returnImgs = ParseImageList(order.ReturnImagePathsJson);
+                    @if (isReturn && request != null){
+                    
+                        @* var returnImgs = ParseImageList(order.ReturnImagePathsJson); *@
 
-                        var returnDisplay = order.ReturnReason ?? "";
+                        @* var returnDisplay = request.RequestIssueType;
                         var rrSep = returnDisplay.IndexOf("||");
                         if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
-                        returnDisplay = StripReturnReasonBrackets(returnDisplay);
+                        returnDisplay = StripReturnReasonBrackets(returnDisplay); *@
 
-                        var rnBannerStatus = order.ReturnApprovedAt.HasValue ? "Approved" : order.ReturnStatus.ToString();
+                        var returnDisplay = request.RequestIssueType switch
+                        {
+                            RequestIssueType.WrongItemReceived => "WrongItemReceived Request",
+                            RequestIssueType.ChangeOfMind => "ChangeOfMind",
+                            RequestIssueType.ItemNotAsDescribed => "ItemNotAsDescribed",
+                            RequestIssueType.ItemNotDelivered => "ItemNotDelivered",
+                            RequestIssueType.DamagedDefective => "DamagedDefective",
+                            RequestIssueType.MissingPartsAccessories => "MissingPartsAccessories",
+                            RequestIssueType.Other => "Other",
+                            _ => request.RequestIssueType.ToString()
+                        };
+
+                        var rnBannerStatus = request.SolvedAt.HasValue ? "Approved" : request.Status.ToString();
                         var rnBannerClass = rnBannerStatus switch {
                             "Approved" or "Refunded" => "ph-notice-return-v2 rn-approved",
                             "Rejected"               => "ph-notice-return-v2 rn-rejected",
@@ -479,17 +491,25 @@
                                 </div>
                             </div>
 
-                            @if (returnImgs.Any())
+                            @if (request?.Images != null && request.Images.Any())
                             {
                                 <div class="rn-photo-strip">
                                     <div class="rn-reason-label">Proof photos</div>
+
                                     <div class="rn-photo-row">
-                                        @foreach (var img in returnImgs)
+                                        @foreach (var img in request.Images)
                                         {
-                                            <div class="rn-strip-thumb" onclick="rtnOpenLightbox('@img')" title="View proof photo">
-                                                <img src="@img" alt="Return proof"
+                                            <div class="rn-strip-thumb"
+                                                onclick="rtnOpenLightbox('@img.ImagePath')"
+                                                title="View proof photo">
+
+                                                <img src="@img.ImagePath"
+                                                    alt="Return proof"
                                                     onerror="this.closest('.rn-strip-thumb').style.display='none'" />
-                                                <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
+
+                                                <div class="rn-img-badge">
+                                                    <i class="ti ti-zoom-in"></i>
+                                                </div>
                                             </div>
                                         }
                                     </div>
