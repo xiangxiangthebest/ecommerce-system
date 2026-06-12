@@ -54,8 +54,7 @@ public class Order : OrderStatusSubject
     public DateTime? ReturnApprovedAt { get; set; }
 
     // ── Review flag (not persisted) ─────────────────────────────────────────
-    [NotMapped]
-    public bool ReviewSubmitted { get; set; }
+    public bool ReviewSubmitted { get; set; } = false;
 
     // ── Navigation properties ────────────────────────────────────────────────
     public Customer? Customer { get; set; }

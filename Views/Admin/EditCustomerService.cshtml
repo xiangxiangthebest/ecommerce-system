@@ -4,8 +4,11 @@
     Layout = "~/Views/Admin/Layout.cshtml";
 }
 
+<link rel="stylesheet" href="~/css/admin/dashboard.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+
 <div class="container py-5">
-    <div class="card shadow-lg border-0" style="border-radius: 15px;">
+    <div class="card shadow-lg border-0" style="border-radius: 15px; overflow: hidden;">
         <div class="card-header p-4" style="background: #2e1f76; color: white;">
             <h3 class="mb-0"><i class="fas fa-user-edit me-2"></i> Edit Customer Service Account</h3>
         </div>
@@ -15,28 +18,48 @@
                 <input type="hidden" asp-for="UserId" />
 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-6 mb-3">
                         <div class="form-group">
-                            <label asp-for="FullName" class="form-label"></label>
-                            <input asp-for="FullName" class="form-control" />
+                            <label asp-for="FullName" class="form-label fw-bold">Full Name</label>
+                            <input asp-for="FullName" class="form-control form-control-lg" />
                             <span asp-validation-for="FullName" class="text-danger"></span>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-6 mb-3">
                         <div class="form-group">
-                            <label asp-for="Email" class="form-label"></label>
-                            <input asp-for="Email" class="form-control" />
+                            <label asp-for="Email" class="form-label fw-bold">Email Address</label>
+                            <input asp-for="Email" class="form-control form-control-lg"
+                                pattern="[a-zA-Z0-9._%+\-]+@@gmail\.com"
+                                title="Email must be a valid @@gmail.com address" />
                             <span asp-validation-for="Email" class="text-danger"></span>
                         </div>
                     </div>
                 </div>
 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-6 mb-3">
                         <div class="form-group">
-                            <label asp-for="PhoneNumber" class="form-label"></label>
-                            <input asp-for="PhoneNumber" class="form-control" />
+                            <label asp-for="PhoneNumber" class="form-label fw-bold">Phone Number</label>
+                            <input asp-for="PhoneNumber" class="form-control form-control-lg"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                onpaste="let p=event.clipboardData.getData('text'); if(!/^\d+$/.test(p)){event.preventDefault();}" />
                             <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="form-group">
+                            <label asp-for="NewPassword" class="form-label fw-bold">New Password <span class="text-muted fw-normal" style="font-size:0.85rem;">(leave blank to keep current)</span></label>
+                            <div class="input-group">
+                                <input asp-for="NewPassword" type="password" class="form-control form-control-lg" id="passwordInput"
+                                    style="border-radius: 8px 0 0 8px !important;" />
+                                <button type="button" onclick="togglePassword()" id="togglePasswordBtn"
+                                    style="border: 1px solid #dee2e6; border-left: none; border-radius: 0 8px 8px 0; padding: 0 16px; background: white; cursor: pointer; color: #666;">
+                                    <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="NewPassword" class="text-danger"></span>
                         </div>
                     </div>
                 </div>
@@ -45,7 +68,7 @@
                     <a href="@Url.Action("ManageCustomerService", "Admin")" class="text-muted text-decoration-none">
                         <i class="fas fa-arrow-left"></i> Back to List
                     </a>
-                    <button type="submit" class="btn" style="background: linear-gradient(135deg, #00e5ff 0%, #00acc1 100%); color: white; border-radius: 12px; padding: 12px 24px;">
+                    <button type="submit" class="btn" style="background: linear-gradient(135deg, #00e5ff 0%, #00acc1 100%); color: white; border-radius: 12px; padding: 12px 24px; font-weight: 600;">
                         <i class="fas fa-save me-2"></i> Save Changes
                     </button>
                 </div>
@@ -53,3 +76,19 @@
         </div>
     </div>
 </div>
+
+<script>
+    function togglePassword() {
+        const input = document.getElementById('passwordInput');
+        const icon = document.getElementById('togglePasswordIcon');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+</script>

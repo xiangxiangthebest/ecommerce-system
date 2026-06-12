@@ -329,3 +329,45 @@
     border-top: 1px solid #e2e8f0;
     background: #f8fafc;
 }
+/* ── Reviews Button ── */
+.glass-container .fancy-table .btn-review-trigger {
+    border: 1px solid #fef3c7;
+    font-weight: 600;
+    color: #b45309;
+    background-color: #fffbeb;
+    border-radius: 6px;
+}
+
+.glass-container .fancy-table .btn-review-trigger:hover {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+/* ── Reviews Modal ── */
+.review-card {
+    background: #ffffff;
+    border-color: #f1f5f9 !important;
+    transition: background 0.15s ease;
+}
+
+.review-card:hover {
+    background: #f8fafc;
+}
+
+.review-summary {
+    border: 1px solid #e2e8f0;
+}
+
+.review-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.review-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.review-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}

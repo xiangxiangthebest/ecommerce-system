@@ -128,25 +128,25 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> CreateCustomerService(RegisterCustomerServiceDto model)
         {
             if (!ModelState.IsValid)
-            {
                 return View(model);
-            }
- 
+
             var existingUser = await _context.Users.AnyAsync(u => u.Email == model.Email);
             if (existingUser)
             {
                 ModelState.AddModelError("Email", "This email address is already in use.");
                 return View(model);
             }
- 
-            UserCreator creator = new CustomerServiceCreator(model); 
+
+            UserCreator creator = new CustomerServiceCreator(model);
             User customerServiceAccount = creator.CreateUser();
- 
-            try 
+
+            customerServiceAccount.PhoneNumber = model.PhoneNumber;
+
+            try
             {
                 _context.Users.Add(customerServiceAccount);
                 await _context.SaveChangesAsync();
- 
+
                 TempData["AdminSuccess"] = "Customer Service account created successfully!";
                 return RedirectToAction("ManageCustomerService");
             }
@@ -174,32 +174,36 @@ namespace EcommerceSystem.Controllers
             return View(model);
         }
  
-        // POST: Admin/EditCustomerService
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditCustomerService(EditCustomerServiceDto model)
         {
             if (!ModelState.IsValid) return View(model);
- 
+
             var user = await _context.Users.FindAsync(model.UserId);
             if (user == null) return NotFound();
- 
+
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == model.Email && u.UserId != model.UserId);
-            
+
             if (emailExists)
             {
                 ModelState.AddModelError("Email", "Email is already in use by another account.");
                 return View(model);
             }
- 
+
             user.FullName = model.FullName;
             user.Email = model.Email;
             user.PhoneNumber = model.PhoneNumber;
- 
+
+            if (!string.IsNullOrWhiteSpace(model.NewPassword))
+            {
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+            }
+
             _context.Update(user);
             await _context.SaveChangesAsync();
- 
+
             TempData["AdminSuccess"] = "Customer Service information updated successfully.";
             return RedirectToAction("ManageCustomerService");
         }
@@ -253,6 +257,8 @@ namespace EcommerceSystem.Controllers
         public async Task<IActionResult> InventoryReview(string searchTerm, string statusFilter, string stockFilter, string deleteFilter)
         {
             var query = _context.Products.Include(p => p.Seller).Include(p => p.Category).AsQueryable();
+            ViewBag.OpenReviewProductId = Request.Query["openReviewProductId"].ToString();
+
  
             // 1. Keyword Search (Product Name, SKU, or Shop Name)
             // AFTER — deleteFilter always applies, regardless of whether searchTerm is used
@@ -336,8 +342,50 @@ namespace EcommerceSystem.Controllers
             
             return View(products);
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteReview(int id, int productId)
+        {
+            var review = await _context.Reviews.FindAsync(id);
+            if (review != null)
+            {
+                _context.Reviews.Remove(review);
+                await _context.SaveChangesAsync();
+
+                // Recalculate product rating only
+                var remaining = await _context.Reviews
+                    .Where(r => r.ProductId == productId)
+                    .ToListAsync();
+
+                var product = await _context.Products.FindAsync(productId);
+                if (product != null)
+                {
+                    product.ReviewCount = remaining.Count;
+                    product.AverageRating = remaining.Count > 0
+                        ? remaining.Average(r => r.Rating)
+                        : 0;
+                    _context.Products.Update(product);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            return RedirectToAction("InventoryReview", new { openReviewProductId = productId });
+        }
+
+        public async Task<IActionResult> GetProductReviews(int productId)
+        {
+            var reviews = await _context.Reviews
+                .Include(r => r.OrderItem)
+                    .ThenInclude(oi => oi.Order)
+                        .ThenInclude(o => o.Customer)
+                .Where(r => r.OrderItem.ProductId == productId)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+
+            return PartialView("ViewProductReviews", reviews);
+        }
  
-        // Delete Product (Soft Delete)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteProduct(int id)
@@ -360,7 +408,6 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("InventoryReview");
         }
  
-        // Restore Product (Undo Soft Delete)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RestoreProduct(int id)

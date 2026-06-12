@@ -133,14 +133,14 @@
             <table class="fancy-table table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 20%;">Product Name</th>
-                        <th style="width: 12%;">SKU</th>
-                        <th style="width: 12%;">Category</th>
-                        <th style="width: 12%;">Price</th>
-                        <th style="width: 15%;">Stock</th>
-                        <th style="width: 12%;">Status</th>
-                        <th style="width: 10%;">Image</th>
-                        <th class="text-center" style="width: 12%;">Actions</th>
+                        <th style="width: 16%;">Product Name</th>
+                        <th style="width: 9%;">SKU</th>
+                        <th style="width: 9%;">Category</th>
+                        <th style="width: 9%;">Price</th>
+                        <th style="width: 11%;">Stock</th>
+                        <th style="width: 9%;">Status</th>
+                        <th style="width: 7%;">Image</th>
+                        <th class="text-center" style="width: 30%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -214,7 +214,7 @@
                                 }
                             </td>
                             <td>
-                                <div class="d-flex gap-2 justify-content-center">
+                                <div class="d-flex gap-2 justify-content-center flex-wrap">
                                     <button type="button" class="btn btn-sm btn-light btn-details-trigger" data-bs-toggle="modal" data-bs-target="#productDetailsModal@(product.ProductId)">
                                         <i class="fas fa-eye text-primary me-1"></i> Details
                                     </button>
@@ -346,6 +346,13 @@
                     <p class="modal-description-paragraph">@p.Description</p>
                 </div>
                 <div class="modal-footer product-details-modal-footer">
+                    <button type="button" class="btn btn-warning px-4 btn-review-trigger"
+                            data-product-id="@p.ProductId"
+                            data-product-name="@p.Name"
+                            data-bs-toggle="modal"
+                            data-bs-target="#reviewsModal">
+                        <i class="fas fa-star me-2"></i>View Reviews
+                    </button>
                     @if (p.IsDeleted)
                     {
                         <form method="post" action="@Url.Action("RestoreProduct", "Admin")" style="display:inline;" onsubmit="return confirm('Restore this product?');">
@@ -372,4 +379,69 @@
         </div>
     </div>
 }
-}
+
+@* ── Shared Reviews Modal ── *@
+<div class="modal fade" id="reviewsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-star text-warning me-2"></i>
+                    <span id="reviewsModalProductName">Product Reviews</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="reviewsModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading reviews...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.btn-review-trigger').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var productId = btn.getAttribute('data-product-id');
+            var productName = btn.getAttribute('data-product-name');
+
+            // Update modal title
+            document.getElementById('reviewsModalProductName').textContent = productName + ' — Reviews';
+
+            // Reset to loading state
+            document.getElementById('reviewsModalBody').innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading reviews...</p>
+                </div>`;
+
+            // Fetch reviews
+            fetch('/Admin/GetProductReviews?productId=' + productId)
+                .then(function (res) {
+                    if (!res.ok) throw new Error('Server error: ' + res.status);
+                    return res.text();
+                })
+                .then(function (html) {
+                    document.getElementById('reviewsModalBody').innerHTML = html;
+                })
+                .catch(function (err) {
+                    document.getElementById('reviewsModalBody').innerHTML =
+                        '<div class="alert alert-danger">Failed to load reviews. Please try again.</div>';
+                });
+        });
+    });
+
+    // Auto-reopen modal if redirected back after a delete
+    const openProductId = '@ViewBag.OpenReviewProductId';
+    if (openProductId) {
+        const trigger = document.querySelector('.btn-review-trigger[data-product-id="' + openProductId + '"]');
+        if (trigger) trigger.click();
+    }
+});
+</script>

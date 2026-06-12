@@ -75,6 +75,32 @@ namespace EcommerceSystem.Services
                 product.ReviewCount = ratings.Count;
             }
 
+            // Check if all items in this order now have a review — if so, mark order as ReviewSubmitted
+            var allOrderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderItem.OrderId)
+                .Select(oi => oi.OrderItemId)
+                .ToListAsync();
+
+            var reviewedItemIds = await _context.Reviews
+                .Where(r => r.CustomerId == customerId && allOrderItems.Contains(r.OrderItemId))
+                .Select(r => r.OrderItemId)
+                .ToListAsync();
+
+            // Include the current review being submitted
+            reviewedItemIds.Add(orderItemId);
+
+            bool allReviewed = allOrderItems.All(id => reviewedItemIds.Contains(id));
+
+            if (allReviewed)
+            {
+                var order = orderItem.Order;
+                if (order != null)
+                {
+                    order.ReviewSubmitted = true;
+                    _context.Order.Update(order);
+                }
+            }
+
             await _context.SaveChangesAsync();
             return OperationResult.Ok();
         }
