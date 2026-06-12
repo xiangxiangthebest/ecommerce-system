@@ -14,4 +14,6 @@ public class Review
     public string? ReviewImagePathsJson { get; set; }
 
     public DateTime CreatedAt { get; set; }
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
 }

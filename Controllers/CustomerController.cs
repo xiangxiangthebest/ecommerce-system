@@ -311,11 +311,33 @@ namespace EcommerceSystem.Controllers
 
             // var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
             // return View(orders);
+            
+            // var requests = await _requestService.GetByUserId(customer.UserId);
+            // var requestMap = requests
+            //     .Where(r => r.OrderId != null)
+            //     .ToDictionary(r => r.OrderId.Value);
+
+            // var vm = new PurchaseHistoryVM
+            // {
+            //     Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
+            //     Requests = await _requestService.GetByUserId(customer.UserId),
+            //     RequestMap = requestMap
+            // };
+
+            // return View(vm);
+
+            var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
+            var requests = await _requestService.GetByUserId(customer.UserId);
+
+            var requestMap = requests
+                .Where(r => r.OrderId != null)
+                .ToDictionary(r => r.OrderId);
 
             var vm = new PurchaseHistoryVM
             {
-                Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
-                Requests = await _requestService.GetByUserId(customer.UserId)
+                Orders = orders,
+                Requests = requests,
+                RequestMap = requestMap
             };
 
             return View(vm);

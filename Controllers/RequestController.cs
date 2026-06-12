@@ -220,12 +220,12 @@ namespace EcommerceSystem.Controllers
                     .Where(oi => requestedQtyMap.ContainsKey(oi.OrderItemId))   // only items the customer selected
                     .Select(oi => new
                     {
-                        productName = oi.Product?.Name,
-                        quantity = oi.Quantity,
-                        requestedQty = requestedQtyMap[oi.OrderItemId],    // safe — key guaranteed by Where
-                        price = oi.Price,
-                        discountedPrice = Math.Round(oi.Price * (1 - discRatio), 2),
-                        imageUrl = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null,
+                        productName       = oi.Product?.Name,
+                        quantity          = oi.Quantity,
+                        requestedQty      = requestedQtyMap[oi.OrderItemId],    // safe — key guaranteed by Where
+                        price             = oi.Price,
+                        discountedPrice   = Math.Round(oi.Price * (1 - discRatio), 2),
+                        imageUrl          = oi.Product?.ImagePath != null ? "/images/" + Path.GetFileName(oi.Product.ImagePath) : null,
                         selectedVariation = oi.SelectedVariation ?? ""          // e.g. {"Flavour":"Honey Tapioca","Size":"120g"}
                     }).ToList(),
                 serviceType = request.RequestServiceType switch

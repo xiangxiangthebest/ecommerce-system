@@ -38,7 +38,42 @@ namespace EcommerceSystem.Services
             if (categoryId.HasValue)
                 query = query.Where(p => p.CategoryId == categoryId.Value);
 
-            return await query.ToListAsync();
+            var products = await query.ToListAsync();
+
+            var productIds = products.Select(p => p.ProductId).ToList();
+
+            var reviewStats = await _context.Reviews
+                .Include(r => r.OrderItem)
+                .Where(r => r.OrderItem != null && productIds.Contains(r.ProductId))
+                .GroupBy(r => new { r.OrderItem!.OrderId, r.ProductId })
+                .Select(g => new { g.Key.ProductId, Rating = g.First().Rating })
+                .ToListAsync();
+
+            var statsByProduct = reviewStats
+                .GroupBy(r => r.ProductId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new {
+                        Count   = g.Count(),
+                        Average = g.Average(r => (double)r.Rating)
+                    }
+                );
+
+            foreach (var product in products)
+            {
+                if (statsByProduct.TryGetValue(product.ProductId, out var stats))
+                {
+                    product.ReviewCount   = stats.Count;
+                    product.AverageRating = stats.Average;
+                }
+                else
+                {
+                    product.ReviewCount   = 0;
+                    product.AverageRating = 0;
+                }
+            }
+
+            return products;
         }
 
         public async Task<QuickAddProductDto?> GetQuickAddProductAsync(int productId)

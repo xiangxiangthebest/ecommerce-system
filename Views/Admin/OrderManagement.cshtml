@@ -5,6 +5,7 @@
     ViewData["Title"] = "Order Management";
     Layout = "~/Views/Admin/Layout.cshtml";
 
+    var requests = ViewBag.Requests as List<Request> ?? new List<Request>();
     var statusFilter = ViewBag.StatusFilter as string ?? "All";
     var searchTerm   = ViewBag.SearchTerm   as string ?? "";
     var tabs = new[]
@@ -161,7 +162,12 @@
                             @order.OrderTime.ToString("dd MMM yyyy, HH:mm")
                         </span>
                     </div>
-                    <span class="order-status-badge @badgeClass">@order.CurrentStatus</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="order-status-badge @badgeClass">@order.CurrentStatus</span>
+                        <button class="btn-view-details" onclick="openOrderDetails(@order.OrderId)">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                    </div>
                 </div>
 
                 <div class="order-card-body">
@@ -262,3 +268,343 @@
         }
     }
 </div>
+
+@* ── Order Detail Modal ─────────────────────────────────────────────────── *@
+<div id="od-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000" onclick="closeOrderDetails()" class="od-backdrop"></div>
+<div id="od-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:18px;width:min(660px,96vw);max-height:88vh;overflow-y:auto;z-index:1001;box-shadow:0 12px 50px rgba(0,0,0,.22)" class="od-modal">
+    <div style="display:flex;align-items:center;gap:12px;padding:22px 24px 16px;border-bottom:1px solid #f0f0f8;position:sticky;top:0;background:#fff;z-index:2;">
+        <div style="width:38px;height:38px;border-radius:10px;background:#1e1b4b;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-receipt" style="color:#fff;font-size:16px"></i></div>
+        <div style="flex:1;min-width:0">
+            <h3 id="od-title" style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b"></h3>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
+                <span id="od-time" style="font-size:12px;color:#9a98b6"></span>
+                <span id="od-status" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;letter-spacing:0.04em;text-transform:uppercase"></span>
+            </div>
+        </div>
+        <button onclick="closeOrderDetails()" style="background:none;border:none;cursor:pointer;font-size:20px;color:#9a98b6;line-height:1;padding:4px;flex-shrink:0;">✕</button>
+    </div>
+    <div style="padding:20px 24px 24px;display:flex;flex-direction:column;gap:18px;">
+        <div class="od-section">
+            <div class="od-section-label">Customer Information</div>
+            <div class="od-info-grid">
+                <div class="od-info-item"><i class="fas fa-user od-info-icon"></i><div><div class="od-info-sub">Full Name</div><div id="od-cust-name" class="od-info-val"></div></div></div>
+                <div class="od-info-item"><i class="fas fa-envelope od-info-icon"></i><div><div class="od-info-sub">Email</div><div id="od-cust-email" class="od-info-val"></div></div></div>
+                <div class="od-info-item"><i class="fas fa-phone od-info-icon"></i><div><div class="od-info-sub">Phone</div><div id="od-cust-phone" class="od-info-val"></div></div></div>
+            </div>
+        </div>
+        <div class="od-section">
+            <div class="od-section-label">Delivery Address</div>
+            <div class="od-info-grid">
+                <div class="od-info-item"><i class="fas fa-user-tag od-info-icon"></i><div><div class="od-info-sub">Recipient</div><div id="od-del-name" class="od-info-val"></div></div></div>
+                <div class="od-info-item"><i class="fas fa-phone-alt od-info-icon"></i><div><div class="od-info-sub">Contact</div><div id="od-del-phone" class="od-info-val"></div></div></div>
+                <div class="od-info-item od-info-item--full"><i class="fas fa-map-marker-alt od-info-icon"></i><div><div class="od-info-sub">Address</div><div id="od-del-addr" class="od-info-val"></div></div></div>
+            </div>
+        </div>
+        <div class="od-section">
+            <div class="od-section-label">Ordered Items</div>
+            <div id="od-items-wrap" style="display:flex;flex-direction:column;gap:0"></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#f8f8ff;border-radius:12px;border:1px solid #ebebf8;">
+            <div style="display:flex;align-items:center;gap:10px;"><i class="fas fa-credit-card" style="color:#9a98b6;font-size:15px"></i><div><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Payment</div><div id="od-payment" style="font-size:14px;font-weight:600;color:#1e1b4b"></div></div></div>
+            <div style="text-align:right"><div style="font-size:11px;color:#9a98b6;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Order Total</div><div id="od-total" style="font-size:22px;font-weight:800;color:#1e1b4b"></div></div>
+        </div>
+        <div id="od-notes-section" style="display:none;background:#fffbf0;border:1px solid #ffe082;border-radius:12px;padding:14px 18px;flex-direction:column;gap:10px"></div>
+    </div>
+</div>
+
+<style>
+    .od-backdrop.active { display:block !important; }
+    .od-modal.active    { display:block !important; }
+    .od-section { display:flex;flex-direction:column;gap:10px; }
+    .od-section-label { font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#9a98b6;margin-bottom:4px; }
+    .od-info-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+    .od-info-item { display:flex;align-items:flex-start;gap:10px;background:#f8f8ff;border-radius:10px;padding:11px 13px; }
+    .od-info-item--full { grid-column:1/-1; }
+    .od-info-icon { color:#9a98b6;font-size:14px;margin-top:2px;flex-shrink:0; }
+    .od-info-sub { font-size:11px;color:#9a98b6;font-weight:500;margin-bottom:2px; }
+    .od-info-val { font-size:13px;font-weight:600;color:#1e1b4b; }
+</style>
+
+
+@section Scripts {
+<script>
+@{
+   
+    var allOrdersForDetails = Model.Select(o => {
+        var request = requests.FirstOrDefault(r => r.OrderId == o.OrderId);
+        var displayReturnReason = request != null
+        ? request.RequestIssueType.ToString()
+        : "";
+        var rSep = displayReturnReason.IndexOf("||");
+        if (rSep >= 0) displayReturnReason = displayReturnReason[..rSep];
+        displayReturnReason = displayReturnReason.Trim();
+        if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]")) displayReturnReason = displayReturnReason[1..^1].Trim();
+        return new {
+            orderId         = o.OrderId,
+            orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
+            status          = o.CurrentStatus.ToString(),
+            paymentMethod   = o.PaymentMethod,
+            totalAmount     = o.TotalAmount.ToString("F2"),
+            customerMessage = o.CustomerMessage ?? "",
+            cancelReason    = o.CancelReason ?? "",
+            returnReason    = displayReturnReason,
+            returnType = request?.RequestServiceType.ToString() ?? "",
+            customerEmail   = o.Customer != null ? o.Customer.Email : "—",
+            customerPhone   = o.Customer != null ? o.Customer.PhoneNumber : "—",
+            customerName    = o.Customer != null ? o.Customer.FullName : "",
+            deliveryName    = o.DeliveryRecipientName,
+            deliveryPhone   = o.DeliveryPhoneNumber,
+            deliveryLine1   = o.DeliveryAddressLine1,
+            deliveryLine2   = o.DeliveryAddressLine2 ?? "",
+            deliveryCity    = o.DeliveryCity,
+            deliveryPostcode= o.DeliveryPostcode,
+            deliveryState   = o.DeliveryState,
+            items = (o.OrderItems ?? Enumerable.Empty<OrderItem>()).Select(oi => new {
+                productName       = oi.Product != null ? oi.Product.Name : $"Product #{oi.ProductId}",
+                sku               = oi.Product != null ? oi.Product.SKU : "—",
+                selectedVariation = oi.SelectedVariation ?? "",
+                quantity          = oi.Quantity,
+                unitPrice         = oi.Price.ToString("F2"),
+                subtotal          = (oi.Price * oi.Quantity).ToString("F2"),
+                imagePath         = oi.Product != null ? oi.Product.ImagePath : "/images/placeholder.png"
+            }).ToList()
+        };
+    }).ToList();
+}
+    const _allOrderDetails = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+    allOrdersForDetails,
+    new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+));
+
+    const statusLabels = {
+        'PENDING':       { label: 'PENDING',        color: '#92400e', bg: '#fef3c7' },
+        'PREPARING':     { label: 'PREPARING',       color: '#1e40af', bg: '#dbeafe' },
+        'SHIPPED':       { label: 'SHIPPED',         color: '#065f46', bg: '#d1fae5' },
+        'DELIVERED':     { label: 'DELIVERED',       color: '#3730a3', bg: '#e0e7ff' },
+        'RECEIVED':      { label: 'RECEIVED',        color: '#166534', bg: '#dcfce7' },
+        'CANCELED':      { label: 'CANCELED',        color: '#991b1b', bg: '#fee2e2' },
+        'RETURN_REFUND': { label: 'RETURN / REFUND', color: '#c2410c', bg: '#fff7ed' },
+    };
+
+    function parseVariation(json) {
+        if (!json || json === '{}' || json === '[]' || json === '') return '';
+        try {
+            const obj = typeof json === 'string' ? JSON.parse(json) : json;
+            return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(' · ');
+        } catch { return ''; }
+    }
+
+    async function openOrderDetails(orderId) {
+        const o = _allOrderDetails.find(x => x.orderId === orderId);
+        if (!o) return;
+
+        const st = statusLabels[o.status] || { label: o.status, color: '#555', bg: '#f5f5f5' };
+
+        document.getElementById('od-title').textContent  = `Order #${o.orderId}`;
+        document.getElementById('od-time').textContent   = o.orderTime;
+        document.getElementById('od-status').textContent = st.label;
+        document.getElementById('od-status').style.background = st.bg;
+        document.getElementById('od-status').style.color      = st.color;
+
+        document.getElementById('od-cust-name').textContent  = o.customerName?.trim() || '—';
+        document.getElementById('od-cust-email').textContent = o.customerEmail;
+        document.getElementById('od-cust-phone').textContent = o.customerPhone;
+
+        document.getElementById('od-del-name').textContent  = o.deliveryName || '—';
+        document.getElementById('od-del-phone').textContent = o.deliveryPhone || '—';
+        const addrParts = [o.deliveryLine1, o.deliveryLine2, o.deliveryCity, o.deliveryPostcode, o.deliveryState].filter(Boolean).join(', ');
+        document.getElementById('od-del-addr').textContent = addrParts || '—';
+
+        let itemHtml = '';
+        o.items.forEach(item => {
+            const varLine = parseVariation(item.selectedVariation);
+            itemHtml += `
+            <div class="od-item-row">
+                <div class="od-item-img-wrap"><img src="${item.imagePath}" alt="${item.productName}" class="od-item-img" onerror="this.src='/images/placeholder.png'" /></div><div style="width:60px;height:60px;min-width:60px;border-radius:10px;overflow:hidden;background:#f5f5fb;border:1px solid #ebebf8;flex-shrink:0;"><img src="${item.imagePath}" alt="${item.productName}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.src='/images/placeholder.png'" /></div>
+                <div class="od-item-info">
+                    <div class="od-item-name">${item.productName}</div>
+                    <div class="od-item-meta">
+                        <span class="od-meta-chip"><i class="fas fa-barcode"></i> ${item.sku}</span>
+                        ${varLine ? `<span class="od-meta-chip"><i class="fas fa-tag"></i> ${varLine}</span>` : ''}
+                    </div>
+                </div>
+                <div class="od-item-pricing">
+                    <div class="od-item-qty">× ${item.quantity}</div>
+                    <div class="od-item-unit">RM ${item.unitPrice} each</div>
+                    <div class="od-item-subtotal">RM ${item.subtotal}</div>
+                </div>
+            </div>`;
+        });
+        document.getElementById('od-items-wrap').innerHTML = itemHtml || '<p style="color:#aaa;font-size:13px">No items found.</p>';
+
+        document.getElementById('od-total').textContent   = `RM ${o.totalAmount}`;
+        document.getElementById('od-payment').textContent = o.paymentMethod;
+
+        const notesEl = document.getElementById('od-notes-section');
+
+        // ── After-sale / Return statuses: fetch full request details ──────────
+        const isAfterSale = o.status === 'AFTER_SALES_REQUESTED' || o.status === 'RETURN_REFUND';
+        if (isAfterSale) {
+            notesEl.style.display = 'flex';
+            notesEl.innerHTML = `
+                <div class="od-section-label">Notes &amp; Remarks</div>
+                <div style="text-align:center;padding:24px 0;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:22px;color:#9a98b6;"></i>
+                </div>`;
+
+            document.getElementById('od-backdrop').classList.add('active');
+            document.getElementById('od-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const res    = await fetch(`/Request/GetRequest?orderId=${orderId}`);
+                const result = await res.json();
+
+                if (!result.success) {
+                    _renderSimpleNotes(notesEl, o);
+                    // modal already opened above, just return
+                    return;
+                }
+
+                let totalRefund = 0;
+                const itemsHtml = result.orderItems.map(item => {
+                    const unitPrice = parseFloat(item.discountedPrice ?? item.price);
+                    const reqQty    = item.requestedQty ?? item.quantity;
+                    const varLine   = parseVariation(item.selectedVariation);
+                    totalRefund    += unitPrice * reqQty;
+                    return `
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #ebebf5;">
+                        <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
+                            ${item.imageUrl
+                                ? `<img src="${item.imageUrl}" style="width:100%;height:100%;object-fit:cover;">`
+                                : `<i class="fas fa-box" style="font-size:18px;color:#9a98b6;"></i>`}
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#1e1b4b;">${item.productName}</p>
+                            ${varLine ? `<p style="margin:0 0 2px;font-size:11px;color:#6366f1;"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</p>` : ''}
+                            <p style="margin:0;font-size:11px;color:#9a98b6;">
+                                Qty ordered: <strong style="color:#6b6b8a;">${item.quantity}</strong>
+                                &nbsp;·&nbsp;
+                                Requested: <strong style="color:#f97316;">${reqQty}</strong>
+                                &nbsp;·&nbsp;
+                                RM ${unitPrice.toFixed(2)} / unit
+                            </p>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                const imagesHtml = result.images?.length
+                    ? result.images.map(url => `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
+                    : '<span style="font-size:13px;color:#9a98b6;">No photos attached</span>';
+
+                const approvalBlock = result.approvedAt ? `
+                <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #bbf7d0;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
+                    </div>
+                    <i class="fas fa-check-circle" style="font-size:20px;color:#22c55e;"></i>
+                </div>` : `
+                <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fde68a;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#92400e;">Pending — awaiting customer service</p>
+                    </div>
+                    <i class="fas fa-hourglass-half" style="font-size:20px;color:#f59e0b;"></i>
+                </div>`;
+
+                if (result.approvedAt) {
+                    const stEl = document.getElementById('od-status');
+                    if (stEl) {
+                        stEl.textContent = 'Return / Refund Approved';
+                        stEl.style.background = '#dcfce7';
+                        stEl.style.color = '#15803d';
+                    }
+                }
+
+                notesEl.innerHTML = `
+                <div class="od-section-label">Notes &amp; Remarks</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                    <i class="fas fa-exchange-alt" style="color:#f97316;font-size:13px;"></i>
+                    <span style="font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.05em;">Return type</span>
+                    <span style="font-size:13px;font-weight:600;color:#1e1b4b;">${result.serviceType ?? '—'}</span>
+                </div>
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request Submitted</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.createdAt}</p>
+                    </div>
+                    <i class="fas fa-clock" style="font-size:20px;color:#9a98b6;"></i>
+                </div>
+                ${approvalBlock}
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order Items</p>
+                    ${itemsHtml}
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;margin-top:4px;border-top:1.5px solid #e8eaf6;">
+                        <p style="margin:0;font-size:12px;font-weight:700;color:#6b6b8a;text-transform:uppercase;letter-spacing:0.05em;">Total Refund Amount</p>
+                        <p style="margin:0;font-size:16px;font-weight:800;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Requested Amount</p>
+                        <p style="margin:0;font-size:13px;font-weight:600;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+                    </div>
+                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.issueType ?? '—'}</p>
+                    </div>
+                </div>
+                ${result.description ? `
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;margin-bottom:8px;">
+                    <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
+                    <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.5;">${result.description}</p>
+                </div>` : ''}
+                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Photos</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">${imagesHtml}</div>
+                </div>`;
+
+            } catch (err) {
+                console.error('Failed to load request details:', err);
+                _renderSimpleNotes(notesEl, o);
+            }
+
+            return;
+        }
+
+        // ── Normal notes (customer message, cancel reason, legacy return) ─────
+        _renderSimpleNotes(notesEl, o);
+
+        document.getElementById('od-backdrop').classList.add('active');
+        document.getElementById('od-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function _renderSimpleNotes(notesEl, o) {
+        const noteLines = [];
+        if (o.customerMessage) noteLines.push({ icon: 'fa-comment-dots', label: 'Customer note', val: o.customerMessage });
+        if (o.cancelReason)    noteLines.push({ icon: 'fa-times-circle',  label: 'Cancel reason',   val: o.cancelReason });
+        if (o.returnReason)    noteLines.push({ icon: 'fa-undo',          label: 'Return reason',   val: o.returnReason });
+        if (o.returnType)      noteLines.push({ icon: 'fa-exchange-alt',  label: 'Return type',     val: o.returnType.replace(/([A-Z])/g, ' $1').trim() });
+
+        if (noteLines.length) {
+            let noteHtml = noteLines.map(n => `<div class="od-note-row"><i class="fas ${n.icon} od-note-icon"></i><div><div class="od-note-label">${n.label}</div><div class="od-note-val">${n.val}</div></div></div>`).join('');
+            notesEl.innerHTML = `<div class="od-section-label">Notes &amp; Remarks</div>${noteHtml}`;
+            notesEl.style.display = 'flex';
+        } else {
+            notesEl.style.display = 'none';
+        }
+    }
+
+    function closeOrderDetails() {
+        document.getElementById('od-backdrop').classList.remove('active');
+        document.getElementById('od-modal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeOrderDetails();
+    });
+</script>
+}

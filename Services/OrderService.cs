@@ -443,7 +443,6 @@ namespace EcommerceSystem.Services
                 .OrderByDescending(o => o.OrderTime)
                 .ToListAsync();
 
-            // review submitted calculation (previous controller logic moved here)
             var orderItemIds = orders.SelectMany(o => o.OrderItems).Select(oi => oi.OrderItemId).ToList();
 
             if (orderItemIds.Count > 0)
@@ -455,19 +454,36 @@ namespace EcommerceSystem.Services
                 var reviewedSet = reviews.Select(r => r.OrderItemId).ToHashSet();
                 var reviewMap   = reviews.ToDictionary(r => r.OrderItemId);
 
+                bool anyChanged = false;
+
                 foreach (var o in orders)
                 {
-                    o.ReviewSubmitted = o.OrderItems.Count > 0
-                        && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
+                    //Console.WriteLine($"[DEBUG] Order {o.OrderId} ReviewSubmitted={o.ReviewSubmitted}"); //debug
+                    // Only calculate if not already permanently marked as submitted
+                    if (!o.ReviewSubmitted)
+                    {
+                        var justSubmitted = o.OrderItems.Count > 0
+                            && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
+
+                        if (justSubmitted)
+                        {
+                            o.ReviewSubmitted = true;
+                            _context.Order.Update(o);
+                            anyChanged = true;
+                        }
+                    }
 
                     foreach (var oi in o.OrderItems)
                         oi.Review = reviewMap.GetValueOrDefault(oi.OrderItemId);
                 }
+
+                // Persist ReviewSubmitted = true for any newly reviewed orders
+                if (anyChanged)
+                    await _context.SaveChangesAsync();
             }
 
             return orders;
         }
-
         public async Task<OperationResult> CancelOrderAsync(int customerId, int orderId, string reason)
         {
             if (string.IsNullOrWhiteSpace(reason))

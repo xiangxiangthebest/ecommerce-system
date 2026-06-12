@@ -284,3 +284,394 @@
 .summary-card.highlight .s-value { 
     color: #4e4af2;
 }
+
+/* ==========================================================================
+   ── Order Detail Modal (Fixed Layout matching Image 4) ──
+   ========================================================================== */
+
+/* Backdrop Overlay */
+.od-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9998;
+}
+.od-backdrop.active {
+    display: block !important;
+}
+
+/* Main Modal Container */
+.od-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 18px;
+    width: min(660px, 96vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    z-index: 9999;
+    box-shadow: 0 12px 50px rgba(0, 0, 0, 0.22);
+    font-family: system-ui, -apple-system, sans-serif;
+}
+.od-modal.active {
+    display: block !important;
+}
+
+/* Modal Header Area */
+.od-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid #f0f0f8;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+}
+
+.od-modal-header-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #1e1b4b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.od-modal-header-icon i {
+    color: #fff;
+    font-size: 16px;
+}
+
+.od-modal-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.od-modal-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e1b4b;
+}
+
+.od-modal-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.od-modal-time {
+    font-size: 12px;
+    color: #9a98b6;
+}
+
+.od-modal-status {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.od-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: #9a98b6;
+    line-height: 1;
+    padding: 4px;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.od-modal-close:hover {
+    color: #1e1b4b;
+}
+
+/* Modal Scrollable Body Content */
+.od-modal-body {
+    padding: 20px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Group Subsections */
+.od-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.od-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9a98b6;
+    margin-bottom: 4px;
+}
+
+/* Metadata Flexible Grids */
+.od-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+.od-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #f8f8ff;
+    border-radius: 10px;
+    padding: 11px 13px;
+}
+.od-info-item--full {
+    grid-column: 1 / -1;
+}
+
+.od-info-icon {
+    color: #9a98b6;
+    font-size: 14px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.od-info-sub {
+    font-size: 11px;
+    color: #9a98b6;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.od-info-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e1b4b;
+    word-break: break-word;
+}
+
+/* Ordered Item Lists */
+.od-items-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+.od-item-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f8;
+    width: 100%;
+}
+.od-item-row:last-child {
+    border-bottom: none;
+}
+
+/* Fix: Hard containment rules to force ANY image size down to the 60px box */
+.od-item-img-wrap {
+    width: 60px !important;
+    height: 60px !important;
+    max-width: 60px !important;
+    max-height: 60px !important;
+    border-radius: 10px !important;
+    overflow: hidden !important; /* Forces the huge flowchart to clip and cut off outside the borders */
+    background: #f5f5fb !important;
+    flex-shrink: 0 !important;
+    border: 1px solid #ebebf8 !important;
+    display: block !important;
+}
+
+.od-item-img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important; /* Compresses the massive diagram file to scale inside the tiny 60px viewport */
+    display: block !important;
+}
+
+.od-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.od-item-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1e1b4b;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.od-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.od-meta-chip {
+    font-size: 11px;
+    color: #6b6b8a;
+    background: #f0f0f8;
+    border-radius: 5px;
+    padding: 2px 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.od-item-pricing {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.od-item-qty {
+    font-size: 13px;
+    color: #9a98b6;
+    font-weight: 500;
+}
+
+.od-item-unit {
+    font-size: 11.5px;
+    color: #9a98b6;
+}
+
+.od-item-subtotal {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e1b4b;
+    margin-top: 2px;
+}
+
+/* Total Billing Status Ribbon */
+.od-payment-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: #f8f8ff;
+    border-radius: 12px;
+    border: 1px solid #ebebf8;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.od-payment-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.od-payment-icon {
+    color: #9a98b6;
+    font-size: 15px;
+}
+
+.od-payment-sub {
+    font-size: 11px;
+    color: #9a98b6;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.od-payment-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e1b4b;
+}
+
+.od-total-right {
+    text-align: right;
+}
+
+.od-total-sub {
+    font-size: 11px;
+    color: #9a98b6;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.od-total-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1e1b4b;
+}
+
+/* Return Request Dynamic Detail Block */
+.od-notes-section {
+    display: none;
+    background: #fffbf0;
+    border: 1px solid #ffe082;
+    border-radius: 12px;
+    padding: 14px 18px;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.od-note-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.od-note-icon {
+    color: #f9a825;
+    font-size: 14px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.od-note-label {
+    font-size: 11px;
+    color: #9a98b6;
+    font-weight: 500;
+    margin-bottom: 1px;
+}
+
+.od-note-val {
+    font-size: 13px;
+    color: #5d4037;
+    font-weight: 500;
+}
+
+/* View-details button */
+.btn-view-details {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 7px;
+    border: 1.5px solid #c5cae9;
+    background: #fff;
+    color: #1e1b4b;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.btn-view-details:hover {
+    background: #e8eaf6;
+    border-color: #9fa8da;
+}

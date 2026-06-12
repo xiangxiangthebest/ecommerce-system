@@ -1503,52 +1503,6 @@
     });
     </script>
 
-    <script>
-document.addEventListener("DOMContentLoaded", function () {
-    // 1. 💡 捕获网址中的 ?tab=Order&search=xxx 参数
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    const searchParam = urlParams.get('search');
-
-    // 2. 如果明确指定了要跳到 Order 标签页
-    if (tabParam === 'Order') {
-        // 先确保切换到订单对应的 Tab 面板上
-        // 假设你们切换 Tab 的按钮类名叫 .nav-link 或者有特殊的 id
-        const orderTabBtn = document.querySelector('[data-bs-target="#Order"]') || document.querySelector('#order-tab');
-        if (orderTabBtn) {
-            orderTabBtn.click(); // 仿真点击，切过去
-        }
-    }
-
-    // 3. 🔥【核心新增】：如果网址里带了订单号参数，自动联动搜索
-    if (searchParam) {
-        // 查找商家管理页面上【订单专用的搜索框】（请把下面的 'orderSearchInput' 换成你页面真实的 Input ID）
-        const orderSearchInput = document.getElementById('orderSearchInput') 
-                              || document.querySelector('input[placeholder*="订单"]') 
-                              || document.querySelector('input[placeholder*="Order"]');
-                              
-        if (orderSearchInput) {
-            // A. 自动填入单号
-            orderSearchInput.value = searchParam.trim();
-            
-            // B. 💡 主动触发搜索：为了让列表立刻刷新，必须让搜索框触发 input 或 change 事件，或者模拟点击搜索按钮
-            orderSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
-            orderSearchInput.dispatchEvent(new Event('change', { bubbles: true }));
-            
-            // C. 兜底方案：如果你们页面有一个专门的“搜索”或者“筛选”按钮，模拟点击它
-            const searchBtn = orderSearchInput.closest('form')?.querySelector('button[type="submit"]')
-                           || document.getElementById('orderSearchBtn');
-            if (searchBtn) {
-                searchBtn.click();
-            } else {
-                // 如果是纯前端 JS 过滤，则直接调用你们原本的过滤函数
-                // 例如：if (typeof filterOrders === 'function') { filterOrders(); }
-            }
-        }
-    }
-});
-</script>
-
     <!-- Approve Return Modal -->
     <div id="approveReturnBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000" onclick="closeApproveReturnModal()" class="approve-return-backdrop"></div>
     <div id="approveReturnModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)" class="approve-return-modal">

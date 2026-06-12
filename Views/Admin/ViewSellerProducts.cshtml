@@ -84,14 +84,14 @@
             <table class="fancy-table table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Product Name</th>
-                        <th style="width: 12%;">SKU</th>
-                        <th style="width: 13%;">Category</th>
-                        <th style="width: 12%;">Price</th>
-                        <th style="width: 15%;">Stock</th>
-                        <th style="width: 13%;">Status</th>
-                        <th style="width: 10%;">Image</th>
-                        <th class="text-center" style="width: 10%;">Actions</th>
+                        <th style="width: 18%;">Product Name</th>
+                        <th style="width: 10%;">SKU</th>
+                        <th style="width: 10%;">Category</th>
+                        <th style="width: 10%;">Price</th>
+                        <th style="width: 12%;">Stock</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 18%;">Image</th>
+                        <th class="text-center" style="width: 22%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -159,9 +159,15 @@
                                 }
                             </td>
                             <td>
-                                <div class="d-flex justify-content-center">
+                                <div class="d-flex justify-content-center gap-1">
                                     <button type="button" class="btn btn-sm btn-details-trigger" data-bs-toggle="modal" data-bs-target="#productModal-@product.ProductId">
                                         <i class="fas fa-eye text-primary me-1"></i> Details
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-review-trigger"
+                                            data-product-id="@product.ProductId"
+                                            data-product-name="@product.Name"
+                                            data-bs-toggle="modal" data-bs-target="#reviewsModal">
+                                        <i class="fas fa-star text-warning me-1"></i> Reviews
                                     </button>
                                 </div>
                             </td>
@@ -172,6 +178,100 @@
         </div>
     }
 </div>
+
+@* ── Shared Reviews Modal (loaded via AJAX) ── *@
+<div class="modal fade" id="reviewsModal" tabindex="-1" aria-labelledby="reviewsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reviewsModalLabel">
+                    <i class="fas fa-star text-warning me-2"></i>
+                    <span id="reviewsModalProductName">Product Reviews</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="reviewsModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading reviews...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const antiforgeryToken = '@Html.AntiForgeryToken()'.match(/value="([^"]+)"/)?.[1] ?? '';
+    const reviewsModal = document.getElementById('reviewsModal');
+    const reviewsModalBody = document.getElementById('reviewsModalBody');
+    const reviewsModalProductName = document.getElementById('reviewsModalProductName');
+
+    let currentProductId = null;
+
+    function loadReviews(productId) {
+        currentProductId = productId;
+        reviewsModalBody.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading reviews...</p>
+            </div>`;
+
+        fetch('/Admin/GetProductReviews?productId=' + productId)
+            .then(function (response) {
+                if (!response.ok) throw new Error('Network error: ' + response.status);
+                return response.text();
+            })
+            .then(function (html) {
+                reviewsModalBody.innerHTML = html;
+                reviewsModalBody.querySelectorAll('.btn-delete-review').forEach(function (delBtn) {
+                    delBtn.addEventListener('click', function () {
+                        if (!confirm('Are you sure you want to permanently delete this review?')) return;
+                        const reviewId = delBtn.getAttribute('data-review-id');
+                        fetch('/Admin/DeleteReview', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'RequestVerificationToken': antiforgeryToken },
+                            body: 'id=' + reviewId + '&__RequestVerificationToken=' + encodeURIComponent(antiforgeryToken)
+                        })
+                        .then(r => r.json())
+                        .then(result => {
+                            if (result.success) {
+                                loadReviews(currentProductId);
+                            } else {
+                                alert('Failed to delete review: ' + result.message);
+                            }
+                        })
+                        .catch(() => alert('An error occurred while deleting the review.'));
+                    });
+                });
+            })
+            .catch(function (err) {
+                reviewsModalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load reviews. Please try again.
+                    </div>`;
+            });
+    }
+
+    const reviewButtons = document.querySelectorAll('.btn-review-trigger');
+    reviewButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const productId = btn.getAttribute('data-product-id');
+            const productName = btn.getAttribute('data-product-name');
+            reviewsModalProductName.textContent = productName + ' — Reviews';
+            loadReviews(productId);
+        });
+    });
+});
+</script>
 
 @if (Model != null)
 {

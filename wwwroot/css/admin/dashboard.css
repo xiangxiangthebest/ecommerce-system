@@ -117,9 +117,7 @@
 
 /* Notification wrapper (header) */
 .notif-wrapper {
-    position: absolute;
-    top: 20px;
-    right: 20px;
+    position: relative;
     z-index: 9999;
 }
 
@@ -494,10 +492,7 @@
     }
 }
 
-.notif-wrapper {
-    position: relative;
-    display: inline-block;
-}
+/* (notif-wrapper defined above) */
 
 .notif-bell {
     background: none;

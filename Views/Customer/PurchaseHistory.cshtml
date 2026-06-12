@@ -1,4 +1,3 @@
-@* @model List<EcommerceSystem.Models.Order> *@
 @using EcommerceSystem.Interfaces;
 @using EcommerceSystem.Models
 @using EcommerceSystem.Enums
@@ -253,16 +252,19 @@
         <div id="phOrderList">
             @foreach (var order in Model.Orders)
             {   
-                var request = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                var statusKey     = order.CurrentStatus.ToString().ToUpper();
+                @* var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId); *@
+                var request = Model.RequestMap.GetValueOrDefault(order.OrderId);
+                var statusKey = request?.Status ?? "NONE";
+                var isSolved = request?.SolvedAt.HasValue == true;
+
                 var sellerName    = order.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop";
                 var sellerInitial = sellerName.Length > 0 ? sellerName[0].ToString().ToUpper() : "S";
                 var itemCount     = order.OrderItems.Count;
                 var searchHint    = order.OrderId + " " + string.Join(" ", order.OrderItems.Select(i => i.Product?.Name ?? ""));
                 <div class="ph-card"
-                     data-order-id="@order.OrderId"
-                     data-status="@statusKey"
-                     data-search="@searchHint.ToLowerInvariant()">
+                    data-order-id="@order.OrderId"
+                    data-status="@statusKey"
+                    data-search="@searchHint.ToLowerInvariant()">
 
                     <div class="ph-card-bar">
                         <div class="ph-card-bar-left">
@@ -273,15 +275,20 @@
                             </span>
                         </div>
                         @{
-                            var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                            var pillApproved = (statusKey == "RETURN_REFUND")
-                                            && requestForPill != null && requestForPill.SolvedAt.HasValue;
-                            var pillApprovedRefund = (statusKey == "REFUND")
-                                            && requestForPill != null && requestForPill.SolvedAt.HasValue;
-                            var pillRejected = request.Status.ToString() == "Rejected";
-                            var pillClass = pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
-                                          : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
-                                          : "ph-s-" + statusKey;
+                            @* var requestForPill = Model.Requests?
+                                .FirstOrDefault(r => r.OrderId == order.OrderId); *@
+
+                            @* var isSolved = requestForPill?.SolvedAt.HasValue == true; *@
+
+                            var pillApproved = statusKey == "RETURN_REFUND" && isSolved;
+                            var pillApprovedRefund = statusKey == "REFUND" && isSolved;
+
+                            var pillRejected = request?.Status == "Rejected";
+
+                            var pillClass =
+                                pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
+                                : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
+                                : "ph-s-" + statusKey;
                         }
                         <span class="ph-status-pill @pillClass">
                             <span class="ph-status-dot"></span>
@@ -668,8 +675,12 @@
         </div>
 
         <div id="phNoResults" class="ph-no-results" style="display:none">
-            <i class="ti ti-search-off"></i>
-            <p>No orders match your search.</p>
+            <div class="ph-no-results-icon"><i class="ti ti-search-off"></i></div>
+            <p class="ph-no-results-title">No orders found</p>
+            <p class="ph-no-results-sub">No orders match your search or filter. Try a different keyword or clear the search.</p>
+            <button class="ph-no-results-clear" onclick="clearSearch()">
+                <i class="ti ti-x"></i> Clear search
+            </button>
         </div>
     }
 
@@ -855,7 +866,6 @@
     <img id="rtnLightboxImg" src="" alt="Preview" onclick="event.stopPropagation()" />
 </div>
 
-<!-- ✅ Keep the anti-forgery token in DOM so JS can read it -->
 <form id="phAntiForgeryForm" style="display:none">
     @Html.AntiForgeryToken()
 </form>

@@ -1,6 +1,5 @@
 @model List<EcommerceSystem.Models.Notification>
 @{
-    ViewData["Title"] = "Notifications";
     var unreadCount = Model?.Count(n => !n.IsRead) ?? 0;
     var totalCount = Model?.Count ?? 0;
 }
