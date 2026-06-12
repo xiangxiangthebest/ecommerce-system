@@ -28,7 +28,9 @@ public class Request
     public DateTime? ApprovedAt { get; set; }
     public string Description { get; set; } = string.Empty;
     public List<RequestImage> Images { get; set; } = new();
-    public string? ReviewedBy { get; set; }
+    // public string? ReviewedBy { get; set; }
+    public CustomerService? ReviewByCS { get; set; }
+    public int? ReviewByCsId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     private IRequestStrategy? _strategy;
     public void SetRequestStrategy(IRequestStrategy strategy)

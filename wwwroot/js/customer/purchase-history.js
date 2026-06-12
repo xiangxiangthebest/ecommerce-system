@@ -197,8 +197,18 @@ function openDrawer(orderId) {
     document.getElementById('odDate').textContent  = order.orderTime;
 
     const badge = document.getElementById('odBadge');
-    badge.className = `ph-status-pill ph-s-${order.status}`;
-    document.getElementById('odBadgeLabel').textContent = order.statusLabel;
+    const isReturnStatus = order.status === 'RETURN_REFUND' || order.status === 'AFTER_SALES_REQUESTED';
+    const isApproved     = isReturnStatus && order.returnApproved;
+    const isRejected     = isReturnStatus && !isApproved && order.returnStatus === 'Rejected';
+    badge.className = `ph-status-pill ${
+        isApproved ? 'ph-s-RETURN_REFUND_APPROVED' :
+        isRejected ? 'ph-s-RETURN_REFUND_REJECTED' :
+        'ph-s-' + order.status
+    }`;
+    document.getElementById('odBadgeLabel').textContent =
+        isApproved ? 'Return/Refund Approved' :
+        isRejected ? 'Return/Refund Rejected' :
+        order.statusLabel;
 
     document.getElementById('odDrawerBody').innerHTML = buildDrawerHTML(order);
     document.getElementById('odBackdrop').classList.add('active');
@@ -552,10 +562,12 @@ function openReturnModal(orderId) {
     currentReturnOrderId = orderId;
 
     _rtnOrderItems  = order.items.map(it => ({
-        orderItemId: it.orderItemId,
-        name:        it.name,
-        image:       it.image,
-        qty:         it.qty,
+        orderItemId:       it.orderItemId,
+        name:              it.name,
+        image:             it.image,
+        qty:               it.qty,
+        selectedVariation: it.selectedVariation || '',
+        sku:               it.sku || '',
     }));
     _rtnFiles          = [];
     _rtnSelectedType   = '';
@@ -570,6 +582,15 @@ function openReturnModal(orderId) {
     rtnRenderItemList();
     rtnRenderPreviews();
     showModal('returnBackdrop', 'returnModal');
+}
+
+/* ── Variation JSON → readable line (shared by request modals) ─────── */
+function parseVariation(json) {
+    if (!json || json === '{}' || json === '[]' || json === '') return '';
+    try {
+        const obj = typeof json === 'string' ? JSON.parse(json) : json;
+        return Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(' · ');
+    } catch { return ''; }
 }
 
 async function openRequestModal(orderId) {
@@ -587,13 +608,13 @@ async function openRequestModal(orderId) {
         return;
     }
 
-    // Build per-item rows and accumulate total refund amount
     let totalRefund = 0;
     const itemsHtml = result.orderItems.map(item => {
         const unitPrice  = parseFloat(item.discountedPrice ?? item.price);
         const reqQty     = item.requestedQty ?? item.quantity;
         const lineTotal  = unitPrice * reqQty;
         totalRefund     += lineTotal;
+        const varLine    = parseVariation(item.selectedVariation);
         return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid #ebebf5;">
             <div style="width:44px;height:44px;border-radius:8px;overflow:hidden;flex-shrink:0;background:#f0f0f8;display:flex;align-items:center;justify-content:center;">
@@ -603,6 +624,7 @@ async function openRequestModal(orderId) {
             </div>
             <div style="flex:1;min-width:0;">
                 <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#1e1b4b;">${item.productName}</p>
+                ${varLine ? `<p style="margin:0 0 2px;font-size:11px;color:#6366f1;"><i class="ti ti-tag" style="margin-right:3px"></i>${varLine}</p>` : ''}
                 <p style="margin:0;font-size:11px;color:#9a98b6;">
                     Qty ordered: <strong style="color:#6b6b8a;">${item.quantity}</strong>
                     &nbsp;·&nbsp;
@@ -702,6 +724,8 @@ function rtnRenderItemList() {
                      onerror="this.src='/images/placeholder.png'" />
                 <div class="rtn-item-info">
                     <div class="rtn-item-name">${esc(item.name)}</div>
+                    ${item.selectedVariation ? `<div class="rtn-item-variation"><i class="ti ti-tag"></i> ${esc(item.selectedVariation)}</div>` : ''}
+                    ${item.sku ? `<div class="rtn-item-sku"><i class="ti ti-barcode"></i> ${esc(item.sku)}</div>` : ''}
                     <div class="rtn-item-ordered">Qty ordered: ${item.qty}</div>
                 </div>
             </label>
@@ -827,6 +851,10 @@ async function submitReturn() {
         formData.append('images', file);
     });
 
+    // Anti-forgery token required by [ValidateAntiForgeryToken]
+    const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+    if (csrfToken) formData.append('__RequestVerificationToken', csrfToken);
+
     const btn = document.querySelector('#returnModal .ph-btn-return');
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Submitting...';
@@ -890,7 +918,11 @@ function openRatingModal(orderId) {
 
             <div class="ph-rating-item-top">
                 <img src="${esc(item.image)}" onerror="this.src='/images/placeholder.png'" />
-                <span>${esc(item.name)}</span>
+                <div class="ph-rating-item-meta">
+                    <span class="ph-rating-item-name">${esc(item.name)}</span>
+                    ${item.selectedVariation ? `<span class="ph-rating-item-var"><i class="ti ti-tag"></i> ${esc(item.selectedVariation)}</span>` : ''}
+                    ${item.sku ? `<span class="ph-rating-item-sku"><i class="ti ti-barcode"></i> ${esc(item.sku)}</span>` : ''}
+                </div>
             </div>
 
             <div class="ph-star-picker" data-selected="0">

@@ -5,163 +5,83 @@ using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
 using EcommerceSystem.Interfaces;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace EcommerceSystem.Controllers
 {
-    // Customer Service handles ALL after-sales requests (Return / Refund).
-    //
-    // ── ROUTING ──────────────────────────────────────────────────────────────
-    // When a customer raises an after-sales request the order goes to
-    // OrderStatus.RETURN_REFUND and a Request row is created in _context.Request.
-    // ALL RequestIssueTypes are routed to Customer Service for approval.
     [Authorize(Roles = "CustomerService")]
     public class CustomerServiceController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly ICustomerServiceContext _customerServiceContext;
         private readonly INotificationService _notificationService;
 
-        public CustomerServiceController(AppDbContext context, INotificationService notificationService)
+        public CustomerServiceController(
+            AppDbContext context,
+            INotificationService notificationService,
+            ICustomerServiceContext customerServiceContext)
         {
             _context = context;
             _notificationService = notificationService;
+            _customerServiceContext = customerServiceContext;
         }
 
         private int GetCurrentUserId()
             => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
-        // ALL issue types route to Customer Service.
-        // ALL issue types route to Customer Service.
-        private static readonly EcommerceSystem.Enums.RequestIssueType[] CsIssueTypes =
-        {
-            EcommerceSystem.Enums.RequestIssueType.WrongItemReceived,
-            EcommerceSystem.Enums.RequestIssueType.ChangeOfMind,
-            EcommerceSystem.Enums.RequestIssueType.ItemNotAsDescribed,
-            EcommerceSystem.Enums.RequestIssueType.ItemNotDelivered,
-            EcommerceSystem.Enums.RequestIssueType.DamagedDefective,
-            EcommerceSystem.Enums.RequestIssueType.MissingPartsAccessories,
-            EcommerceSystem.Enums.RequestIssueType.Other
-        };
+        private async Task LoadNavbarAsync()
+            {
+                var customer = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
+                if (customer == null) return;
 
-        // ─────────────────────────────────────────────────────────────────────
-        // HOME — list the after-sales requests routed to Customer Service.
-        // Pending ones are AFTER_SALES_REQUESTED; once approved we flip them to
-        // RETURN_REFUND (see ApproveReturn) so they still show under "Approved".
-        // ─────────────────────────────────────────────────────────────────────
+                var notifications = await _notificationService.GetForUserAsync(customer.UserId);
+                ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
+            }
+
         public async Task<IActionResult> Home()
         {
-            var currentUserId = GetCurrentUserId();
+            await LoadNavbarAsync();
 
-            // Notification bell unread count
-            var notifications = await _notificationService.GetForUserAsync(currentUserId);
-            ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
-
-            // After-sales requests that belong to Customer Service (filter in
-            // memory to avoid enum-array translation issues on the DB provider).
-            var allRequests = await _context.Request
-                .Where(r => r.OrderId != null)
+            var requests = await _context.Request
+                .Include(r => r.RequestUser)
                 .ToListAsync();
 
-            var csRequests = allRequests
-                .Where(r => CsIssueTypes.Contains(r.RequestIssueType))
-                .ToList();
-
-            var csOrderIds = csRequests.Select(r => r.OrderId!.Value).Distinct().ToList();
-
-            var orders = await _context.Order
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
-                .Where(o => csOrderIds.Contains(o.OrderId)
-                         && (o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED   // pending
-                          || o.CurrentStatus == OrderStatus.RETURN_REFUND           // approved (flipped)
-                          || o.CurrentStatus == OrderStatus.REFUND))
-                .OrderByDescending(o => o.ReturnInitiatedAt ?? o.OrderTime)
-                .ToListAsync();
-
-            var shownOrderIds = orders.Select(o => o.OrderId).ToHashSet();
-            ViewBag.Orders = orders;
-
-            // Per-order display labels built here so the view never has to
-            // reference the AfterSalesRequest entity type directly.
-            var issueLabel   = new Dictionary<int, string>();
-            var serviceLabel = new Dictionary<int, string>();   // "Return & Refund" / "Refund Only"
-            var serviceToken = new Dictionary<int, string>();   // "ReturnRefund"    / "RefundOnly"
-
-            foreach (var r in csRequests)
+            ViewBag.RequestIssueType = Enum.GetValues(typeof(EcommerceSystem.Enums.RequestIssueType))
+            .Cast<EcommerceSystem.Enums.RequestIssueType>()
+            .Select(e => new SelectListItem
             {
-                var oid = r.OrderId!.Value;
-                if (!shownOrderIds.Contains(oid) || issueLabel.ContainsKey(oid)) continue;
+                Value = e.ToString(),
+                Text = e.ToString()
+            }).ToList();
 
-                issueLabel[oid] = r.RequestIssueType switch
-                {
-                    EcommerceSystem.Enums.RequestIssueType.WrongItemReceived       => "Wrong item received",
-                    EcommerceSystem.Enums.RequestIssueType.ChangeOfMind            => "Change of mind",
-                    EcommerceSystem.Enums.RequestIssueType.ItemNotAsDescribed      => "Item not as described",
-                    EcommerceSystem.Enums.RequestIssueType.ItemNotDelivered        => "Item not delivered",
-                    EcommerceSystem.Enums.RequestIssueType.DamagedDefective        => "Damaged / defective",
-                    EcommerceSystem.Enums.RequestIssueType.MissingPartsAccessories => "Missing parts / accessories",
-                    _                                                              => "Other"
-                };
-
-                bool isRR = r.RequestServiceType == EcommerceSystem.Enums.RequestServiceType.RETURN_REFUND;
-                serviceLabel[oid] = isRR ? "Return & Refund" : "Refund Only";
-                serviceToken[oid] = isRR ? "ReturnRefund"    : "RefundOnly";
-            }
-
-            // Per-order requested qty map: orderId -> { orderItemId -> requestedQty }
-            // Built by parsing RequestedItemsJson so the approve modal pre-fills
-            // exactly what the customer asked for instead of the full order qty.
-            var requestedQtyMap = new Dictionary<int, Dictionary<int, int>>();
-
-            foreach (var r2 in csRequests)
-            {
-                var oid2 = r2.OrderId!.Value;
-                if (!shownOrderIds.Contains(oid2) || requestedQtyMap.ContainsKey(oid2)) continue;
-
-                var itemQtyMap = new Dictionary<int, int>();
-                if (!string.IsNullOrWhiteSpace(r2.RequestedItemsJson))
-                {
-                    try
-                    {
-                        var selections = System.Text.Json.JsonSerializer
-                            .Deserialize<List<System.Text.Json.JsonElement>>(r2.RequestedItemsJson);
-                        if (selections != null)
-                            foreach (var s in selections)
-                                if (s.TryGetProperty("orderItemId", out var idEl)
-                                    && s.TryGetProperty("qty", out var qtyEl))
-                                    itemQtyMap[idEl.GetInt32()] = qtyEl.GetInt32();
-                    }
-                    catch { /* fallback: empty map → view falls back to full order qty */ }
-                }
-                requestedQtyMap[oid2] = itemQtyMap;
-            }
-
-            ViewBag.IssueLabel      = issueLabel;
-            ViewBag.ServiceLabel    = serviceLabel;
-            ViewBag.ServiceToken    = serviceToken;
-            ViewBag.RequestedQtyMap = requestedQtyMap;
-
-            return View();
+            return View(requests);
         }
 
-        // ─────────────────────────────────────────────────────────────────────
-        // APPROVE RETURN / REFUND  (Customer-Service side)
-        //
-        // Same money + stock logic the seller used to run, but it now works on
-        // the AFTER_SALES_REQUESTED status and reads the return type from the
-        // AfterSalesRequest row.
-        //
-        //   * Per-item refund uses the proportional voucher discount
-        //     (TotalAmount is the post-voucher merchandise total).
-        //   * Return & Refund -> stock is restored (goods came back).
-        //   * Refund Only     -> stock stays as-is (goods never returned).
-        //   * Sets ReturnStatus / ReturnApprovedAt / ApprovedRefundAmount /
-        //     ReturnType, then moves CurrentStatus to RETURN_REFUND.
-        //
-        // Moving to RETURN_REFUND is what keeps the SELLER's existing revenue
-        // calculation working unchanged.
-        // ─────────────────────────────────────────────────────────────────────
+        public async Task<IActionResult> Profile()
+        {
+            await LoadNavbarAsync();
+            var cs = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
+            if (cs == null) return NotFound();
+            return View(cs);
+        }
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateProfile(EcommerceSystem.Models.CustomerService model)
+        {
+            var cs = await _customerServiceContext.GetCurrentCustomerServiceAsync(User);
+
+            if (cs == null) return NotFound();
+            
+            cs.FullName = model.FullName;
+            cs.PhoneNumber = model.PhoneNumber;
+
+            await _context.SaveChangesAsync();
+
+            TempData["ProfileSuccess"] = "Profile updated successfully.";
+            return RedirectToAction("Profile");
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveReturn(int orderId,
@@ -231,7 +151,6 @@ namespace EcommerceSystem.Controllers
             if (request != null)
             {
                 request.ApprovedAt  = DateTime.UtcNow;
-                request.ReviewedBy  = "CustomerService";
             }
 
             await _context.SaveChangesAsync();
@@ -261,7 +180,7 @@ namespace EcommerceSystem.Controllers
                             userId:  customerId.Value,
                             title:   "Return & Refund Approved",
                             message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
-                                     $"has been approved by Customer Service. Total: RM{total:F2}"
+                                    $"has been approved by Customer Service. Total: RM{total:F2}"
                         );
                     }
 
@@ -271,7 +190,7 @@ namespace EcommerceSystem.Controllers
                             userId:  sellerId.Value,
                             title:   "Return & Refund Approved",
                             message: $"Customer Service approved a {returnTypeLabel} request for Order #{orderId} " +
-                                     $"from {customerName}. Refund total: RM{total:F2}"
+                                    $"from {customerName}. Refund total: RM{total:F2}"
                         );
                     }
 
@@ -286,7 +205,7 @@ namespace EcommerceSystem.Controllers
                             userId:  adminId,
                             title:   "Return & Refund Approved",
                             message: $"Order #{orderId} — Customer Service approved a {returnTypeLabel} " +
-                                     $"request from {customerName} ({shopName}). Total: RM{total:F2}"
+                                    $"request from {customerName} ({shopName}). Total: RM{total:F2}"
                         );
                     }
 
@@ -302,7 +221,7 @@ namespace EcommerceSystem.Controllers
                             userId:  csUserId,
                             title:   "Return & Refund Approved",
                             message: $"Order #{orderId} — {returnTypeLabel} request from {customerName} " +
-                                     $"({shopName}) has been approved. Refund: RM{total:F2}"
+                                    $"({shopName}) has been approved. Refund: RM{total:F2}"
                         );
                     }
                 }

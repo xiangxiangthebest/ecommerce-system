@@ -1,0 +1,93 @@
+@model EcommerceSystem.Models.CustomerService
+
+<link rel="stylesheet" href="~/css/customer/profile.css" asp-append-version="true" />
+
+<div class="profile-page">
+    <div class="profile-layout">
+
+        <!-- ── Sidebar ── -->
+        <div class="profile-sidebar">
+            <div class="avatar-card">
+                <div>
+                    <p class="avatar-name">@Model.FullName</p>
+                    <p class="avatar-email">@Model.Email</p>
+                </div>
+                <span class="status-badge">
+                    <span class="status-dot @(Model.IsActive ? "" : "inactive")"></span>
+                    @(Model.IsActive ? "Active" : "Inactive")
+                </span>
+            </div>
+
+            <div class="meta-card">
+                <div class="meta-row">
+                    <i class="ti ti-calendar" aria-hidden="true"></i>
+                    <div>
+                        <div class="meta-sub">Member since</div>
+                        <span>@Model.DateJoin.ToString("MMM dd, yyyy")</span>
+                    </div>
+                </div>
+                <div class="meta-row">
+                    <i class="ti ti-shield-check" aria-hidden="true"></i>
+                    <div>
+                        <div class="meta-sub">Account status</div>
+                        <span>Verified</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Main column ── -->
+        <div class="profile-main">
+
+            <!-- ── Profile Form  ── -->
+            <form asp-action="UpdateProfile"
+                method="post"
+                enctype="multipart/form-data"
+                class="form-card"
+                id="profileForm">
+
+                <input type="hidden" asp-for="UserId" />
+                <input type="file" id="profileImageInput" name="profileImage" style="display:none" />
+
+                <!-- Personal info -->
+                <div class="form-section">
+                    <p class="section-label">Personal info</p>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label asp-for="FullName">Full Name</label>
+                            <input asp-for="FullName" required />
+                            <span asp-validation-for="FullName" class="text-danger"></span>
+                        </div>
+
+                        <div class="field">
+                            <label asp-for="PhoneNumber">Phone Number</label>
+                            <input asp-for="PhoneNumber" required />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-save" form="profileForm" style="display:block; margin-left:auto; margin-top:12px;">
+                        <i class="ti ti-check" aria-hidden="true"></i> Save
+                    </button>
+                </div>
+
+                <!-- Account -->
+                <div class="form-section">
+                    <p class="section-label">Account</p>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label asp-for="Email">Email</label>
+                            <input asp-for="Email" readonly />
+                        </div>
+                        <div class="field">
+                            <label>Status</label>
+                            <input value="@(Model.IsActive ? "Active" : "Inactive")" readonly />
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>

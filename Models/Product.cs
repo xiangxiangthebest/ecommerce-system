@@ -62,7 +62,7 @@ namespace EcommerceSystem.Models
         public Product() { }
 
         public Product(int productId, string name, string description, double price,
-                       int stockQuantity, Category category, Seller seller)
+                    int stockQuantity, Category category, Seller seller)
         {
             ProductId = productId;
             Name = name;
