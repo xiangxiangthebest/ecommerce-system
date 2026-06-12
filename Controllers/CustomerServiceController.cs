@@ -5,6 +5,7 @@ using EcommerceSystem.Data;
 using System.Security.Claims;
 using EcommerceSystem.Models;
 using EcommerceSystem.Interfaces;
+
 using EcommerceSystem.Enums;
 using System.Text.Json;
 namespace EcommerceSystem.Controllers
@@ -196,7 +197,8 @@ namespace EcommerceSystem.Controllers
             order.CurrentStatus = OrderStatus.DELIVERED;
 
             request.ReviewByCsId = csId;
-            request.SolvedAt = DateTime.UtcNow; // 视为已处理，需要的话可加 IsRejected 字段
+            request.SolvedAt = DateTime.UtcNow;
+            request.Status = "Rejected";
 
             await _context.SaveChangesAsync();
 

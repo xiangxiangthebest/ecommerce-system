@@ -61,7 +61,14 @@
                 @foreach (var order in allOrders)
                 {   
                     var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                    var approvedKey = request?.SolvedAt.HasValue == true ? "APPROVED" : "PENDING";
+
+                    @* var approvedKey = request?.SolvedAt.HasValue == true ? "APPROVED" : "PENDING"; *@
+                    var approvedKey = request?.Status switch
+                    {
+                        "Approved" => "APPROVED",
+                        "Rejected" => "REJECTED",
+                        "Pending"  => "PENDING"
+                    };
                     var searchHint  = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                     var svc         = serviceLabel.GetValueOrDefault(order.OrderId, "—");
                     var reason      = issueLabel.GetValueOrDefault(order.OrderId, "—");
@@ -82,8 +89,8 @@
                             }
                             else if (request.Status=="Pending")
                             {
-                                <button class="btn-approve-return" onclick="openApproveReturnModal(@order.OrderId)">
-                                    <i class="fas fa-check-circle"></i> Approve Return
+                                <button class="btn-approve-return" onclick="openApproveReturnModal(@order.OrderId,@request.RequestId)">
+                                View
                                 </button>
                             }
                             else if (request.Status=="Approved")
@@ -91,6 +98,10 @@
                                 <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
                                     <i class="fas fa-check-circle"></i> Approved (RM@((request.ApprovedRefundAmount ?? 0m).ToString("F2")))
                                 </span>
+                            }
+                            else if (request.Status=="Rejected")
+                            {
+                                <button data-status="REJECTED">Rejected</button>
                             }
                         </td>
                     </tr>
@@ -120,7 +131,7 @@
 <div id="approveReturnModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)" class="approve-return-modal">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <i class="fas fa-check-circle" style="color:#f97316;font-size:22px"></i>
-        <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b">Approve Return Request</h3>
+        <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b">Approve Request</h3>
         <button onclick="closeApproveReturnModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;color:#9a98b6">✕</button>
     </div>
     <div style="font-size:10px;color:#a16207;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px"><i class="fas fa-clipboard-list" style="margin-right:4px"></i>Customer Request Summary</div>
@@ -148,13 +159,15 @@
         </table>
     </div>
     <input type="hidden" id="approveReturnOrderId" />
+    <input type="hidden" id="approveRequestId" />
     <!-- Error message area inside modal -->
     <div id="approveReturnError" style="display:none;margin-top:12px;padding:10px 14px;background:#ffebee;border-radius:8px;color:#c62828;font-size:13px;font-weight:600;">
         <i class="fas fa-exclamation-circle"></i> <span id="approveReturnErrorMsg"></span>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
         <button onclick="closeApproveReturnModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #e0e0f0;background:#fff;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button id="approveReturnBtn" onclick="submitApproveReturn()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i> Approve &amp; Process</button>
+        <button id="approveReturnBtn" onclick="submitApproveReturn()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i>Approve</button>
+        <button id="rejectReturnBtn" onclick="submitRejectRequest()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-times"></i></i>Reject</button>
     </div>
 </div>
 
@@ -255,7 +268,7 @@ var ordersForJs = allOrders
     }
 
     // ── Approve Return modal ─────────────────────────────────────────────
-    function openApproveReturnModal(orderId) {
+    function openApproveReturnModal(orderId, requestId) {
         const order = _csReturnOrders.find(o => o.orderId === orderId);
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
@@ -263,6 +276,7 @@ var ordersForJs = allOrders
         // Clear any previous error
         document.getElementById('approveReturnError').style.display = 'none';
         document.getElementById('approveReturnErrorMsg').textContent = '';
+        document.getElementById("approveRequestId").value = requestId;
 
         const icon = (order.returnToken === 'ReturnRefund') ? '📦' : '💰';
         const custName = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
@@ -356,6 +370,27 @@ var ordersForJs = allOrders
         document.getElementById('approveReturnBackdrop').classList.remove('active');
         document.getElementById('approveReturnModal').classList.remove('active');
         document.body.style.overflow = '';
+    }
+
+
+    async function submitRejectRequest() {
+        const requestId = document.getElementById("approveRequestId").value;
+
+        const params = new URLSearchParams();
+        params.append("requestId", requestId);
+        params.append("__RequestVerificationToken", getAntiForgeryToken());
+
+        const res = await fetch('/CustomerService/RejectRequest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params.toString()
+        });
+
+        if(res.ok){
+            location.reload();
+        }
     }
 
     async function submitApproveReturn() {
