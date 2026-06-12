@@ -82,4 +82,19 @@ public class NotificationsController : Controller
 
         return Ok();
     }
+
+        [HttpPost]
+    public async Task<IActionResult> CSMarkAllRead()
+    {
+        var userId = await GetCurrentUserIdAsync();
+        await _notificationService.MarkAllAsReadAsync(userId);
+
+        // If it's a regular form POST (customer page), redirect back
+        if (!Request.Headers.ContainsKey("X-Requested-With"))
+        {
+            return RedirectToAction("Notifications", "CustomerService");
+        }
+
+        return Ok();
+    }
 }

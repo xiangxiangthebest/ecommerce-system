@@ -274,11 +274,11 @@
                         </div>
                         @{
                             var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                            var pillApproved = (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
+                            var pillApproved = (statusKey == "RETURN_REFUND")
                                             && requestForPill != null && requestForPill.SolvedAt.HasValue;
-                            var pillRejected = !pillApproved
-                                            && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                            && request.Status.ToString() == "Rejected";
+                            var pillApprovedRefund = (statusKey == "REFUND")
+                                            && requestForPill != null && requestForPill.SolvedAt.HasValue;
+                            var pillRejected = request.Status.ToString() == "Rejected";
                             var pillClass = pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
                                           : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
                                           : "ph-s-" + statusKey;
@@ -288,6 +288,9 @@
                             @if (pillApproved)
                             {
                                 @:Return/Refund Approved
+                            }
+                            else if(pillApprovedRefund){
+                                 @:Refund Approved
                             }
                             else if (pillRejected)
                             {

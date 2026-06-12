@@ -966,8 +966,8 @@ namespace EcommerceSystem.Controllers
 
             if (!sellerAllowed)
             {
-                TempData["OrderError"] =
-                    $"Cannot update order #{orderId} from {order.CurrentStatus} to {newStatus}.";
+                // TempData["OrderError"] =
+                //     $"Cannot update order #{orderId} from {order.CurrentStatus} to {newStatus}.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 
