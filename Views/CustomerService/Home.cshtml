@@ -6,10 +6,11 @@
     var serviceLabel = ViewBag.ServiceLabel as Dictionary<int, string> ?? new Dictionary<int, string>();
     var serviceToken    = ViewBag.ServiceToken    as Dictionary<int, string>                          ?? new Dictionary<int, string>();
     var requestedQtyMap = ViewBag.RequestedQtyMap as Dictionary<int, Dictionary<int, int>> ?? new Dictionary<int, Dictionary<int, int>>();
-
     int cntAll      = allOrders.Count;
-    int cntPending  = allOrders.Count(o => !o.ReturnApprovedAt.HasValue);
-    int cntApproved = allOrders.Count(o => o.ReturnApprovedAt.HasValue);
+
+    var requests = ViewBag.Requests as List<Request> ?? new List<Request>();
+    int cntPending = requests.Count(r => r.Status?.ToString() == "Pending");
+    int cntApproved = requests.Count(r => r.Status?.ToString() == "Approved");
 }
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -58,8 +59,9 @@
             </thead>
             <tbody id="ordersTableBody">
                 @foreach (var order in allOrders)
-                {
-                    var approvedKey = order.ReturnApprovedAt.HasValue ? "APPROVED" : "PENDING";
+                {   
+                    var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
+                    var approvedKey = request?.SolvedAt.HasValue == true ? "APPROVED" : "PENDING";
                     var searchHint  = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                     var svc         = serviceLabel.GetValueOrDefault(order.OrderId, "—");
                     var reason      = issueLabel.GetValueOrDefault(order.OrderId, "—");
@@ -73,16 +75,21 @@
                         <td><span class="status-badge status-return_refund">@svc</span></td>
                         <td style="max-width:240px;font-size:0.85rem;color:#5d4037;">@reason</td>
                         <td>
-                            @if (!order.ReturnApprovedAt.HasValue)
+
+                            @if (request == null)
+                            {
+                                <span style="color:#9a98b6;">No Request</span>
+                            }
+                            else if (request.Status=="Pending")
                             {
                                 <button class="btn-approve-return" onclick="openApproveReturnModal(@order.OrderId)">
                                     <i class="fas fa-check-circle"></i> Approve Return
                                 </button>
                             }
-                            else
+                            else if (request.Status=="Approved")
                             {
                                 <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
-                                    <i class="fas fa-check-circle"></i> Approved (RM@(order.ApprovedRefundAmount.ToString("F2")))
+                                    <i class="fas fa-check-circle"></i> Approved (RM@((request.ApprovedRefundAmount ?? 0m).ToString("F2")))
                                 </span>
                             }
                         </td>
@@ -181,40 +188,55 @@
 </div>
 
 @{
-    var ordersForJs = allOrders
-        .Where(o => !o.ReturnApprovedAt.HasValue)
-        .Select(o => {
-            var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
-            var vDiscount   = Math.Max(0m, rawSubtotal - o.TotalAmount);
-            var discRatio   = rawSubtotal > 0 ? vDiscount / rawSubtotal : 0m;
+var ordersForJs = allOrders
+    .Where(o => !requests.Any(r => r.OrderId == o.OrderId && r.SolvedAt.HasValue))
+    .Select(o =>
+    {
+        var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+        var vDiscount = Math.Max(0m, rawSubtotal - o.TotalAmount);
+        var discRatio = rawSubtotal > 0 ? vDiscount / rawSubtotal : 0m;
 
-            return new {
-                orderId       = o.OrderId,
-                returnToken   = serviceToken.GetValueOrDefault(o.OrderId, "RefundOnly"),
-                serviceLabel  = serviceLabel.GetValueOrDefault(o.OrderId, "Refund Only"),
-                issueLabel    = issueLabel.GetValueOrDefault(o.OrderId, "—"),
-                returnImages  = new List<string>(),
-                customerEmail = o.Customer?.Email ?? "—",
-                customerName  = o.Customer?.FullName ?? "",
-                items = o.OrderItems
-                    .Where(oi => {                                                      // only items the customer selected
-                        requestedQtyMap.TryGetValue(o.OrderId, out var m);
-                        return m != null && m.ContainsKey(oi.OrderItemId);
-                    })
-                    .Select(oi => {
-                        requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
-                        var reqQty = itemQtyMap![oi.OrderItemId];                       // safe — key guaranteed by Where
-                        return new {
-                            orderItemId       = oi.OrderItemId,
-                            name              = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-                            orderedQty        = oi.Quantity,
-                            requestedQty      = reqQty,
-                            unitPrice         = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
-                            selectedVariation = oi.SelectedVariation ?? ""
-                        };
-                    }).ToList()
-            };
-        }).ToList();
+        requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
+
+        return new
+        {
+            orderId = o.OrderId,
+            returnToken = serviceToken.GetValueOrDefault(o.OrderId, "RefundOnly"),
+            serviceLabel = serviceLabel.GetValueOrDefault(o.OrderId, "Refund Only"),
+            issueLabel = issueLabel.GetValueOrDefault(o.OrderId, "—"),
+            returnImages = new List<string>(),
+            customerEmail = o.Customer?.Email ?? "—",
+            customerName = o.Customer?.FullName ?? "",
+
+            items = o.OrderItems
+                .Where(oi =>
+                    itemQtyMap != null &&
+                    itemQtyMap.ContainsKey(oi.OrderItemId)
+                )
+                .Select(oi =>
+                {
+                    var reqQty = itemQtyMap.TryGetValue(oi.OrderItemId, out var q)
+                        ? q
+                        : 0;
+
+                    return new
+                    {
+                        orderItemId = oi.OrderItemId,
+                        name = (!string.IsNullOrWhiteSpace(oi.Product?.SKU)
+                            ? $"[{oi.Product!.SKU}] "
+                            : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
+
+                        orderedQty = oi.Quantity,
+                        requestedQty = reqQty,
+
+                        unitPrice = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
+                        selectedVariation = oi.SelectedVariation ?? ""
+                    };
+                })
+                .ToList()
+        };
+    })
+    .ToList();
 }
 
 <script>

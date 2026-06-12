@@ -1,0 +1,154 @@
+@model List<EcommerceSystem.Models.Notification>
+@{
+    ViewData["Title"] = "Notifications";
+    var unreadCount = Model?.Count(n => !n.IsRead) ?? 0;
+    var totalCount = Model?.Count ?? 0;
+}
+
+<link rel="stylesheet" href="~/css/customer/notification.css" asp-append-version="true" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@@tabler/icons-webfont@@latest/tabler-icons.min.css" />
+
+<div class="notif-page">
+
+    <div class="notif-container">
+
+        @* -- Sidebar / Filter Panel -- *@
+        <aside class="notif-sidebar">
+            <div class="notif-sidebar-header">
+                <span class="notif-sidebar-label">Filter</span>
+            </div>
+            <nav class="notif-filter-nav">
+                <button class="notif-filter-btn active" data-filter="all">
+                    <i class="ti ti-layout-list" aria-hidden="true"></i>
+                    <span>All</span>
+                    @if (totalCount > 0)
+                    {
+                        <span class="notif-filter-count" id="filterCountAll">@totalCount</span>
+                    }
+                </button>
+                <button class="notif-filter-btn" data-filter="unread">
+                    <i class="ti ti-circle-dot" aria-hidden="true"></i>
+                    <span>Unread</span>
+                    @if (unreadCount > 0)
+                    {
+                        <span class="notif-filter-count notif-filter-count--blue" id="filterCountUnread">@unreadCount</span>
+                    }
+                </button>
+                <button class="notif-filter-btn" data-filter="read">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    <span>Read</span>
+                </button>
+            </nav>
+        </aside>
+
+        @* -- Main Panel -- *@
+        <main class="notif-main">
+
+            @* -- Header -- *@
+            <div class="notif-main-header">
+                <div class="notif-main-title-group">
+                    <h1 class="notif-main-title">Notifications</h1>
+                    @if (unreadCount > 0)
+                    {
+                        <span class="notif-unread-badge" id="headerUnreadBadge">@unreadCount unread</span>
+                    }
+                </div>
+
+                @if (Model?.Any(n => !n.IsRead) == true)
+                {
+                    <form asp-controller="Notifications" asp-action="CSMarkAllRead" method="post" id="markAllForm">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="notif-markall-btn">
+                            <i class="ti ti-checks" aria-hidden="true"></i>
+                            Mark all as read
+                        </button>
+                    </form>
+                }
+            </div>
+
+            @* -- Notification List -- *@
+            @if (!(Model?.Any() ?? false))
+            {
+                <div class="notif-empty-state">
+                    <div class="notif-empty-icon-wrap">
+                        <i class="ti ti-bell-off" aria-hidden="true"></i>
+                    </div>
+                    <h3 class="notif-empty-title">No notifications yet</h3>
+                    <p class="notif-empty-sub">We'll let you know when something happens with your orders or account.</p>
+                </div>
+            }
+            else
+            {
+                <div class="notif-list" id="notifList">
+                    @foreach (var n in Model ?? new List<EcommerceSystem.Models.Notification>())
+                    {
+                        <div class="notif-item @(n.IsRead ? "is-read" : "is-unread")"
+                             id="notif-@n.NotificationId"
+                             data-status="@(n.IsRead ? "read" : "unread")">
+
+                            @* -- Left: icon -- *@
+                            <div class="notif-item-icon-wrap @(n.IsRead ? "" : "notif-item-icon-wrap--active")">
+                                <i class="ti @GetNotifIcon(n.Title)" aria-hidden="true"></i>
+                            </div>
+
+                            @* -- Middle: content -- *@
+                            <div class="notif-item-body">
+                                <div class="notif-item-top">
+                                    <span class="notif-item-title">
+                                        @if (!n.IsRead)
+                                        {
+                                            <span class="notif-dot" aria-label="Unread"></span>
+                                        }
+                                        @n.Title
+                                    </span>
+                                    <time class="notif-item-time" datetime="@n.CreatedAt.ToString("o")">
+                                        @n.CreatedAt.ToLocalTime().ToString("dd MMM, h:mm tt")
+                                    </time>
+                                </div>
+                                <p class="notif-item-msg">@n.Message</p>
+                            </div>
+
+                            @* -- Right: action -- *@
+                            @if (!n.IsRead)
+                            {
+                                <div class="notif-item-action">
+                                    <form asp-controller="Notifications" asp-action="MarkRead"
+                                          asp-route-id="@n.NotificationId" method="post"
+                                          onsubmit="markSingleRead(event, @n.NotificationId)">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="notif-read-btn" title="Mark as read" aria-label="Mark as read">
+                                            <i class="ti ti-check" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+
+                        </div>
+                    }
+                </div>
+            }
+
+        </main>
+    </div>
+</div>
+
+@functions {
+    string GetNotifIcon(string title)
+    {
+        if (title == null) return "ti-bell";
+        var t = title.ToLower();
+        if (t.Contains("order") || t.Contains("placed")) return "ti-shopping-bag";
+        if (t.Contains("ship") || t.Contains("dispatch") || t.Contains("delivery")) return "ti-truck-delivery";
+        if (t.Contains("deliver") || t.Contains("arrived")) return "ti-package";
+        if (t.Contains("cancel")) return "ti-x";
+        if (t.Contains("refund") || t.Contains("return")) return "ti-receipt-refund";
+        if (t.Contains("payment") || t.Contains("paid")) return "ti-credit-card";
+        if (t.Contains("promo") || t.Contains("offer") || t.Contains("deal")) return "ti-tag";
+        if (t.Contains("account") || t.Contains("profile")) return "ti-user";
+        return "ti-bell";
+    }
+}
+
+@section Scripts {
+    <script src="~/js/customerservice/notification.js" asp-append-version="true"></script>
+}

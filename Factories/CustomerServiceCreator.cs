@@ -20,9 +20,8 @@ namespace EcommerceSystem.Factories
                 FullName = _dto.FullName,
                 Email = _dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(_dto.Password),
-                Phone = _dto.PhoneNumber,
+                PhoneNumber = _dto.PhoneNumber,
                 Role = "CustomerService",
-                HireDate = DateTime.Now
             };
         }
     }

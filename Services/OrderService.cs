@@ -535,32 +535,7 @@ namespace EcommerceSystem.Services
 
             return OperationResult.Ok();
         }
-
-        public async Task<OperationResult> RequestCancelOrderAsync(int customerId, int orderId, string reason)
-        {
-            if (string.IsNullOrWhiteSpace(reason))
-                return OperationResult.Fail("Please provide a cancellation reason.");
-
-            var order = await _context.Order
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customerId
-                                    && o.CurrentStatus == OrderStatus.PREPARING);
-
-            if (order == null)
-                return OperationResult.Fail("Order cannot be requested for cancellation or order not found.");
-
-            order.CancelReason = reason.Trim();
-            
-            AttachObservers(order);
-            await order.SetStatusAsync(OrderStatus.CANCEL_REQUESTED);
-
-            await _context.SaveChangesAsync();
-            
-            return OperationResult.Ok();
-        }
-
+        
         public async Task<OperationResult> ConfirmReceivedAsync(int customerId, int orderId)
         {
             var order = await _context.Order
@@ -605,7 +580,7 @@ namespace EcommerceSystem.Services
             return OperationResult.Ok();
         }
 
-        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths, ReturnInitiatedBy initiatedBy)
+        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths)
         {
             if (string.IsNullOrWhiteSpace(reason))
                 return OperationResult.Fail("Please provide a return/refund reason.");
@@ -625,12 +600,12 @@ namespace EcommerceSystem.Services
             if (order.CurrentStatus != OrderStatus.DELIVERED)
                 return OperationResult.Fail("Only delivered orders can request return/refund.");
 
-            order.ReturnRequested = true;
-            order.ReturnStatus = ReturnStatus.Requested;
-            order.ReturnReason = reason.Trim();
-            order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
-            order.ReturnInitiatedAt = DateTime.UtcNow;
-            order.ReturnInitiatedBy = initiatedBy;
+            // order.ReturnRequested = true;
+            // order.ReturnStatus = ReturnStatus.Requested;
+            // order.ReturnReason = reason.Trim();
+            // order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
+            // order.ReturnInitiatedAt = DateTime.UtcNow;
+            // order.ReturnInitiatedBy = initiatedBy;
 
             // ── Notify all parties then persist ──
             AttachObservers(order);

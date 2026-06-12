@@ -35,19 +35,19 @@
         cancelReason    = o.CancelReason ?? "",
 
         // Strip "||<json>" suffix and legacy bracket wrapping to avoid weird characters in UI
-        returnReason    = StripReturnReasonBrackets(
+        @* returnReason    = StripReturnReasonBrackets(
                             (o.ReturnReason != null && o.ReturnReason.Contains("||"))
                                 ? o.ReturnReason[..o.ReturnReason.IndexOf("||")]
                                 : (o.ReturnReason ?? "")
-                ),
+                ), *@
 
         // If approved timestamp exists, show Approved even if enum didn’t update
-        returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
+        @* returnStatus    = (o.ReturnApprovedAt.HasValue && o.ReturnStatus.ToString() == "Requested")
                             ? "Approved"
                             : o.ReturnStatus.ToString(),
 
         returnApproved  = o.ReturnApprovedAt.HasValue,
-        returnImagePath = ParseImageList(o.ReturnImagePathsJson),
+        returnImagePath = ParseImageList(o.ReturnImagePathsJson), *@
 
         reviewSubmitted = o.ReviewSubmitted,
 
@@ -252,16 +252,19 @@
         <div id="phOrderList">
             @foreach (var order in Model.Orders)
             {   
-                var request = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                var statusKey     = order.CurrentStatus.ToString().ToUpper();
+                @* var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId); *@
+                var request = Model.RequestMap.GetValueOrDefault(order.OrderId);
+                var statusKey = request?.Status ?? "NONE";
+                var isSolved = request?.SolvedAt.HasValue == true;
+
                 var sellerName    = order.OrderItems.FirstOrDefault()?.Product?.Seller?.ShopName ?? "Unknown Shop";
                 var sellerInitial = sellerName.Length > 0 ? sellerName[0].ToString().ToUpper() : "S";
                 var itemCount     = order.OrderItems.Count;
                 var searchHint    = order.OrderId + " " + string.Join(" ", order.OrderItems.Select(i => i.Product?.Name ?? ""));
                 <div class="ph-card"
-                     data-order-id="@order.OrderId"
-                     data-status="@statusKey"
-                     data-search="@searchHint.ToLowerInvariant()">
+                    data-order-id="@order.OrderId"
+                    data-status="@statusKey"
+                    data-search="@searchHint.ToLowerInvariant()">
 
                     <div class="ph-card-bar">
                         <div class="ph-card-bar-left">
@@ -272,21 +275,29 @@
                             </span>
                         </div>
                         @{
-                            var requestForPill = Model.Requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                            var pillApproved = (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                               && requestForPill != null && requestForPill.ApprovedAt.HasValue;
-                            var pillRejected = !pillApproved
-                                               && (statusKey == "RETURN_REFUND" || statusKey == "AFTER_SALES_REQUESTED")
-                                               && order.ReturnStatus.ToString() == "Rejected";
-                            var pillClass = pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
-                                          : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
-                                          : "ph-s-" + statusKey;
+                            @* var requestForPill = Model.Requests?
+                                .FirstOrDefault(r => r.OrderId == order.OrderId); *@
+
+                            @* var isSolved = requestForPill?.SolvedAt.HasValue == true; *@
+
+                            var pillApproved = statusKey == "RETURN_REFUND" && isSolved;
+                            var pillApprovedRefund = statusKey == "REFUND" && isSolved;
+
+                            var pillRejected = request?.Status == "Rejected";
+
+                            var pillClass =
+                                pillApproved ? "ph-s-RETURN_REFUND_APPROVED"
+                                : pillRejected ? "ph-s-RETURN_REFUND_REJECTED"
+                                : "ph-s-" + statusKey;
                         }
                         <span class="ph-status-pill @pillClass">
                             <span class="ph-status-dot"></span>
                             @if (pillApproved)
                             {
                                 @:Return/Refund Approved
+                            }
+                            else if(pillApprovedRefund){
+                                 @:Refund Approved
                             }
                             else if (pillRejected)
                             {
@@ -351,22 +362,11 @@
                         </div>
                     }
 
-                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCEL_REQUESTED)
-                    {
-                        <div class="ph-notice ph-notice-warning" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; display: flex; gap: 10px; margin-top: 10px;">
-                            <i class="ti ti-hourglass" style="color: #d97706; font-size: 20px; margin-top: 2px;"></i>
-                            <div>
-                                <strong style="color: #b45309; display: block;">Cancellation Requested. Waiting for seller's response. </strong>
-                                <span>@order.CancelReason</span>
-                            </div>
-                        </div>
-                    }
-
                     else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
-                          || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
+                        || (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND && request != null))
                     {
-                        var isApprovedBanner = request != null && request.ApprovedAt.HasValue;
-                        var isRejectedBanner = !isApprovedBanner && order.ReturnStatus.ToString() == "Rejected";
+                        var isApprovedBanner = request != null && request.SolvedAt.HasValue;
+                        var isRejectedBanner = !isApprovedBanner && request.Status.ToString() == "Rejected";
 
                         if (isApprovedBanner)
                         {
@@ -442,16 +442,28 @@
                     }
 
                     @* Legacy ReturnReason banner — only for old-style returns with no Request record *@
-                    @if (isReturn && request == null && !string.IsNullOrWhiteSpace(order.ReturnReason))
-                    {
-                        var returnImgs = ParseImageList(order.ReturnImagePathsJson);
+                    @if (isReturn && request != null){
+                    
+                        @* var returnImgs = ParseImageList(order.ReturnImagePathsJson); *@
 
-                        var returnDisplay = order.ReturnReason ?? "";
+                        @* var returnDisplay = request.RequestIssueType;
                         var rrSep = returnDisplay.IndexOf("||");
                         if (rrSep >= 0) returnDisplay = returnDisplay[..rrSep];
-                        returnDisplay = StripReturnReasonBrackets(returnDisplay);
+                        returnDisplay = StripReturnReasonBrackets(returnDisplay); *@
 
-                        var rnBannerStatus = order.ReturnApprovedAt.HasValue ? "Approved" : order.ReturnStatus.ToString();
+                        var returnDisplay = request.RequestIssueType switch
+                        {
+                            RequestIssueType.WrongItemReceived => "WrongItemReceived Request",
+                            RequestIssueType.ChangeOfMind => "ChangeOfMind",
+                            RequestIssueType.ItemNotAsDescribed => "ItemNotAsDescribed",
+                            RequestIssueType.ItemNotDelivered => "ItemNotDelivered",
+                            RequestIssueType.DamagedDefective => "DamagedDefective",
+                            RequestIssueType.MissingPartsAccessories => "MissingPartsAccessories",
+                            RequestIssueType.Other => "Other",
+                            _ => request.RequestIssueType.ToString()
+                        };
+
+                        var rnBannerStatus = request.SolvedAt.HasValue ? "Approved" : request.Status.ToString();
                         var rnBannerClass = rnBannerStatus switch {
                             "Approved" or "Refunded" => "ph-notice-return-v2 rn-approved",
                             "Rejected"               => "ph-notice-return-v2 rn-rejected",
@@ -489,17 +501,25 @@
                                 </div>
                             </div>
 
-                            @if (returnImgs.Any())
+                            @if (request?.Images != null && request.Images.Any())
                             {
                                 <div class="rn-photo-strip">
                                     <div class="rn-reason-label">Proof photos</div>
+
                                     <div class="rn-photo-row">
-                                        @foreach (var img in returnImgs)
+                                        @foreach (var img in request.Images)
                                         {
-                                            <div class="rn-strip-thumb" onclick="rtnOpenLightbox('@img')" title="View proof photo">
-                                                <img src="@img" alt="Return proof"
+                                            <div class="rn-strip-thumb"
+                                                onclick="rtnOpenLightbox('@img.ImagePath')"
+                                                title="View proof photo">
+
+                                                <img src="@img.ImagePath"
+                                                    alt="Return proof"
                                                     onerror="this.closest('.rn-strip-thumb').style.display='none'" />
-                                                <div class="rn-img-badge"><i class="ti ti-zoom-in"></i></div>
+
+                                                <div class="rn-img-badge">
+                                                    <i class="ti ti-zoom-in"></i>
+                                                </div>
                                             </div>
                                         }
                                     </div>
@@ -599,7 +619,7 @@
 
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.PENDING)
                             {
-                                <button class="ph-btn ph-btn-danger" onclick="openCancelModal(@order.OrderId, false)">
+                                <button class="ph-btn ph-btn-danger" onclick="openCancelModal(@order.OrderId)">
                                     <i class="ti ti-x"></i> Cancel Order
                                 </button>
                             }
@@ -624,7 +644,7 @@
                                 </button>
 
                                 @* If approved → let customer confirm receipt so they can write a review *@
-                                @if (request != null && request.ApprovedAt.HasValue)
+                                @if (request != null && request.SolvedAt.HasValue)
                                 {
                                     <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
                                         <i class="ti ti-circle-check"></i> Order Received

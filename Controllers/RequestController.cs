@@ -66,12 +66,13 @@ namespace EcommerceSystem.Controllers
 
             var request = new Request
             {
-                RequestUserId = user.UserId,
+                CustomerId = user.UserId,
                 OrderId = orderId,
-                RequestServiceType = serviceType,  
+                RequestServiceType = serviceType,
                 RequestIssueType = issueType,
                 Description = description,
                 RequestedItemsJson = JsonSerializer.Serialize(requestedItems),
+                Status = "Pending"
             };
 
             _context.Request.Add(request);
@@ -87,7 +88,7 @@ namespace EcommerceSystem.Controllers
                     using var stream = new FileStream(path, FileMode.Create);
                     await file.CopyToAsync(stream);
 
-                    _context.RequestImage.Add(new RequestImage
+                    _context.RequestImages.Add(new RequestImage
                     {
                         RequestId = request.RequestId,
                         ImagePath = fileName
@@ -123,7 +124,7 @@ namespace EcommerceSystem.Controllers
                             userId:  customerId.Value,
                             title:   "After-Sales Request Submitted",
                             message: $"Your {serviceLabel} request for Order #{orderId} from {shopName} " +
-                                     $"has been submitted and is pending Customer Service approval."
+                                    $"has been submitted and is pending Customer Service approval."
                         );
 
                     // 2. Notify Seller — their order has an after-sales request pending
@@ -132,7 +133,7 @@ namespace EcommerceSystem.Controllers
                             userId:  sellerId.Value,
                             title:   "After-Sales Request — Pending CS Approval",
                             message: $"Customer {customerName} has submitted a {serviceLabel} request " +
-                                     $"for Order #{orderId}. Awaiting Customer Service approval."
+                                    $"for Order #{orderId}. Awaiting Customer Service approval."
                         );
 
                     // 3. Notify all Admins
@@ -145,7 +146,7 @@ namespace EcommerceSystem.Controllers
                             userId:  adminId,
                             title:   "After-Sales Request — Pending CS Approval",
                             message: $"Order #{orderId} — {customerName} submitted a {serviceLabel} request " +
-                                     $"from {shopName}. Total: RM{total:F2}. Awaiting Customer Service approval."
+                                    $"from {shopName}. Total: RM{total:F2}. Awaiting Customer Service approval."
                         );
 
                     // 4. Notify all CustomerService users — action required
@@ -158,8 +159,8 @@ namespace EcommerceSystem.Controllers
                             userId:  csUserId,
                             title:   $"New {serviceLabel} Request — Action Required",
                             message: $"Customer {customerName} has submitted a {serviceLabel} request " +
-                                     $"for Order #{orderId} at {shopName}. " +
-                                     $"Total: RM{total:F2}. Please review and approve or reject."
+                                    $"for Order #{orderId} at {shopName}. " +
+                                    $"Total: RM{total:F2}. Please review and approve or reject."
                         );
                 }
             }
@@ -205,7 +206,7 @@ namespace EcommerceSystem.Controllers
                     if (selections != null)
                         foreach (var s in selections)
                             if (s.TryGetProperty("orderItemId", out var idEl)
-                                && s.TryGetProperty("qty", out var qtyEl)) 
+                                && s.TryGetProperty("qty", out var qtyEl))
                                 requestedQtyMap[idEl.GetInt32()] = qtyEl.GetInt32();
                 }
                 catch { /* fallback to full qty below */ }
@@ -231,7 +232,6 @@ namespace EcommerceSystem.Controllers
                 {
                     RequestServiceType.RETURN_REFUND => "Return & Refund",
                     RequestServiceType.REFUND => "Refund Only",
-                    RequestServiceType.SUSPEND_ACCOUNT => "Suspend Account",
                     _ => "Other"
                 },
                 issueType = request.RequestIssueType switch
@@ -244,111 +244,20 @@ namespace EcommerceSystem.Controllers
                     RequestIssueType.MissingPartsAccessories => "Missing parts / accessories",
                     _ => "Other"
                 },
-                description          = request.Description,
-                createdAt            = request.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
-                approvedAt           = request.ApprovedAt.HasValue
-                                        ? request.ApprovedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                description = request.Description,
+                createdAt = request.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
+                approvedAt = request.SolvedAt.HasValue
+                                        ? request.SolvedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                                         : (string?)null,
-                approvedRefundAmount = order.ApprovedRefundAmount > 0
-                                        ? order.ApprovedRefundAmount.ToString("F2")
-                                        : (string?)null,
-                returnType           = order.ReturnType.HasValue
-                                        ? (order.ReturnType == EcommerceSystem.Enums.ReturnType.ReturnRefund
-                                            ? "Return & Refund"
-                                            : "Refund Only")
-                                        : (string?)null,
-                images               = request.Images.Select(img => "/uploads/" + img.ImagePath).ToList(),
-                requestId            = request.RequestId
+                approvedRefundAmount = request.ApprovedRefundAmount.HasValue
+                ? request.ApprovedRefundAmount.Value.ToString("F2")
+                : "0.00",
+                returnType = request.RequestServiceType == EcommerceSystem.Enums.RequestServiceType.RETURN_REFUND
+                    ? "Return & Refund"
+                    : "Refund Only",
+                images = request.Images.Select(img => "/uploads/" + img.ImagePath).ToList(),
+                requestId = request.RequestId
             });
-        }
-
-        [HttpPost]
-        public IActionResult ApproveRequest(int requestId)
-        {
-            var request = _context.Request
-                .Include(r => r.Order)
-                .FirstOrDefault(r => r.RequestId == requestId);
-
-            if (request == null) return NotFound();
-
-            IRequestStrategy strategy;
-
-            if (request.RequestServiceType == RequestServiceType.RETURN_REFUND)
-            {
-                strategy = new ReturnRefundStrategy();
-            }
-            else if (request.RequestServiceType == RequestServiceType.REFUND)
-            {
-                strategy = new RefundStrategy();
-            }
-            else if (request.RequestServiceType == RequestServiceType.SUSPEND_ACCOUNT)
-            {
-                strategy = new SuspendAccountStrategy();
-            }
-            else if (request.RequestServiceType == RequestServiceType.ACTIVE_ACCOUNT)
-            {
-                strategy = new ActivateAccountStrategy();
-            }
-            else
-            {
-                return BadRequest("Invalid request type for approval.");
-            }
-
-            strategy.Solve(request);
-            request.ApprovedAt = DateTime.UtcNow;
-            request.ReviewedBy = User.Identity?.Name;
-            _context.SaveChanges();
-            return Json(new { success = true });
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> RejectAfterSale(int requestId, int orderId)
-        {
-            var request = await _context.Request
-                .Include(r => r.Order)
-                .FirstOrDefaultAsync(r => r.RequestId == requestId);
-
-            if (request == null) return NotFound();
-
-            var order = await _context.Order
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId);
-
-            if (order == null) return NotFound();
-
-            order.CurrentStatus = OrderStatus.DELIVERED;
-
-            await _context.SaveChangesAsync();
-
-            // ── Notify Customer that their after-sales request was rejected ────
-            try
-            {
-                var rejectedRequest = await _context.Request
-                    .FirstOrDefaultAsync(r => r.RequestId == requestId);
-
-                var shopName     = order.Seller?.ShopName ?? "the seller";
-                var customerId   = order.Customer?.UserId;
-                var serviceLabel = rejectedRequest?.RequestServiceType == RequestServiceType.RETURN_REFUND
-                    ? "Return & Refund" : "Refund Only";
-
-                if (customerId.HasValue)
-                    await _notificationService.CreateAsync(
-                        userId:  customerId.Value,
-                        title:   "After-Sales Request Rejected",
-                        message: $"Your {serviceLabel} request for Order #{orderId} from {shopName} " +
-                                 $"has been reviewed and rejected by Customer Service. " +
-                                 $"Your order status has been restored to Delivered."
-                    );
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[RequestController] Rejection notification failed for order #{orderId}: {ex.Message}");
-            }
-
-            return Json(new { success = true });
         }
     }
 }

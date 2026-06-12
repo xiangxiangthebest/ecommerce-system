@@ -5,6 +5,7 @@
     ViewData["Title"] = "Order Management";
     Layout = "~/Views/Admin/Layout.cshtml";
 
+    var requests = ViewBag.Requests as List<Request> ?? new List<Request>();
     var statusFilter = ViewBag.StatusFilter as string ?? "All";
     var searchTerm   = ViewBag.SearchTerm   as string ?? "";
     var tabs = new[]
@@ -328,8 +329,12 @@
 @section Scripts {
 <script>
 @{
+   
     var allOrdersForDetails = Model.Select(o => {
-        var displayReturnReason = o.ReturnReason ?? "";
+        var request = requests.FirstOrDefault(r => r.OrderId == o.OrderId);
+        var displayReturnReason = request != null
+        ? request.RequestIssueType.ToString()
+        : "";
         var rSep = displayReturnReason.IndexOf("||");
         if (rSep >= 0) displayReturnReason = displayReturnReason[..rSep];
         displayReturnReason = displayReturnReason.Trim();
@@ -343,7 +348,7 @@
             customerMessage = o.CustomerMessage ?? "",
             cancelReason    = o.CancelReason ?? "",
             returnReason    = displayReturnReason,
-            returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "",
+            returnType = request?.RequestServiceType.ToString() ?? "",
             customerEmail   = o.Customer != null ? o.Customer.Email : "—",
             customerPhone   = o.Customer != null ? o.Customer.PhoneNumber : "—",
             customerName    = o.Customer != null ? o.Customer.FullName : "",

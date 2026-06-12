@@ -8,5 +8,6 @@ namespace EcommerceSystem.Interfaces
         Task<List<Request>> GetByOrderId(int orderId);
         Task<Request?> GetById(int requestId);
         Task CreateAsync(Request request);
+        Task<List<RequestImage>> GetRequestImagesByRequestId(int requestId);
     }
 }

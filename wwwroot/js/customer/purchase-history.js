@@ -530,7 +530,7 @@ function closeDrawer() {
 /* ============================================================
    CANCEL ORDER
    ============================================================ */
-function openCancelModal(orderId, request) {
+function openCancelModal(orderId) {
     document.getElementById('cancelOrderId').value = orderId;
     document.getElementById('cancelCustom').value  = '';
     _cancelSelectedReason = '';
@@ -542,19 +542,11 @@ function openCancelModal(orderId, request) {
     const noticeEl = document.getElementById('cancelModalNotice');
     const btnTextEl = document.getElementById('cancelBtnText');
 
-    if (request) {
-        // 需要卖家同意的界面
-        titleEl.innerText = "Request Cancel";
-        btnTextEl.innerText = "Submit Request";
-        noticeEl.style.display = "flex"; 
-        submitBtn.dataset.isRequest = "true";
-    } else {
         // 直接取消的界面
-        titleEl.innerText = "Cancel Order";
-        btnTextEl.innerText = "Confirm Cancel";
-        noticeEl.style.display = "none"; 
-        submitBtn.dataset.isRequest = "false";
-    }
+    titleEl.innerText = "Cancel Order";
+    btnTextEl.innerText = "Confirm Cancel";
+    noticeEl.style.display = "none"; 
+    submitBtn.dataset.isRequest = "false";
 
     showModal('cancelBackdrop', 'cancelModal');
 }
@@ -582,7 +574,6 @@ async function submitCancel() {
     }
 
     const btn = document.getElementById('cancelModalSubmitBtn');
-    const isRequest = btn.dataset.isRequest === "true";
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Processing…';
 
@@ -591,12 +582,10 @@ async function submitCancel() {
     // btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Canceling…';
 
     try {
-        const res = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason ,request: isRequest});
+        const res = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason});
         if (res.success) {
             closeCancelModal();
-            const successMsg = isRequest 
-                ? 'Cancellation request submitted to seller.' 
-                : 'Order canceled successfully.';           
+            const successMsg = 'Order canceled successfully.';           
                 
             showToast(successMsg, 'success');
             setTimeout(() => location.reload(), 1200);

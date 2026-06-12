@@ -747,7 +747,11 @@ namespace EcommerceSystem.Controllers
             ViewBag.CountReturnRefund = allOrders.Count(o => o.CurrentStatus == OrderStatus.RETURN_REFUND);
  
             ViewBag.StatusFilter = statusFilter;
-            ViewBag.SearchTerm   = searchTerm;
+            ViewBag.SearchTerm = searchTerm;
+            ViewBag.Requests = await _context.Request
+                .Include(r => r.Order)
+                .Where(r => r.OrderId != null)
+                .ToListAsync();
  
             return View(orders);
         }
