@@ -3,7 +3,6 @@ using EcommerceSystem.Interfaces;
 using EcommerceSystem.Observers;
 using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
-using EcommerceSystem.Enums;
 using System.Text.Json;
 
 namespace EcommerceSystem.Services
@@ -547,7 +546,8 @@ namespace EcommerceSystem.Services
                     && o.CustomerUserId == customerId
                     && (o.CurrentStatus == OrderStatus.DELIVERED
                         || o.CurrentStatus == OrderStatus.RETURN_REFUND
-                        || o.CurrentStatus == OrderStatus.REFUND));
+                        || o.CurrentStatus == OrderStatus.REFUND
+                        || o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED));
 
             if (order == null)
                 return OperationResult.Fail("Order not found or already confirmed.");
@@ -558,7 +558,8 @@ namespace EcommerceSystem.Services
             // the state machine (Order.SetStatusAsync) may not define that transition.
             // Notifications are sent manually so Customer/Seller/Admin are still informed.
             if (order.CurrentStatus == OrderStatus.RETURN_REFUND
-                || order.CurrentStatus == OrderStatus.REFUND)
+                || order.CurrentStatus == OrderStatus.REFUND
+                || order.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED)
             {
                 order.CurrentStatus = OrderStatus.RECEIVED;
                 // Send notifications directly (bypassing state machine)

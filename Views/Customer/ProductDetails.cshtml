@@ -478,9 +478,13 @@
                 var emptyS     = 5 - fullS;
 
                 var allVarTags = new List<string>();
-                foreach (var r in group)
+                var siblingItems = first.OrderItem?.Order?.OrderItems
+                    ?.Where(oi => oi.ProductId == first.OrderItem!.ProductId)
+                    .ToList() ?? new List<OrderItem>();
+
+                foreach (var oi in siblingItems)
                 {
-                    var varJson = r.OrderItem?.SelectedVariation;
+                    var varJson = oi.SelectedVariation;
                     if (!string.IsNullOrWhiteSpace(varJson) && varJson != "{}" && varJson != "[]")
                     {
                         try {

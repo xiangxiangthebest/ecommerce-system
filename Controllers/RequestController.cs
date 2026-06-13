@@ -52,7 +52,7 @@ namespace EcommerceSystem.Controllers
 
             // RETURN_REFUND and REFUND go straight to customer service → use RETURN_REFUND status
             // so the customer service dashboard (which filters on RETURN_REFUND) picks them up.
-            order.CurrentStatus = OrderStatus.AFTER_SALES_REQUESTED;
+            order.CurrentStatus = OrderStatus.RETURN_REFUND_REQUESTED;
 
             if (!Enum.TryParse<RequestIssueType>(requestIssueType, true, out var issueType)
                 || !Enum.IsDefined(typeof(RequestIssueType), issueType))
@@ -120,7 +120,7 @@ namespace EcommerceSystem.Controllers
                     if (customerId.HasValue)
                         await _notificationService.CreateAsync(
                             userId:  customerId.Value,
-                            title:   "After-Sales Request Submitted",
+                            title:   "Return/Refund Request Submitted",
                             message: $"Your {serviceLabel} request for Order #{orderId} from {shopName} " +
                                     $"has been submitted and is pending Customer Service approval."
                         );
@@ -129,7 +129,7 @@ namespace EcommerceSystem.Controllers
                     if (sellerId.HasValue)
                         await _notificationService.CreateAsync(
                             userId:  sellerId.Value,
-                            title:   "After-Sales Request — Pending CS Approval",
+                            title:   "Return/Refund Requested",
                             message: $"Customer {customerName} has submitted a {serviceLabel} request " +
                                     $"for Order #{orderId}. Awaiting Customer Service approval."
                         );
@@ -142,9 +142,9 @@ namespace EcommerceSystem.Controllers
                     foreach (var adminId in adminIds)
                         await _notificationService.CreateAsync(
                             userId:  adminId,
-                            title:   "After-Sales Request — Pending CS Approval",
+                            title:   "Return/Refund Requested",
                             message: $"Order #{orderId} — {customerName} submitted a {serviceLabel} request " +
-                                    $"from {shopName}. Total: RM{total:F2}. Awaiting Customer Service approval."
+                                    $"from {shopName}. Awaiting Customer Service approval."
                         );
 
                     // 4. Notify all CustomerService users — action required
@@ -157,8 +157,7 @@ namespace EcommerceSystem.Controllers
                             userId:  csUserId,
                             title:   $"New {serviceLabel} Request — Action Required",
                             message: $"Customer {customerName} has submitted a {serviceLabel} request " +
-                                    $"for Order #{orderId} at {shopName}. " +
-                                    $"Total: RM{total:F2}. Please review and approve or reject."
+                                    $"for Order #{orderId} at {shopName}. Please review and approve or reject."
                         );
                 }
             }
@@ -244,7 +243,11 @@ namespace EcommerceSystem.Controllers
                 },
                 description = request.Description,
                 createdAt = request.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
-                approvedAt = request.SolvedAt.HasValue
+                status = request.Status,
+                approvedAt = (request.SolvedAt.HasValue && request.Status == "Approved")
+                                        ? request.SolvedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                        : (string?)null,
+                rejectedAt = (request.SolvedAt.HasValue && request.Status == "Rejected")
                                         ? request.SolvedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                                         : (string?)null,
                 approvedRefundAmount = request.ApprovedRefundAmount.HasValue

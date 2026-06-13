@@ -67,7 +67,8 @@
                     {
                         "Approved" => "APPROVED",
                         "Rejected" => "REJECTED",
-                        "Pending"  => "PENDING"
+                        "Pending"  => "PENDING",
+                        _          => "PENDING"
                     };
                     var searchHint  = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                     var svc         = serviceLabel.GetValueOrDefault(order.OrderId, "—");
@@ -199,7 +200,7 @@ var ordersForJs = allOrders
                 )
                 .Select(oi =>
                 {
-                    var reqQty = itemQtyMap.TryGetValue(oi.OrderItemId, out var q)
+                    var reqQty = itemQtyMap!.TryGetValue(oi.OrderItemId, out var q)
                         ? q
                         : 0;
 

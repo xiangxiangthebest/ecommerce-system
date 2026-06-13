@@ -58,7 +58,7 @@ else
                         onsubmit="return confirm('Are you sure you want to permanently delete this review?');">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@review.ReviewId" />
-                        <input type="hidden" name="productId" value="@review.OrderItem.ProductId" />
+                        <input type="hidden" name="productId" value="@review.OrderItem?.ProductId" />
                         <button type="submit" class="btn btn-sm btn-outline-danger"
                                 style="padding: 0.15rem 0.45rem; font-size: 0.75rem; line-height: 1.4;">
                             <i class="fas fa-trash"></i>

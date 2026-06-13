@@ -40,7 +40,38 @@ namespace EcommerceSystem.Services
                                     && r.CustomerId          == customerId);
 
             if (existing != null)
-                return OperationResult.Fail("You have already reviewed this item.");
+            {
+                // Already reviewed this product for this order (e.g. submitting a rating
+                // that covers multiple variations/order items of the same product).
+                // Treat as a no-op success so the UI doesn't show "could not be saved",
+                // but still let this orderItemId count toward "all items reviewed".
+                var allOrderItemsDup = await _context.OrderItems
+                    .Where(oi => oi.OrderId == orderItem.OrderId)
+                    .Select(oi => oi.OrderItemId)
+                    .ToListAsync();
+
+                var reviewedItemIdsDup = await _context.Reviews
+                    .Include(r => r.OrderItem)
+                    .Where(r => r.CustomerId == customerId && r.OrderItem != null && r.OrderItem.OrderId == orderItem.OrderId)
+                    .Select(r => r.OrderItemId)
+                    .ToListAsync();
+
+                reviewedItemIdsDup.Add(orderItemId);
+
+                bool allReviewedDup = allOrderItemsDup.All(id => reviewedItemIdsDup.Contains(id));
+                if (allReviewedDup)
+                {
+                    var orderDup = orderItem.Order;
+                    if (orderDup != null)
+                    {
+                        orderDup.ReviewSubmitted = true;
+                        _context.Order.Update(orderDup);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                return OperationResult.Ok();
+            }
 
             if (images != null && images.Count > 4)
                 return OperationResult.Fail("Maximum 4 images allowed.");
