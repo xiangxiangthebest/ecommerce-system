@@ -387,7 +387,7 @@ namespace EcommerceSystem.Controllers
                     {
                         await _notificationService.CreateAsync(
                             userId:  customerId.Value,
-                            title:   "Return & Refund Approved",
+                            title:   "Return/Refund Approved",
                             message: $"Your {returnTypeLabel} request for Order #{orderId} from {shopName} " +
                                      $"has been approved by Customer Service. Total: RM{total:F2}"
                         );
@@ -397,7 +397,7 @@ namespace EcommerceSystem.Controllers
                     {
                         await _notificationService.CreateAsync(
                             userId:  sellerId.Value,
-                            title:   "Return & Refund Approved",
+                            title:   "Return/Refund Approved",
                             message: $"Customer Service approved a {returnTypeLabel} request for Order #{orderId} " +
                                      $"from {customerName}. Refund total: RM{total:F2}"
                         );
@@ -412,7 +412,7 @@ namespace EcommerceSystem.Controllers
                     {
                         await _notificationService.CreateAsync(
                             userId:  adminId,
-                            title:   "Return & Refund Approved",
+                            title:   "Return/Refund Approved",
                             message: $"Order #{orderId} — Customer Service approved a {returnTypeLabel} " +
                                      $"request from {customerName} ({shopName}). Total: RM{total:F2}"
                         );
@@ -428,7 +428,7 @@ namespace EcommerceSystem.Controllers
                     {
                         await _notificationService.CreateAsync(
                             userId:  csUserId,
-                            title:   "Return & Refund Approved",
+                            title:   "Return/Refund Approved",
                             message: $"Order #{orderId} — {returnTypeLabel} request from {customerName} " +
                                      $"({shopName}) has been approved. Refund: RM{total:F2}"
                         );

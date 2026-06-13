@@ -174,103 +174,66 @@ namespace EcommerceSystem.Controllers
 
                 double actualProfit = 0;
 
+                // ── Load ALL approved requests for this seller's orders in ONE query ──
+                var deliveredOrderIds = deliveredOrders.Select(o => o.OrderId).ToList();
+                var allRequests = await _context.Request
+                    .Where(r => deliveredOrderIds.Contains(r.OrderId))
+                    .ToListAsync();
+
+                ViewBag.Requests = allRequests;
+
                 foreach (var order in deliveredOrders)
                 {
-                    // Voucher discount ratio for this order
-                    decimal rawSubtotal = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
+                    // Voucher discount ratio for THIS order
+                    decimal rawSubtotal    = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
                     decimal voucherDiscount = Math.Max(0m, rawSubtotal - order.TotalAmount);
-                    decimal discountRatio = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
+                    decimal discountRatio   = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
 
-                // Step 1: Add profit (revenue - cost) for every item in this order
-                foreach (var item in order.OrderItems)
-                {
-                    var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                    var costPrice = product != null && product.OriginalPrice > 0
-                        ? product.OriginalPrice
-                        : (double)item.Price;
-
-                    var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
-                    actualProfit += (discountedUnitPrice - costPrice) * item.Quantity;
-                }
-
-                    var orderIds = deliveredOrders.Select(o => o.OrderId).ToList();
-
-                    var requests = _context.Request
-                    .Where(r => orderIds.Contains(r.OrderId))
-                    .ToList();
-                        
-                    ViewBag.Requests = requests;                        
-                    foreach (var request in requests)
+                    // Step 1: Add profit (discounted revenue - cost) for every item in this order
+                    foreach (var item in order.OrderItems)
                     {
-                        if (request.SolvedAt.HasValue && request.ApprovedRefundAmount > 0)
-                        {
-                            bool isReturnRefund =
-                                request.Status=="Approved" &&
-                                request.RequestServiceType == RequestServiceType.RETURN_REFUND;
+                        var product   = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                        var costPrice = product != null && product.OriginalPrice > 0
+                            ? product.OriginalPrice
+                            : (double)item.Price;
 
-                            if (isReturnRefund)
+                        var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
+                        actualProfit += (discountedUnitPrice - costPrice) * item.Quantity;
+                    }
+
+                    // Step 2: Deduct approved refund impact for THIS order only
+                    var request = allRequests.FirstOrDefault(r => r.OrderId == order.OrderId);
+                    if (request != null && request.Status == "Approved"
+                        && request.ApprovedRefundAmount.HasValue && request.ApprovedRefundAmount.Value > 0)
+                    {
+                        bool isReturnRefund = request.RequestServiceType == RequestServiceType.RETURN_REFUND;
+
+                        if (isReturnRefund)
+                        {
+                            // Return & Refund: goods came back -> seller only loses the PROFIT portion.
+                            // Deduct = ApprovedRefundAmount * (1 - costRatio)
+                            decimal paidMerchandise = rawSubtotal - voucherDiscount;
+                            if (paidMerchandise > 0)
                             {
-                                decimal paidMerchandise = rawSubtotal - voucherDiscount;
-                                if (paidMerchandise > 0)
+                                double totalCost = 0;
+                                foreach (var item in order.OrderItems)
                                 {
-                                    double totalCost = 0;
-                                    foreach (var item in order.OrderItems)
-                                    {
-                                        var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                                        var costPrice = product != null && product.OriginalPrice > 0
-                                            ? product.OriginalPrice
-                                            : (double)item.Price;
-                                        totalCost += costPrice * item.Quantity;
-                                    }
-                                    double costRatio = totalCost / (double)paidMerchandise;
-                                    actualProfit -= (double)request.ApprovedRefundAmount * (1.0 - costRatio);
+                                    var product   = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                                    var costPrice = product != null && product.OriginalPrice > 0
+                                        ? product.OriginalPrice
+                                        : (double)item.Price;
+                                    totalCost += costPrice * item.Quantity;
                                 }
-                            }
-                            else
-                            {
-                                actualProfit -= (double)request.ApprovedRefundAmount;
+                                double costRatio = totalCost / (double)paidMerchandise;
+                                actualProfit -= (double)request.ApprovedRefundAmount.Value * (1.0 - costRatio);
                             }
                         }
+                        else
+                        {
+                            // Refund Only: goods NOT returned -> full refund amount is a direct profit loss.
+                            actualProfit -= (double)request.ApprovedRefundAmount.Value;
+                        }
                     }
-                        
-
-
-                    
-                    // Step 2: Deduct refund impact if return was approved
-                    // if (requests.SolvedAt.HasValue && requests.ApprovedRefundAmount > 0)
-                    // {
-                    //     bool isReturnRefund = order.ReturnType.HasValue &&
-                    //         order.ReturnType.Value == EcommerceSystem.Enums.ReturnType.ReturnRefund;
-
-                    //     if (isReturnRefund)
-                    //     {
-                    //         // Goods came back → seller recovers the cost, loses only the profit.
-                    //         // costRatio = total cost / total paid revenue (post-voucher)
-                    //         // Deduct = ApprovedRefundAmount × (1 - costRatio)  ← profit portion only
-                    //         // e.g. cost RM3, sell RM6, 3 items: costRatio=0.5 → deduct RM18×0.5 = RM9 ✅
-                    //         decimal paidMerchandise = rawSubtotal - voucherDiscount;
-                    //         if (paidMerchandise > 0)
-                    //         {
-                    //             double totalCost = 0;
-                    //             foreach (var item in order.OrderItems)
-                    //             {
-                    //                 var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                    //                 var costPrice = product != null && product.OriginalPrice > 0
-                    //                     ? product.OriginalPrice
-                    //                     : (double)item.Price;
-                    //                 totalCost += costPrice * item.Quantity;
-                    //             }
-                    //             double costRatio = totalCost / (double)paidMerchandise;
-                    //             actualProfit -= (double)order.ApprovedRefundAmount * (1.0 - costRatio);
-                    //         }
-                    //     }
-                    //     else
-                    //     {
-                    //         // Refund Only → goods NOT returned, full refunded revenue is lost.
-                    //         // e.g. 2 items at RM5.50 → deduct RM11 straight from profit ✅
-                    //         actualProfit -= (double)order.ApprovedRefundAmount;
-                    //     }
-                    // }
                 }
 
             ViewBag.TotalProfit = (decimal)actualProfit;
@@ -294,8 +257,10 @@ namespace EcommerceSystem.Controllers
                     .OrderByDescending(o => o.OrderTime)
                     .ToList();
 
+                // Re-fetch requests scoped to ALL orders for the Order tab display
+                var allOrderIds = orders.Select(o => o.OrderId).ToList();
                 ViewBag.Requests = await _context.Request
-                    .Where(r => orders.Select(o => o.OrderId).Contains(r.OrderId))
+                    .Where(r => allOrderIds.Contains(r.OrderId))
                     .ToListAsync();
             }
 

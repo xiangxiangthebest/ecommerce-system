@@ -355,7 +355,8 @@
             int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
             int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                                                  || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED
-                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED);
+                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED
+                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND);
 
             <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
@@ -408,7 +409,7 @@
                             var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
                             // Map RETURN_REFUND_REQUESTED → RETURN_REFUND so it appears under the Return/Refund tab
                             var rawStatusKey = order.CurrentStatus.ToString().ToUpper();
-                            var statusKey    = (rawStatusKey == "RETURN_REFUND_REQUESTED" || rawStatusKey == "RETURN_REFUND_REJECTED") ? "RETURN_REFUND" : rawStatusKey;
+                            var statusKey    = (rawStatusKey == "RETURN_REFUND_REQUESTED" || rawStatusKey == "RETURN_REFUND_REJECTED" || rawStatusKey == "REFUND" || rawStatusKey == "RETURN_REFUND") ? "RETURN_REFUND" : rawStatusKey;
                             var skuList    = string.Join(" ", order.OrderItems.Select(oi => oi.Product?.SKU ?? "")).ToLower();
                             var searchHint = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                             
@@ -419,30 +420,44 @@
                                 <td>@order.TotalAmount.ToString("F2")</td>
                                 <td>@order.PaymentMethod</td>
                                 <td>
-                                    @{  
-                                       @* var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId); *@
-                                        var isReturnApproved  = (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                                                               || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED)
-                                                               && request.SolvedAt.HasValue;
-                                        var isPendingCS       = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED
-                                                               && !request.SolvedAt.HasValue;
+                                    @{
+                                        var isAfterSaleStatus =
+                                            order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED ||
+                                            order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND ||
+                                            order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED ||
+                                            order.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND;
+
+                                        var isPendingCS = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED
+                                                       && (request == null || !request.SolvedAt.HasValue);
+
+                                        var isReturnApproved = isAfterSaleStatus
+                                                            && request != null && request.Status == "Approved";
+
+                                        var isReturnRejected = isAfterSaleStatus
+                                                            && request != null && request.Status == "Rejected";
                                     }
-                                    @if (isReturnApproved)
-                                    {
-                                        <span class="status-badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;">
-                                            RETURN/REFUND APPROVED
-                                        </span>
-                                    }
-                                    else if (isPendingCS)
+                                    @if (isPendingCS)
                                     {
                                         <span class="status-badge" style="background:#fffbeb;color:#b45309;border:1px solid #fcd34d;">
                                             RETURN/REFUND REQUESTED
                                         </span>
                                     }
-                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED)
+                                    else if (isReturnApproved)
+                                    {
+                                        <span class="status-badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;">
+                                            RETURN/REFUND APPROVED
+                                        </span>
+                                    }
+                                    else if (isReturnRejected)
                                     {
                                         <span class="status-badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;">
                                             RETURN/REFUND REJECTED
+                                        </span>
+                                    }
+                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED && isAfterSaleStatus == false)
+                                    {
+                                        <span class="status-badge" style="background:#dcfce7;color:#15803d;border:1px solid #86efac;">
+                                            RECEIVED
                                         </span>
                                     }
                                     else
@@ -1331,10 +1346,10 @@
         'SHIPPED':       { label: 'Shipped',        color: '#1565c0', bg: '#e3f2fd' },
         'DELIVERED':     { label: 'Delivered',      color: '#2e7d32', bg: '#e8f5e9' },
         'RECEIVED':      { label: 'Received',       color: '#2e7d32', bg: '#e8f5e9' },
-        'RETURN_REFUND': { label: 'Return / Refund',color: '#c62828', bg: '#ffebee' },
-        'RETURN_REFUND_APPROVED': { label: 'Return / Refund Approved', color: '#2e7d32', bg: '#e8f5e9' },
-        'RETURN_REFUND_REQUESTED': { label: 'Return / Refund Requested', color: '#b45309', bg: '#fffbeb' },
-        'RETURN_REFUND_REJECTED': { label: 'Return / Refund Rejected', color: '#b91c1c', bg: '#fee2e2' },
+        'RETURN_REFUND':          { label: 'Return/Refund Requested',  color: '#b45309', bg: '#fffbeb' },
+        'REFUND':                 { label: 'Return/Refund Requested',  color: '#b45309', bg: '#fffbeb' },
+        'RETURN_REFUND_REQUESTED':{ label: 'Return/Refund Requested',  color: '#b45309', bg: '#fffbeb' },
+        'RETURN_REFUND_REJECTED': { label: 'Return/Refund Rejected',   color: '#b91c1c', bg: '#fee2e2' },
         'CANCELED':      { label: 'Canceled',       color: '#c62828', bg: '#ffebee' },
     };
 
@@ -1386,7 +1401,7 @@
         const notesEl = document.getElementById('od-notes-section');
 
         // ── After-sale / Return statuses: fetch full request details ──────────
-        const isAfterSale = o.status === 'RETURN_REFUND_REQUESTED' || o.status === 'RETURN_REFUND' || o.status === 'RETURN_REFUND_REJECTED';
+        const isAfterSale = o.status === 'RETURN_REFUND_REQUESTED' || o.status === 'RETURN_REFUND' || o.status === 'RETURN_REFUND_REJECTED' || o.status === 'REFUND' || o.status === 'RECEIVED';
         if (isAfterSale) {
             notesEl.style.display = 'block';
             notesEl.innerHTML = `
@@ -1442,88 +1457,97 @@
                     ? result.images.map(url => `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:0.5px solid #ebebf5;">`).join('')
                     : '<span style="font-size:13px;color:#9a98b6;">No photos attached</span>';
 
+                // ── Status-specific approval block (image-matched card style) ──────────
+                // Pending (RETURN_REFUND_REQUESTED, no approvedAt / rejectedAt)
+                // Approved (RETURN_REFUND with approvedAt)
+                // Rejected (RETURN_REFUND_REJECTED with rejectedAt)
                 const approvalBlock = result.approvedAt ? `
-                <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #bbf7d0;">
+                <div style="background:#f0fdf4;border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #bbf7d0;">
                     <div>
-                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Return &amp; Refund Approved</p>
                         <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
                     </div>
-                    <i class="fas fa-check-circle" style="font-size:20px;color:#22c55e;"></i>
+                    <i class="fas fa-check-circle" style="font-size:22px;color:#22c55e;flex-shrink:0;"></i>
                 </div>` : result.rejectedAt ? `
-                <div style="background:#fff1f2;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fecdd3;">
+                <div style="background:#fff1f2;border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fecdd3;">
                     <div>
-                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Request Rejected</p>
-                        <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${result.rejectedAt}${result.rejectionReason ? ' · ' + result.rejectionReason : ''}</p>
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Return &amp; Refund Rejected</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${result.rejectedAt}${result.rejectionReason ? ' &nbsp;·&nbsp; ' + result.rejectionReason : ''}</p>
                     </div>
-                    <i class="fas fa-times-circle" style="font-size:20px;color:#ef4444;"></i>
+                    <i class="fas fa-times-circle" style="font-size:22px;color:#ef4444;flex-shrink:0;"></i>
                 </div>` : `
-                <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fde68a;">
+                <div style="background:#fffbeb;border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fde68a;">
                     <div>
-                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
                         <p style="margin:0;font-size:13px;font-weight:500;color:#92400e;">Pending — awaiting customer service</p>
                     </div>
-                    <i class="fas fa-hourglass-half" style="font-size:20px;color:#f59e0b;"></i>
+                    <i class="fas fa-hourglass-half" style="font-size:22px;color:#f59e0b;flex-shrink:0;"></i>
                 </div>`;
 
                 // Update the modal header badge based on approval/rejection state
                 const stEl = document.getElementById('od-status');
                 if (stEl) {
                     if (result.approvedAt) {
-                        stEl.textContent = 'Return / Refund Approved';
+                        stEl.textContent = 'Return/Refund Approved';
                         stEl.style.background = '#dcfce7';
                         stEl.style.color = '#15803d';
                     } else if (result.rejectedAt) {
-                        stEl.textContent = 'Return / Refund Rejected';
+                        stEl.textContent = 'Return/Refund Rejected';
                         stEl.style.background = '#fee2e2';
                         stEl.style.color = '#b91c1c';
+                    } else {
+                        stEl.textContent = 'Return/Refund Requested';
+                        stEl.style.background = '#fffbeb';
+                        stEl.style.color = '#b45309';
                     }
                 }
 
                 notesEl.innerHTML = `
-                <div class="od-section-label">Notes &amp; Remarks</div>
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                    <i class="fas fa-exchange-alt" style="color:#f97316;font-size:13px;"></i>
-                    <span style="font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.05em;">Return type</span>
-                    <span style="font-size:13px;font-weight:600;color:#1e1b4b;">${result.serviceType ?? '—'}</span>
+                <div class="od-section-label" style="margin-bottom:10px;">Notes &amp; Remarks</div>
+
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+                    <i class="fas fa-exchange-alt" style="color:#f97316;font-size:13px;flex-shrink:0;"></i>
+                    <span style="font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.05em;">Return Type</span>
+                    <span style="font-size:13px;font-weight:600;color:#1e1b4b;margin-left:4px;">${result.serviceType ?? '—'}</span>
                 </div>
 
-                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                     <div>
-                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request Submitted</p>
+                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Request Submitted</p>
                         <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.createdAt}</p>
                     </div>
-                    <i class="fas fa-clock" style="font-size:20px;color:#9a98b6;"></i>
+                    <i class="fas fa-clock" style="font-size:22px;color:#9a98b6;flex-shrink:0;"></i>
                 </div>
 
                 ${approvalBlock}
 
-                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+                <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
                     <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order Items</p>
                     ${itemsHtml}
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;margin-top:4px;border-top:1.5px solid #e8eaf6;">
-                        <p style="margin:0;font-size:12px;font-weight:700;color:#6b6b8a;text-transform:uppercase;letter-spacing:0.05em;">Total Refund Amount</p>
+                        <p style="margin:0;font-size:11px;font-weight:700;color:#6b6b8a;text-transform:uppercase;letter-spacing:0.05em;">Total Refund Amount</p>
                         <p style="margin:0;font-size:16px;font-weight:800;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
                     </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
-                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Requested Amount</p>
-                        <p style="margin:0;font-size:13px;font-weight:600;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
+                    <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:11px 14px;">
+                        <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Requested Amount</p>
+                        <p style="margin:0;font-size:14px;font-weight:700;color:#f97316;">RM ${totalRefund.toFixed(2)}</p>
                     </div>
-                    <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
-                        <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
+                    <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:11px 14px;">
+                        <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Reason</p>
                         <p style="margin:0;font-size:13px;font-weight:500;color:#1e1b4b;">${result.issueType ?? '—'}</p>
                     </div>
                 </div>
 
                 ${result.description ? `
-                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;margin-bottom:8px;">
-                    <p style="margin:0 0 3px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
-                    <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.5;">${result.description}</p>
+                <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:11px 14px;margin-bottom:8px;">
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Description</p>
+                    <p style="margin:0;font-size:13px;color:#1e1b4b;line-height:1.55;">${result.description}</p>
                 </div>` : ''}
 
-                <div style="background:#ffffff;border:1px solid #ebebf5;border-radius:10px;padding:10px 14px;">
+                <div style="background:#ffffff;border:1px solid #e8eaf6;border-radius:10px;padding:11px 14px;">
                     <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Photos</p>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">${imagesHtml}</div>
                 </div>`;
