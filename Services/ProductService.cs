@@ -129,6 +129,9 @@ namespace EcommerceSystem.Services
                 .Include(r => r.OrderItem)
                     .ThenInclude(oi => oi!.Order)
                         .ThenInclude(o => o!.Customer)
+                .Include(r => r.OrderItem)
+                    .ThenInclude(oi => oi!.Order)
+                        .ThenInclude(o => o!.OrderItems)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 

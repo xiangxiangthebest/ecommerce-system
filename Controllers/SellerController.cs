@@ -161,13 +161,14 @@ namespace EcommerceSystem.Controllers
                             || o.CurrentStatus == OrderStatus.RECEIVED
                             || o.CurrentStatus == OrderStatus.RETURN_REFUND
                             // ── After-sales statuses ───────────────────────────────
-                            // An order moves to AFTER_SALES_REQUESTED while a return/refund
+                            // An order moves to RETURN_REFUND_REQUESTED while a return/refund
                             // is pending (and may end up REFUND for refund-only). We keep
                             // counting its profit here so revenue doesn't "drop" while the
                             // request is pending. Once approved, ReturnApprovedAt +
                             // ApprovedRefundAmount are set and the deduction below applies —
                             // exactly the same way your original RETURN_REFUND case did.
-                            || o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED
+                            || o.CurrentStatus == OrderStatus.RETURN_REFUND_REQUESTED
+                            || o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED
                             || o.CurrentStatus == OrderStatus.REFUND))
                     .ToListAsync();
 
@@ -195,7 +196,7 @@ namespace EcommerceSystem.Controllers
                     var orderIds = deliveredOrders.Select(o => o.OrderId).ToList();
 
                     var requests = _context.Request
-                    .Where(r => r.OrderId != null && orderIds.Contains(r.OrderId))
+                    .Where(r => orderIds.Contains(r.OrderId))
                     .ToList();
                         
                     ViewBag.Requests = requests;                        
@@ -294,7 +295,7 @@ namespace EcommerceSystem.Controllers
                     .ToList();
 
                 ViewBag.Requests = await _context.Request
-                    .Where(r => r.OrderId != null && orders.Select(o => o.OrderId).Contains(r.OrderId))
+                    .Where(r => orders.Select(o => o.OrderId).Contains(r.OrderId))
                     .ToListAsync();
             }
 
@@ -344,6 +345,9 @@ namespace EcommerceSystem.Controllers
                     .Include(r => r.OrderItem!)
                         .ThenInclude(oi => oi.Order!)
                             .ThenInclude(o => o.Customer)
+                    .Include(r => r.OrderItem!)
+                        .ThenInclude(oi => oi.Order!)
+                            .ThenInclude(o => o.OrderItems)
                     .Where(r => productIds.Contains(r.ProductId))
                     .OrderByDescending(r => r.CreatedAt)
                     .ToListAsync();

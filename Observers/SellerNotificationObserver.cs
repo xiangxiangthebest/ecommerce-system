@@ -108,7 +108,7 @@ namespace EcommerceSystem.Observers
                     case OrderStatus.RETURN_REFUND:
                     case OrderStatus.REFUND:
                     {
-                        title = "Return & Refund Request — Pending CS Approval";
+                        title = "Return & Refund Request";
                         message =
                             $"Customer #{customerId} ({customerName}) has submitted a " +
                             $"return/refund request for Order #{orderId}. " +

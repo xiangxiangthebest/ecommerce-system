@@ -354,7 +354,8 @@
             int cntReceived     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RECEIVED);
             int cntCanceled     = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.CANCELED);
             int cntReturnRefund = allOrders.Count(o => o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED);
+                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED
+                                                 || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED);
 
             <div class="product-header" style="margin-bottom:20px">
                 <h2 class="section-title">Your Orders</h2>
@@ -405,9 +406,9 @@
                         {   
                             var requests = (List<Request>)ViewBag.Requests;
                             var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                            // Map AFTER_SALES_REQUESTED → RETURN_REFUND so it appears under the Return/Refund tab
+                            // Map RETURN_REFUND_REQUESTED → RETURN_REFUND so it appears under the Return/Refund tab
                             var rawStatusKey = order.CurrentStatus.ToString().ToUpper();
-                            var statusKey    = rawStatusKey == "AFTER_SALES_REQUESTED" ? "RETURN_REFUND" : rawStatusKey;
+                            var statusKey    = (rawStatusKey == "RETURN_REFUND_REQUESTED" || rawStatusKey == "RETURN_REFUND_REJECTED") ? "RETURN_REFUND" : rawStatusKey;
                             var skuList    = string.Join(" ", order.OrderItems.Select(oi => oi.Product?.SKU ?? "")).ToLower();
                             var searchHint = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                             
@@ -421,9 +422,9 @@
                                     @{  
                                        @* var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId); *@
                                         var isReturnApproved  = (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                                                               || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                                                               || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED)
                                                                && request.SolvedAt.HasValue;
-                                        var isPendingCS       = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
+                                        var isPendingCS       = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED
                                                                && !request.SolvedAt.HasValue;
                                     }
                                     @if (isReturnApproved)
@@ -435,7 +436,13 @@
                                     else if (isPendingCS)
                                     {
                                         <span class="status-badge" style="background:#fffbeb;color:#b45309;border:1px solid #fcd34d;">
-                                            PENDING CS APPROVAL
+                                            RETURN/REFUND REQUESTED
+                                        </span>
+                                    }
+                                    else if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED)
+                                    {
+                                        <span class="status-badge" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;">
+                                            RETURN/REFUND REJECTED
                                         </span>
                                     }
                                     else
@@ -749,6 +756,31 @@
                                     try { reviewImgList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.ReviewImagePathsJson) ?? new List<string>(); } catch { }
                                 }
 
+                                var varTags = new List<string>();
+                                var siblingItems = r.OrderItem?.Order?.OrderItems
+                                    ?.Where(oi => oi.ProductId == r.OrderItem!.ProductId)
+                                    .ToList() ?? new List<EcommerceSystem.Models.OrderItem>();
+
+                                foreach (var oi in siblingItems)
+                                {
+                                    var varJson = oi.SelectedVariation;
+                                    if (!string.IsNullOrWhiteSpace(varJson) && varJson != "{}" && varJson != "[]")
+                                    {
+                                        try {
+                                            using var varDoc = System.Text.Json.JsonDocument.Parse(varJson);
+                                            if (varDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                            {
+                                                var parts = new List<string>();
+                                                foreach (var prop in varDoc.RootElement.EnumerateObject())
+                                                    parts.Add($"{prop.Name}: {prop.Value}");
+                                                var varLine = string.Join(" · ", parts);
+                                                if (!string.IsNullOrWhiteSpace(varLine) && !varTags.Contains(varLine))
+                                                    varTags.Add(varLine);
+                                            }
+                                        } catch { }
+                                    }
+                                }
+
                                 <div class="rv-card-seller">
                                     <div class="rv-card-author">
                                         <div class="rv-avatar">@customerInit</div>
@@ -761,6 +793,20 @@
                                         @for (int i = 0; i < r.Rating; i++) { <span class="rv-star-gold">★</span> }
                                         @for (int i = 0; i < (5 - r.Rating); i++) { <span class="rv-star-empty">★</span> }
                                     </div>
+                                    @if (varTags.Any())
+                                    {
+                                        <div class="rv-card-variation">
+                                            @foreach (var tag in varTags)
+                                            {
+                                                <div class="rv-var-row">
+                                                    @foreach (var part in tag.Split(" · "))
+                                                    {
+                                                        <span class="rv-var-tag">@part</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(r.ReviewText))
                                     {
                                         <p class="rv-card-text-seller">@r.ReviewText</p>
@@ -843,6 +889,16 @@
                 .rv-author-name { font-size: 14px; font-weight: 700; color: #1e1b4b; }
                 .rv-card-date { font-size: 12px; color: #9a98b6; }
                 .rv-card-stars-seller { display: flex; gap: 2px; margin-bottom: 8px; }
+                .rv-card-variation { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+                .rv-var-row { display: flex; gap: 6px; flex-wrap: wrap; }
+                .rv-var-tag {
+                    display: inline-block;
+                    font-size: 12px;
+                    color: #6b6890;
+                    background: #f1f0fa;
+                    border-radius: 6px;
+                    padding: 2px 8px;
+                }
                 .rv-star-gold  { color: #f59e0b; font-size: 16px; }
                 .rv-star-empty { color: #d1d5db; font-size: 16px; }
                 .rv-card-text-seller { font-size: 13.5px; color: #1e1b4b; margin: 0 0 10px; line-height: 1.5; }
@@ -1037,7 +1093,7 @@
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
         .Where(o => (o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED)
                 )
         .Select(o => {
             @* var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason); *@
@@ -1277,7 +1333,8 @@
         'RECEIVED':      { label: 'Received',       color: '#2e7d32', bg: '#e8f5e9' },
         'RETURN_REFUND': { label: 'Return / Refund',color: '#c62828', bg: '#ffebee' },
         'RETURN_REFUND_APPROVED': { label: 'Return / Refund Approved', color: '#2e7d32', bg: '#e8f5e9' },
-        'AFTER_SALES_REQUESTED': { label: 'After-Sale Request', color: '#b45309', bg: '#fffbeb' },
+        'RETURN_REFUND_REQUESTED': { label: 'Return / Refund Requested', color: '#b45309', bg: '#fffbeb' },
+        'RETURN_REFUND_REJECTED': { label: 'Return / Refund Rejected', color: '#b91c1c', bg: '#fee2e2' },
         'CANCELED':      { label: 'Canceled',       color: '#c62828', bg: '#ffebee' },
     };
 
@@ -1329,7 +1386,7 @@
         const notesEl = document.getElementById('od-notes-section');
 
         // ── After-sale / Return statuses: fetch full request details ──────────
-        const isAfterSale = o.status === 'AFTER_SALES_REQUESTED' || o.status === 'RETURN_REFUND';
+        const isAfterSale = o.status === 'RETURN_REFUND_REQUESTED' || o.status === 'RETURN_REFUND' || o.status === 'RETURN_REFUND_REJECTED';
         if (isAfterSale) {
             notesEl.style.display = 'block';
             notesEl.innerHTML = `
@@ -1392,6 +1449,13 @@
                         <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
                     </div>
                     <i class="fas fa-check-circle" style="font-size:20px;color:#22c55e;"></i>
+                </div>` : result.rejectedAt ? `
+                <div style="background:#fff1f2;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fecdd3;">
+                    <div>
+                        <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Request Rejected</p>
+                        <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${result.rejectedAt}${result.rejectionReason ? ' · ' + result.rejectionReason : ''}</p>
+                    </div>
+                    <i class="fas fa-times-circle" style="font-size:20px;color:#ef4444;"></i>
                 </div>` : `
                 <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;border:1px solid #fde68a;">
                     <div>
@@ -1401,13 +1465,17 @@
                     <i class="fas fa-hourglass-half" style="font-size:20px;color:#f59e0b;"></i>
                 </div>`;
 
-                // Update the modal header badge to green if approved
-                if (result.approvedAt) {
-                    const stEl = document.getElementById('od-status');
-                    if (stEl) {
+                // Update the modal header badge based on approval/rejection state
+                const stEl = document.getElementById('od-status');
+                if (stEl) {
+                    if (result.approvedAt) {
                         stEl.textContent = 'Return / Refund Approved';
                         stEl.style.background = '#dcfce7';
                         stEl.style.color = '#15803d';
+                    } else if (result.rejectedAt) {
+                        stEl.textContent = 'Return / Refund Rejected';
+                        stEl.style.background = '#fee2e2';
+                        stEl.style.color = '#b91c1c';
                     }
                 }
 

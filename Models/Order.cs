@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using EcommerceSystem.Interfaces;
-using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Models;
 
@@ -90,11 +89,11 @@ public class Order : OrderStatusSubject
         { OrderStatus.PENDING,       new() { OrderStatus.CANCELED } },
         { OrderStatus.PREPARING,     new() { OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { } },
-        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.AFTER_SALES_REQUESTED } },
-        { OrderStatus.RECEIVED,      new() { OrderStatus.AFTER_SALES_REQUESTED } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND_REQUESTED } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND_REQUESTED } },
 
         // after sales flow ends order control
-        { OrderStatus.AFTER_SALES_REQUESTED, new() { } },
+        { OrderStatus.RETURN_REFUND_REQUESTED, new() { } },
 
         { OrderStatus.CANCELED, new() { } },
         { OrderStatus.CANCEL_REQUESTED, new() { } }
@@ -110,13 +109,13 @@ public class Order : OrderStatusSubject
         { OrderStatus.PENDING,       new() { OrderStatus.PREPARING, OrderStatus.CANCELED } },
         { OrderStatus.PREPARING,     new() { OrderStatus.SHIPPED, OrderStatus.CANCEL_REQUESTED } },
         { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
-        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.AFTER_SALES_REQUESTED } },
-        { OrderStatus.RECEIVED,      new() { OrderStatus.AFTER_SALES_REQUESTED } },
+        { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND_REQUESTED } },
+        { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND_REQUESTED } },
         { OrderStatus.CANCELED,      new() { } },
 
         // after sales flow ends order control
         { OrderStatus.CANCEL_REQUESTED, new() { OrderStatus.CANCELED} },
-        { OrderStatus.AFTER_SALES_REQUESTED, new(){ }}
+        { OrderStatus.RETURN_REFUND_REQUESTED, new(){ }}
     };
 
     /// <summary>
