@@ -5,13 +5,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] MMU Shop</title>
+    <title>@ViewData["Title"] MMU Shop Customer Service</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/customer/layout.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ecommerce_system.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@@tabler/icons-webfont@@3.31.0/dist/tabler-icons.min.css" />
 </head>
 <body>
     <header>
@@ -23,44 +24,27 @@
                 <i class="ti ti-menu-2"></i>
             </button>
 
-            <a class="nav-brand" asp-controller="Customer" asp-action="Home">
-                <div class="brand-icon">🛍️</div>
-                <span class="brand-name">MMU Shop</span>
-            </a>
-
             <div class="nav-divider-v"></div>
+
+            @{
+                var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+                var action = ViewContext.RouteData.Values["action"]?.ToString();
+            }
+
 
             <!-- Desktop links -->
             <div class="nav-links">
-                <a class="nav-link" asp-controller="Customer" asp-action="Home">
-                <i class="ti ti-home"></i> Home
+                <a class="nav-link @(controller == "CustomerService" && action == "Home" ? "active" : "")" 
+                asp-controller="CustomerService" asp-action="Home">
+                    <i class="ti ti-clipboard-list"></i> Request
                 </a>
-                <a class="nav-link" asp-controller="Customer" asp-action="PurchaseHistory">
-                <i class="ti ti-receipt"></i> Purchase History
-                </a>
-                <a class="nav-link" asp-controller="Chat" asp-action="CustomerInbox">
-                <i class="bi bi-chat-text"></i> Chat
-                </a>
-                <a class="nav-link" asp-controller="Customer" asp-action="MyReports">
-                <i class="ti ti-flag"></i> My Reports
+                <a class="nav-link @(controller == "CustomerService" && action == "Notifications" ? "active" : "")" 
+                asp-controller="CustomerService" asp-action="Notifications">
+                    <i class="ti ti-bell"></i> Notification
                 </a>
             </div>
 
             <div class="nav-right">
-                <a class="icon-btn" asp-controller="Customer" asp-action="Notifications">
-                    <i class="ti ti-bell"></i>
-                    @if (ViewBag.UnreadNotificationCount is int count && count > 0)
-                    {
-                        <span class="notification-badge">@(count > 99 ? "99+" : count.ToString())</span>
-                    }
-                </a>
-                <a class="cart-btn" asp-controller="Customer" asp-action="Cart">
-                <i class="ti ti-shopping-cart"></i>
-                <span>Cart</span>
-                <span id="navCartCount" class="cart-count">
-                    @ViewBag.CartCount
-                </span>
-                </a>
                 <div class="nav-divider-v"></div>
                 <div class="profile-dropdown">
                 <button class="profile-btn">
@@ -78,7 +62,7 @@
                     <i class="ti ti-chevron-down"></i>
                 </button>
                 <div class="dropdown-menu">
-                    <a class="dropdown-item" asp-controller="Customer" asp-action="Profile">
+                    <a class="dropdown-item" asp-controller="CustomerService" asp-action="Profile">
                     <i class="ti ti-user"></i> My Profile
                     </a>
                     <hr class="dropdown-sep" />
@@ -94,22 +78,6 @@
 
             </div>
 
-            <!-- Mobile drawer -->
-            <div class="mobile-drawer" id="mobileDrawer">
-            <a class="nav-link" asp-controller="Customer" asp-action="Home">
-                <i class="ti ti-home"></i> Home
-            </a>
-            <a class="nav-link" asp-controller="Customer" asp-action="PurchaseHistory">
-                <i class="ti ti-receipt"></i> Purchase History
-            </a>
-            <a class="nav-link" asp-controller="Chat" asp-action="CustomerInbox">
-                <i class="bi bi-chat-text"></i> Chat
-            </a>
-            <a class="nav-link" asp-controller="Customer" asp-action="MyReports">
-                <i class="ti ti-flag"></i> My Reports
-            </a>
-            </div>
-
         </nav>
     </header>
     <div class="container-fluid p-0">
@@ -121,7 +89,7 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
-    <script src="~/js/customer/layout.js" asp-append-version="true"></script>
+    <script src="~/js/customerservice/layout.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 
 </body>

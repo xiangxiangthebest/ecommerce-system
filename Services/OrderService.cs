@@ -443,7 +443,6 @@ namespace EcommerceSystem.Services
                 .OrderByDescending(o => o.OrderTime)
                 .ToListAsync();
 
-            // review submitted calculation (previous controller logic moved here)
             var orderItemIds = orders.SelectMany(o => o.OrderItems).Select(oi => oi.OrderItemId).ToList();
 
             if (orderItemIds.Count > 0)
@@ -455,19 +454,36 @@ namespace EcommerceSystem.Services
                 var reviewedSet = reviews.Select(r => r.OrderItemId).ToHashSet();
                 var reviewMap   = reviews.ToDictionary(r => r.OrderItemId);
 
+                bool anyChanged = false;
+
                 foreach (var o in orders)
                 {
-                    o.ReviewSubmitted = o.OrderItems.Count > 0
-                        && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
+                    //Console.WriteLine($"[DEBUG] Order {o.OrderId} ReviewSubmitted={o.ReviewSubmitted}"); //debug
+                    // Only calculate if not already permanently marked as submitted
+                    if (!o.ReviewSubmitted)
+                    {
+                        var justSubmitted = o.OrderItems.Count > 0
+                            && o.OrderItems.All(oi => reviewedSet.Contains(oi.OrderItemId));
+
+                        if (justSubmitted)
+                        {
+                            o.ReviewSubmitted = true;
+                            _context.Order.Update(o);
+                            anyChanged = true;
+                        }
+                    }
 
                     foreach (var oi in o.OrderItems)
                         oi.Review = reviewMap.GetValueOrDefault(oi.OrderItemId);
                 }
+
+                // Persist ReviewSubmitted = true for any newly reviewed orders
+                if (anyChanged)
+                    await _context.SaveChangesAsync();
             }
 
             return orders;
         }
-
         public async Task<OperationResult> CancelOrderAsync(int customerId, int orderId, string reason)
         {
             if (string.IsNullOrWhiteSpace(reason))
@@ -519,32 +535,7 @@ namespace EcommerceSystem.Services
 
             return OperationResult.Ok();
         }
-
-        public async Task<OperationResult> RequestCancelOrderAsync(int customerId, int orderId, string reason)
-        {
-            if (string.IsNullOrWhiteSpace(reason))
-                return OperationResult.Fail("Please provide a cancellation reason.");
-
-            var order = await _context.Order
-                .Include(o => o.Customer)
-                .Include(o => o.Seller)
-                .FirstOrDefaultAsync(o => o.OrderId == orderId
-                                    && o.CustomerUserId == customerId
-                                    && o.CurrentStatus == OrderStatus.PREPARING);
-
-            if (order == null)
-                return OperationResult.Fail("Order cannot be requested for cancellation or order not found.");
-
-            order.CancelReason = reason.Trim();
-            
-            AttachObservers(order);
-            await order.SetStatusAsync(OrderStatus.CANCEL_REQUESTED);
-
-            await _context.SaveChangesAsync();
-            
-            return OperationResult.Ok();
-        }
-
+        
         public async Task<OperationResult> ConfirmReceivedAsync(int customerId, int orderId)
         {
             var order = await _context.Order
@@ -589,7 +580,7 @@ namespace EcommerceSystem.Services
             return OperationResult.Ok();
         }
 
-        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths, ReturnInitiatedBy initiatedBy)
+        public async Task<OperationResult> RequestReturnRefundAsync(int userId, int orderId, string reason, List<string> imagePaths)
         {
             if (string.IsNullOrWhiteSpace(reason))
                 return OperationResult.Fail("Please provide a return/refund reason.");
@@ -609,12 +600,12 @@ namespace EcommerceSystem.Services
             if (order.CurrentStatus != OrderStatus.DELIVERED)
                 return OperationResult.Fail("Only delivered orders can request return/refund.");
 
-            order.ReturnRequested = true;
-            order.ReturnStatus = ReturnStatus.Requested;
-            order.ReturnReason = reason.Trim();
-            order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
-            order.ReturnInitiatedAt = DateTime.UtcNow;
-            order.ReturnInitiatedBy = initiatedBy;
+            // order.ReturnRequested = true;
+            // order.ReturnStatus = ReturnStatus.Requested;
+            // order.ReturnReason = reason.Trim();
+            // order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
+            // order.ReturnInitiatedAt = DateTime.UtcNow;
+            // order.ReturnInitiatedBy = initiatedBy;
 
             // ── Notify all parties then persist ──
             AttachObservers(order);

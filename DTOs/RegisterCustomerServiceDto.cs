@@ -9,12 +9,14 @@ namespace EcommerceSystem.DTOs
 
         [Required]
         [EmailAddress]
+        [RegularExpression(@"^[a-zA-Z0-9._%+\-]+@gmail\.com$", ErrorMessage = "Email must be a valid @gmail.com address.")]
         public string Email { get; set; } = string.Empty;
 
         [Required]
         public string Password { get; set; } = string.Empty;
 
         [Required]
+        [RegularExpression(@"^\d+$", ErrorMessage = "Phone number must contain digits only.")]
         public string PhoneNumber { get; set; } = string.Empty;
 
     }

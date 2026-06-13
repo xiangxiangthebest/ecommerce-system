@@ -311,11 +311,33 @@ namespace EcommerceSystem.Controllers
 
             // var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
             // return View(orders);
+            
+            // var requests = await _requestService.GetByUserId(customer.UserId);
+            // var requestMap = requests
+            //     .Where(r => r.OrderId != null)
+            //     .ToDictionary(r => r.OrderId.Value);
+
+            // var vm = new PurchaseHistoryVM
+            // {
+            //     Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
+            //     Requests = await _requestService.GetByUserId(customer.UserId),
+            //     RequestMap = requestMap
+            // };
+
+            // return View(vm);
+
+            var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
+            var requests = await _requestService.GetByUserId(customer.UserId);
+
+            var requestMap = requests
+                .Where(r => r.OrderId != null)
+                .ToDictionary(r => r.OrderId);
 
             var vm = new PurchaseHistoryVM
             {
-                Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
-                Requests = await _requestService.GetByUserId(customer.UserId)
+                Orders = orders,
+                Requests = requests,
+                RequestMap = requestMap
             };
 
             return View(vm);
@@ -326,7 +348,7 @@ namespace EcommerceSystem.Controllers
         // =========================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason, bool request)
+        public async Task<IActionResult> CancelOrder(int orderId, string cancelReason)
         {
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
@@ -343,16 +365,9 @@ namespace EcommerceSystem.Controllers
 
             OperationResult result;
 
-            if (request || orderCheck.CurrentStatus == OrderStatus.PREPARING)
-            {
-                // 走申请取消流程 -> 状态变为 CANCEL_REQUESTED (状态机完全允许，绝不报错)
-                result = await _orderService.RequestCancelOrderAsync(customer.UserId, orderId, cancelReason);
-            }
-            else
-            {
                 // 走直接取消流程 -> 状态变为 CANCELED 
-                result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
-            }
+            result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
+            
 
             // 3. 返回安全数据
             return Json(new { success = result.Success, message = result.Error });

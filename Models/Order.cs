@@ -13,7 +13,6 @@ public class Order : OrderStatusSubject
     public DateTime OrderTime { get; set; }
     public decimal TotalAmount { get; set; }
     public bool VoucherApplied { get; set; } = false;
-    public decimal ApprovedRefundAmount { get; set; } = 0m;  
     public string PaymentMethod { get; set; } = string.Empty;
     public int? AddressId { get; set; }
     public string? CustomerMessage { get; set; }
@@ -36,31 +35,12 @@ public class Order : OrderStatusSubject
     public DateTime? DeliveredAt { get; set; }
     public DateTime? ReceivedAt { get; set; }
 
-    // ── Return / Refund ─────────────────────────────────────────────────────
-    public string? ReturnReason { get; set; }
-
-    /// <summary>The kind of resolution the customer is requesting (ReturnRefund / ReturnReplace / RefundOnly).</summary>
-    public ReturnType? ReturnType { get; set; }
-
-    /// <summary>JSON-serialised list of image paths uploaded by the customer with the return request.</summary>
-    public string? ReturnImagePathsJson { get; set; }
-
-    public DateTime? ReturnInitiatedAt { get; set; }
-    public ReturnInitiatedBy? ReturnInitiatedBy { get; set; }
-    public ReturnStatus ReturnStatus { get; set; } = ReturnStatus.None;
-    public bool ReturnRequested { get; set; } = false;
-
-    /// <summary>Set when seller approves the return/refund request — triggers stock restoration.</summary>
-    public DateTime? ReturnApprovedAt { get; set; }
-
     // ── Review flag (not persisted) ─────────────────────────────────────────
-    [NotMapped]
-    public bool ReviewSubmitted { get; set; }
+    public bool ReviewSubmitted { get; set; } = false;
 
     // ── Navigation properties ────────────────────────────────────────────────
     public Customer? Customer { get; set; }
     public Seller? Seller { get; set; }
-
 
     // ── Observer list (not persisted) ───────────────────────────────────────
     [NotMapped]

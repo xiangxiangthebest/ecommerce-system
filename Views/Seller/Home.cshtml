@@ -402,7 +402,9 @@
                     </thead>
                     <tbody id="ordersTableBody">
                         @foreach (var order in allOrders)
-                        {
+                        {   
+                            var requests = (List<Request>)ViewBag.Requests;
+                            var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
                             // Map AFTER_SALES_REQUESTED → RETURN_REFUND so it appears under the Return/Refund tab
                             var rawStatusKey = order.CurrentStatus.ToString().ToUpper();
                             var statusKey    = rawStatusKey == "AFTER_SALES_REQUESTED" ? "RETURN_REFUND" : rawStatusKey;
@@ -416,12 +418,13 @@
                                 <td>@order.TotalAmount.ToString("F2")</td>
                                 <td>@order.PaymentMethod</td>
                                 <td>
-                                    @{
+                                    @{  
+                                       @* var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId); *@
                                         var isReturnApproved  = (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
                                                                || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
-                                                               && order.ReturnApprovedAt.HasValue;
+                                                               && request.SolvedAt.HasValue;
                                         var isPendingCS       = order.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED
-                                                               && !order.ReturnApprovedAt.HasValue;
+                                                               && !request.SolvedAt.HasValue;
                                     }
                                     @if (isReturnApproved)
                                     {
@@ -1034,12 +1037,12 @@
 
     var ordersForJs = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
         .Where(o => (o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND
-                  || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
-                 && !o.ReturnApprovedAt.HasValue)
+                || o.CurrentStatus == EcommerceSystem.Models.OrderStatus.AFTER_SALES_REQUESTED)
+                )
         .Select(o => {
-            var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason);
-            var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
-            var useAllItems = requestedQtys.Count == 0;
+            @* var (reasonText, embeddedType, description, requestedQtys, parsedReturnType) = ParseReturnReason(o.ReturnReason); *@
+            @* var returnType = !string.IsNullOrWhiteSpace(embeddedType) ? embeddedType : (!string.IsNullOrWhiteSpace(parsedReturnType) ? parsedReturnType : (o.ReturnType.HasValue ? o.ReturnType.ToString() : ""));
+            var useAllItems = requestedQtys.Count == 0; *@
             var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
             // TotalAmount is merchandise-only (no shipping/SST), so discount = rawSubtotal - TotalAmount
             var vDiscount   = Math.Max(0m, rawSubtotal - o.TotalAmount);
@@ -1047,13 +1050,13 @@
         
         return new {
             orderId           = o.OrderId,
-            returnType        = returnType,
+            @* returnType        = returnType,
             returnReason      = reasonText,
-            returnDescription = description,
-            returnImages      = ParseImagePaths(o.ReturnImagePathsJson),
+            returnDescription = description, *@
+            @* returnImages      = ParseImagePaths(o.ReturnImagePathsJson), *@
             customerEmail     = o.Customer?.Email ?? "—",
             customerName      = o.Customer?.FullName ?? "",
-            items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
+            @* items = o.OrderItems.Where(oi => useAllItems || requestedQtys.ContainsKey(oi.OrderItemId)).Select(oi => new {
                 orderItemId       = oi.OrderItemId,
                 name              = (!string.IsNullOrWhiteSpace(oi.Product?.SKU) ? $"[{oi.Product!.SKU}] " : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
                 sku               = oi.Product?.SKU ?? "—",
@@ -1061,17 +1064,17 @@
                 requestedQty      = requestedQtys.GetValueOrDefault(oi.OrderItemId, oi.Quantity),
                 unitPrice         = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
                 selectedVariation = oi.SelectedVariation ?? ""   // e.g. {"Flavour":"Honey Tapioca","Size":"120g"}
-            }).ToList()
+            }).ToList() *@
         };
         }).ToList();
 
     var allOrdersForDetails = ((List<EcommerceSystem.Models.Order>)ViewBag.Orders)
         .Select(o => {
-            var displayReturnReason = o.ReturnReason ?? "";
-            var rSep = displayReturnReason.IndexOf("||");
+            @* var displayReturnReason = o.ReturnReason ?? ""; *@
+            @* var rSep = displayReturnReason.IndexOf("||");
             if (rSep >= 0) displayReturnReason = displayReturnReason[..rSep];
             displayReturnReason = displayReturnReason.Trim();
-            if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]")) displayReturnReason = displayReturnReason[1..^1].Trim();
+            if (displayReturnReason.StartsWith("[") && displayReturnReason.EndsWith("]")) displayReturnReason = displayReturnReason[1..^1].Trim(); *@
             return new {
                 orderId         = o.OrderId,
                 orderTime       = o.OrderTime.ToString("dd MMM yyyy, hh:mm tt"),
@@ -1080,8 +1083,8 @@
                 totalAmount     = o.TotalAmount.ToString("F2"),
                 customerMessage = o.CustomerMessage ?? "",
                 cancelReason    = o.CancelReason ?? "",
-                returnReason    = displayReturnReason,
-                returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "",
+                @* returnReason    = displayReturnReason,
+                returnType      = o.ReturnType.HasValue ? o.ReturnType.ToString() : "", *@
                 customerEmail   = o.Customer?.Email ?? "—",
                 customerPhone   = o.Customer?.PhoneNumber ?? "—",
                 customerName    = (o.Customer?.FullName ?? ""),

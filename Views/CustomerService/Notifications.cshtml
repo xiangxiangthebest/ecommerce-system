@@ -1,5 +1,6 @@
 @model List<EcommerceSystem.Models.Notification>
 @{
+    ViewData["Title"] = "Notifications";
     var unreadCount = Model?.Count(n => !n.IsRead) ?? 0;
     var totalCount = Model?.Count ?? 0;
 }
@@ -55,7 +56,7 @@
 
                 @if (Model?.Any(n => !n.IsRead) == true)
                 {
-                    <form asp-controller="Notifications" asp-action="MarkAllRead" method="post" id="markAllForm">
+                    <form asp-controller="Notifications" asp-action="CSMarkAllRead" method="post" id="markAllForm">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="notif-markall-btn">
                             <i class="ti ti-checks" aria-hidden="true"></i>
@@ -149,5 +150,5 @@
 }
 
 @section Scripts {
-    <script src="~/js/customer/notification.js" asp-append-version="true"></script>
+    <script src="~/js/customerservice/notification.js" asp-append-version="true"></script>
 }

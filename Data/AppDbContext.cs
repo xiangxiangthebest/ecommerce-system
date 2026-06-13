@@ -31,8 +31,7 @@ public class AppDbContext : DbContext
     public DbSet<CustomerVoucher> CustomerVouchers { get; set; }
     public DbSet<Voucher> Vouchers { get; set; }
     public DbSet<Request> Request { get; set; }
-    public DbSet<RequestImage> RequestImage { get; set; }
-
+    public DbSet<RequestImage> RequestImages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,8 +43,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Cart>().ToTable("Cart");
         modelBuilder.Entity<DeliveryField>().ToTable("DeliveryField");
         modelBuilder.Entity<Order>().ToTable("Order");
-        modelBuilder.Entity<Order>().Property(o => o.ReturnStatus).HasConversion<string>();
-        modelBuilder.Entity<Order>().Property(o => o.ReturnInitiatedBy).HasConversion<string>();
         modelBuilder.Entity<Order>().Property(o => o.CurrentStatus).HasConversion<string>();
         modelBuilder.Entity<Order>().HasOne(o => o.Address).WithMany().HasForeignKey(o => o.AddressId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Product>().ToTable("Product");
@@ -62,12 +59,6 @@ public class AppDbContext : DbContext
         .WithMany()
         .HasForeignKey(r => r.OrderId)
         .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Request>()
-            .HasOne(r => r.ReportedUser)
-            .WithMany()
-            .HasForeignKey(r => r.ReportedUserId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Request>()
         .Property(r => r.RequestServiceType)

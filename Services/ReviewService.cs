@@ -31,8 +31,13 @@ namespace EcommerceSystem.Services
             if (orderItem == null)
                 return OperationResult.Fail("Cannot review this item.");
 
+            // One review per Order per Product (not per customer lifetime)
             var existing = await _context.Reviews
-                .FirstOrDefaultAsync(r => r.OrderItemId == orderItemId && r.CustomerId == customerId);
+                .Include(r => r.OrderItem)
+                .FirstOrDefaultAsync(r => r.OrderItem != null
+                                    && r.OrderItem.OrderId   == orderItem.OrderId
+                                    && r.OrderItem.ProductId == orderItem.ProductId
+                                    && r.CustomerId          == customerId);
 
             if (existing != null)
                 return OperationResult.Fail("You have already reviewed this item.");
@@ -41,7 +46,6 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Maximum 4 images allowed.");
 
             var imagePaths = new List<string>();
-
             if (images?.Count > 0)
             {
                 var limited = images.Take(4).ToList();
@@ -50,29 +54,61 @@ namespace EcommerceSystem.Services
 
             var review = new Review
             {
-                OrderItemId = orderItemId,
-                ProductId = orderItem.ProductId,
-                CustomerId = customerId,
-                Rating = rating,
-                ReviewText = reviewText?.Trim() ?? "",
-                CreatedAt = DateTime.UtcNow,
+                OrderItemId  = orderItemId,
+                ProductId    = orderItem.ProductId,
+                CustomerId   = customerId,
+                Rating       = rating,
+                ReviewText   = reviewText?.Trim() ?? "",
+                CreatedAt    = DateTime.UtcNow,
                 ReviewImagePathsJson = System.Text.Json.JsonSerializer.Serialize(imagePaths)
             };
 
             _context.Reviews.Add(review);
 
             var product = await _context.Products.FindAsync(orderItem.ProductId);
-            
             if (product != null)
             {
-                var ratings = await _context.Reviews
-                    .Where(r => r.ProductId == orderItem.ProductId)
-                    .Select(r => r.Rating)
+                var allRatings = await _context.Reviews
+                    .Include(r => r.OrderItem)
+                    .Where(r => r.ProductId == orderItem.ProductId && r.OrderItem != null)
+                    .Select(r => new { r.OrderItem!.OrderId, r.Rating })
                     .ToListAsync();
 
-                ratings.Add(rating);
-                product.AverageRating = ratings.Average();
-                product.ReviewCount = ratings.Count;
+                allRatings.Add(new { OrderId = orderItem.OrderId, Rating = rating });
+
+                var deduplicatedRatings = allRatings
+                    .GroupBy(r => r.OrderId)
+                    .Select(g => g.First().Rating)
+                    .ToList();
+
+                product.AverageRating = deduplicatedRatings.Average();
+                product.ReviewCount   = deduplicatedRatings.Count;
+            }
+
+            // Check if all items in this order now have a review — if so, mark order as ReviewSubmitted
+            var allOrderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderItem.OrderId)
+                .Select(oi => oi.OrderItemId)
+                .ToListAsync();
+
+            var reviewedItemIds = await _context.Reviews
+                .Where(r => r.CustomerId == customerId && allOrderItems.Contains(r.OrderItemId))
+                .Select(r => r.OrderItemId)
+                .ToListAsync();
+
+            // Include the current review being submitted
+            reviewedItemIds.Add(orderItemId);
+
+            bool allReviewed = allOrderItems.All(id => reviewedItemIds.Contains(id));
+
+            if (allReviewed)
+            {
+                var order = orderItem.Order;
+                if (order != null)
+                {
+                    order.ReviewSubmitted = true;
+                    _context.Order.Update(order);
+                }
             }
 
             await _context.SaveChangesAsync();
