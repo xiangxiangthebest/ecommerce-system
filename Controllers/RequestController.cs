@@ -52,9 +52,7 @@ namespace EcommerceSystem.Controllers
 
             // RETURN_REFUND and REFUND go straight to customer service → use RETURN_REFUND status
             // so the customer service dashboard (which filters on RETURN_REFUND) picks them up.
-            order.CurrentStatus = (serviceType == RequestServiceType.RETURN_REFUND || serviceType == RequestServiceType.REFUND)
-                ? OrderStatus.RETURN_REFUND
-                : OrderStatus.AFTER_SALES_REQUESTED;
+            order.CurrentStatus = OrderStatus.AFTER_SALES_REQUESTED;
 
             if (!Enum.TryParse<RequestIssueType>(requestIssueType, true, out var issueType)
                 || !Enum.IsDefined(typeof(RequestIssueType), issueType))
