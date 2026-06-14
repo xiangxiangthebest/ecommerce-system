@@ -76,11 +76,7 @@ namespace EcommerceSystem.Controllers
                 .Include(o => o.Seller)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
-                .Where(o => csOrderIds.Contains(o.OrderId)
-                         && (o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED   // pending
-                          || o.CurrentStatus == OrderStatus.RETURN_REFUND           // approved (flipped)
-                        || o.CurrentStatus == OrderStatus.REFUND))
-
+                .Where(o => csOrderIds.Contains(o.OrderId))
                 .ToListAsync();
 
             var shownOrderIds = orders.Select(o => o.OrderId).ToHashSet();
@@ -145,6 +141,13 @@ namespace EcommerceSystem.Controllers
             ViewBag.ServiceLabel    = serviceLabel;
             ViewBag.ServiceToken    = serviceToken;
             ViewBag.RequestedQtyMap = requestedQtyMap;
+
+            // 在 ViewBag.Requests = ... 那行之后加
+            var requestIds = csRequests.Select(r => r.RequestId).ToList();
+            var requestImages = await _context.RequestImages
+                .Where(img => requestIds.Contains(img.RequestId))
+                .ToListAsync();
+            ViewBag.RequestImages = requestImages;
             ViewBag.Requests = await _context.Request
                 .Include(r => r.Order)
                 .Where(r => r.OrderId != null)
@@ -240,7 +243,8 @@ namespace EcommerceSystem.Controllers
                 .Include(o => o.OrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId
                     && (o.CurrentStatus == OrderStatus.RETURN_REFUND
-                        || o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED));
+                        || o.CurrentStatus == OrderStatus.AFTER_SALES_REQUESTED
+                        || o.CurrentStatus == OrderStatus.REFUND));
 
             if (approveItemIds == null || approveItemIds.Count == 0)
                 return Json(new { success = false, message = "Please select at least one item to approve." });

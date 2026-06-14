@@ -28,7 +28,6 @@ public class Request
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public decimal? ApprovedRefundAmount { get; set; } = 0m;
     private IRequestStrategy? _strategy;
-    
 
     public void SetRequestStrategy(IRequestStrategy strategy)
     {

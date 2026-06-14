@@ -6,11 +6,13 @@
     var serviceLabel = ViewBag.ServiceLabel as Dictionary<int, string> ?? new Dictionary<int, string>();
     var serviceToken    = ViewBag.ServiceToken    as Dictionary<int, string>                          ?? new Dictionary<int, string>();
     var requestedQtyMap = ViewBag.RequestedQtyMap as Dictionary<int, Dictionary<int, int>> ?? new Dictionary<int, Dictionary<int, int>>();
-    int cntAll      = allOrders.Count;
-
     var requests = ViewBag.Requests as List<Request> ?? new List<Request>();
+    var requestImages = ViewBag.RequestImages as List<EcommerceSystem.Models.RequestImage> ?? new List<EcommerceSystem.Models.RequestImage>();
+
+    int cntAll      = allOrders.Count;
     int cntPending = requests.Count(r => r.Status?.ToString() == "Pending");
     int cntApproved = requests.Count(r => r.Status?.ToString() == "Approved");
+    int cntRejected = requests.Count(r => r.Status?.ToString() == "Rejected");
 }
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -31,8 +33,9 @@
 
     <div class="order-tabs" id="orderTabs">
         <button class="order-tab active" data-status="ALL">All <span class="order-tab-badge">@cntAll</span></button>
-        <button class="order-tab" data-status="PENDING">Pending Approval <span class="order-tab-badge">@cntPending</span></button>
-        <button class="order-tab" data-status="APPROVED">Approved <span class="order-tab-badge">@cntApproved</span></button>
+        <button class="order-tab" data-status="PENDING">Pending<span class="order-tab-badge">@cntPending</span></button>
+        <button class="order-tab" data-status="APPROVED">Approved<span class="order-tab-badge">@cntApproved</span></button>
+        <button class="order-tab" data-status="REJECTED">Rejected <span class="order-tab-badge">@cntRejected</span></button>
     </div>
 
     <div class="order-filter-bar">
@@ -50,10 +53,9 @@
                     <th>Order ID</th>
                     <th>Customer</th>
                     <th>Date</th>
-                    <th>Total (RM)</th>
-                    <th>Payment</th>
                     <th>Request</th>
                     <th>Reason</th>
+                    <th>Status</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -61,13 +63,12 @@
                 @foreach (var order in allOrders)
                 {   
                     var request = requests.FirstOrDefault(r => r.OrderId == order.OrderId);
-
-                    @* var approvedKey = request?.SolvedAt.HasValue == true ? "APPROVED" : "PENDING"; *@
                     var approvedKey = request?.Status switch
                     {
                         "Approved" => "APPROVED",
                         "Rejected" => "REJECTED",
-                        "Pending"  => "PENDING"
+                        "Pending"  => "PENDING",
+                        _          => "ALL"
                     };
                     var searchHint  = ("#" + order.OrderId + " " + (order.Customer?.Email ?? "")).ToLower();
                     var svc         = serviceLabel.GetValueOrDefault(order.OrderId, "—");
@@ -77,32 +78,33 @@
                         <td>#@order.OrderId</td>
                         <td>@(order.Customer?.Email ?? "—")</td>
                         <td>@order.OrderTime.ToString("dd MMM yyyy")</td>
-                        <td>@order.TotalAmount.ToString("F2")</td>
-                        <td>@order.PaymentMethod</td>
-                        <td><span class="status-badge status-return_refund">@svc</span></td>
-                        <td style="max-width:240px;font-size:0.85rem;color:#5d4037;">@reason</td>
+                        <td>@svc</td>
+                        <td style="max-width:240px;font-size:0.85rem;">@reason</td>
                         <td>
-
-                            @if (request == null)
-                            {
-                                <span style="color:#9a98b6;">No Request</span>
-                            }
-                            else if (request.Status=="Pending")
-                            {
-                                <button class="btn-approve-return" onclick="openApproveReturnModal(@order.OrderId,@request.RequestId)">
-                                View
-                                </button>
-                            }
-                            else if (request.Status=="Approved")
+                            @if (request.Status == "Approved")
                             {
                                 <span style="color:#22c55e;font-size:13px;font-weight:600;white-space:nowrap;">
-                                    <i class="fas fa-check-circle"></i> Approved (RM@((request.ApprovedRefundAmount ?? 0m).ToString("F2")))
+                                    <i class="fas fa-check-circle"></i> Approved 
+                                    (RM@((request.ApprovedRefundAmount ?? 0m).ToString("F2")))
                                 </span>
                             }
-                            else if (request.Status=="Rejected")
+                            else if (request.Status == "Rejected")
                             {
-                                <button data-status="REJECTED">Rejected</button>
+                                <span style="color:#c52222;font-size:13px;font-weight:600;white-space:nowrap;">
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                </span>
                             }
+                            else
+                            {
+                                <span style="color:#f59e0b;font-size:13px;font-weight:600;white-space:nowrap;">
+                                    <i class="fas fa-clock"></i> Pending
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn-approve-return" onclick="openApproveReturnModal(@order.OrderId,@request.RequestId)">
+                            View
+                            </button>
                         </td>
                     </tr>
                 }
@@ -130,13 +132,12 @@
 <div id="approveReturnBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000" onclick="closeApproveReturnModal()" class="approve-return-backdrop"></div>
 <div id="approveReturnModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;width:min(600px,96vw);max-height:90vh;overflow-y:auto;z-index:1001;box-shadow:0 8px 40px rgba(0,0,0,.18)" class="approve-return-modal">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <i class="fas fa-check-circle" style="color:#f97316;font-size:22px"></i>
-        <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b">Approve Request</h3>
+        <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e1b4b">Request</h3>
         <button onclick="closeApproveReturnModal()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;color:#9a98b6">✕</button>
     </div>
     <div style="font-size:10px;color:#a16207;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px"><i class="fas fa-clipboard-list" style="margin-right:4px"></i>Customer Request Summary</div>
     <div id="approveReturnTypeInfo" style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:10px;padding:12px 14px;font-size:13px;color:#6d4c41;margin-bottom:14px;line-height:1.5"></div>
-    <p style="font-size:13px;color:#6b6b8a;margin:0 0 16px">Tick the items you are approving and confirm the quantity.</p>
+    <p id="approveTickHint" style="font-size:13px;color:#6b6b8a;margin:0 0 16px">Tick the items you are approving and confirm the quantity.</p>
     <div id="approveItemsWrap"></div>
     <div style="background:#f8f8ff;border:1.5px solid #e8eaf6;border-radius:10px;padding:12px 16px;margin-top:14px;font-size:13px;">
         <div style="font-weight:700;color:#1e1b4b;margin-bottom:8px;font-size:11px;letter-spacing:0.03em;text-transform:uppercase">Refund Breakdown</div>
@@ -167,13 +168,15 @@
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
         <button onclick="closeApproveReturnModal()" style="padding:9px 20px;border-radius:8px;border:1px solid #e0e0f0;background:#fff;font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
         <button id="approveReturnBtn" onclick="submitApproveReturn()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i>Approve</button>
-        <button id="rejectReturnBtn" onclick="submitRejectRequest()" style="padding:9px 20px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-times"></i></i>Reject</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <button id="rejectReturnBtn" onclick="submitRejectRequest()" style="padding:9px 20px;border-radius:8px;border:none;background:#dc2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer"><i class="fas fa-times"></i> Reject</button>
+            <span id="rejectHint" style="display:none;font-size:11px;color:#dc2626;font-weight:600"><i class="fas fa-exclamation-circle"></i> Uncheck all items to reject</span>
+        </div>
     </div>
 </div>
 
 @{
 var ordersForJs = allOrders
-    .Where(o => !requests.Any(r => r.OrderId == o.OrderId && r.SolvedAt.HasValue))
     .Select(o =>
     {
         var rawSubtotal = o.OrderItems.Sum(oi => oi.Price * oi.Quantity);
@@ -181,6 +184,36 @@ var ordersForJs = allOrders
         var discRatio = rawSubtotal > 0 ? vDiscount / rawSubtotal : 0m;
 
         requestedQtyMap.TryGetValue(o.OrderId, out var itemQtyMap);
+
+        var req = requests.FirstOrDefault(r => r.OrderId == o.OrderId);
+
+        // RequestedItemsJson: [{"orderItemId":9,"qty":3}, {"orderItemId":10,"qty":2}]
+        // ApproveItemsJson:   [2, 2]  — approved qtys in the SAME order as RequestedItemsJson
+        // So we zip them together: orderItemId[i] -> approvedQty[i]
+        var approvedItemIds  = new List<int>();
+        var approvedItemQtys = new Dictionary<int, int>(); // orderItemId -> approved qty
+        if (!string.IsNullOrWhiteSpace(req?.ApproveItemsJson) && !string.IsNullOrWhiteSpace(req?.RequestedItemsJson))
+        {
+            try
+            {
+                var approveQtys = System.Text.Json.JsonSerializer.Deserialize<List<int>>(req.ApproveItemsJson)
+                    ?? new List<int>();
+                var requestedItems = System.Text.Json.JsonSerializer
+                    .Deserialize<List<System.Text.Json.JsonElement>>(req.RequestedItemsJson)
+                    ?? new List<System.Text.Json.JsonElement>();
+
+                for (int idx = 0; idx < Math.Min(approveQtys.Count, requestedItems.Count); idx++)
+                {
+                    if (requestedItems[idx].TryGetProperty("orderItemId", out var idEl))
+                    {
+                        var oid = idEl.GetInt32();
+                        approvedItemIds.Add(oid);
+                        approvedItemQtys[oid] = approveQtys[idx];
+                    }
+                }
+            }
+            catch { }
+        }
 
         return new
         {
@@ -192,27 +225,36 @@ var ordersForJs = allOrders
             customerEmail = o.Customer?.Email ?? "—",
             customerName = o.Customer?.FullName ?? "",
 
+            request = req == null ? (object?)null : new
+            {
+                status = req.Status,
+                reviewByCsId = req.ReviewByCsId,
+                solvedAt = req.SolvedAt.HasValue
+                    ? req.SolvedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
+                    : (string?)null,
+                approvedRefundAmount = req.ApprovedRefundAmount,
+                approvedItemIds,
+                approvedItemQtys, // id -> approved qty
+                description = req.Description ?? "",
+                imagePaths = requestImages
+                    .Where(img => img.RequestId == req.RequestId)
+                    .Select(img => "/uploads/" + System.IO.Path.GetFileName(img.ImagePath))
+                    .ToList()
+            },
+
             items = o.OrderItems
-                .Where(oi =>
-                    itemQtyMap != null &&
-                    itemQtyMap.ContainsKey(oi.OrderItemId)
-                )
+                .Where(oi => itemQtyMap != null && itemQtyMap.ContainsKey(oi.OrderItemId))
                 .Select(oi =>
                 {
-                    var reqQty = itemQtyMap.TryGetValue(oi.OrderItemId, out var q)
-                        ? q
-                        : 0;
-
+                    var reqQty = itemQtyMap != null && itemQtyMap.TryGetValue(oi.OrderItemId, out var q) ? q : 0;
                     return new
                     {
                         orderItemId = oi.OrderItemId,
                         name = (!string.IsNullOrWhiteSpace(oi.Product?.SKU)
                             ? $"[{oi.Product!.SKU}] "
                             : "") + (oi.Product?.Name ?? $"Item #{oi.OrderItemId}"),
-
                         orderedQty = oi.Quantity,
                         requestedQty = reqQty,
-
                         unitPrice = Math.Round(oi.Price * (1 - discRatio), 2).ToString("F2"),
                         selectedVariation = oi.SelectedVariation ?? ""
                     };
@@ -267,8 +309,209 @@ var ordersForJs = allOrders
         } catch { return ''; }
     }
 
+function openApproveReturnModal(orderId, requestId) {
+
+    const order = _csReturnOrders.find(o => o.orderId === orderId);
+    if (!order) return;
+
+    const request = order.request ?? null;
+
+    const isPending  = !request || request.status === "Pending";
+    const isApproved = request?.status === "Approved";
+    const isRejected = request?.status === "Rejected";
+
+    // Reset hidden fields
+    document.getElementById('approveReturnOrderId').value = orderId;
+    document.getElementById('approveRequestId').value = requestId;
+    document.getElementById('approveReturnError').style.display = 'none';
+
+    // Reset stale reject-hint state from any previous modal session
+    const rejectHintEl = document.getElementById('rejectHint');
+    if (rejectHintEl) rejectHintEl.style.display = 'none';
+
+    // Hide/show the tick hint — only for pending
+    const tickHint = document.getElementById('approveTickHint');
+    if (tickHint) tickHint.style.display = isPending ? '' : 'none';
+
+    // ── CUSTOMER + REQUEST INFO ──────────────────────────────────────────
+    const icon = (order.returnToken === 'ReturnRefund') ? '📦' : '💰';
+    const custName = order.customerName
+        ? `${order.customerName} (${order.customerEmail})`
+        : order.customerEmail;
+
+    let headerHtml = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #ffe0b2;">
+            <i class="fas fa-user-circle" style="color:#f97316;font-size:16px;flex-shrink:0"></i>
+            <div>
+                <div style="font-size:11px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Customer</div>
+                <div style="font-size:13px;color:#1e1b4b;font-weight:600">${custName}</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
+                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Return Type</div>
+                <div style="font-size:13px;font-weight:700;color:#1e1b4b">${icon} ${order.serviceLabel}</div>
+            </div>
+            <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
+                <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Reason</div>
+                <div style="font-size:13px;font-weight:700;color:#1e1b4b">${order.issueLabel || '—'}</div>
+            </div>
+        </div>
+    `;
+
+    // Description
+    if (request?.description) {
+        headerHtml += `
+        <div style="margin-top:8px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #ffe0b2;">
+            <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Customer Note</div>
+            <div style="font-size:13px;color:#1e1b4b;">${request.description}</div>
+        </div>`;
+    }
+
+    // Images
+    if (request?.imagePaths?.length) {
+        headerHtml += `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">`;
+        request.imagePaths.forEach(p => {
+            headerHtml += `<img src="${p}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #ffe0b2;cursor:pointer" onclick="window.open('${p}','_blank')" />`;
+        });
+        headerHtml += `</div>`;
+    }
+
+    // CS Review block (Approved / Rejected only)
+    if (!isPending && request) {
+        const statusColor  = isApproved ? '#16a34a' : '#dc2626';
+        const statusBg     = isApproved ? '#f0fdf4' : '#fef2f2';
+        const statusBorder = isApproved ? '#bbf7d0' : '#fecaca';
+
+        headerHtml += `
+        <div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:${statusBg};border:1.5px solid ${statusBorder};">
+            <div style="font-size:11px;font-weight:700;color:${statusColor};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">
+                <i class="fas fa-${isApproved ? 'check-circle' : 'times-circle'}"></i>
+                CS Review — ${request.status}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+                <div>
+                    <div style="font-size:11px;color:#64748b;">Reviewed By</div>
+                    <div style="font-weight:600;color:#1e1b4b;">${request.reviewByCsId || '—'}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:#64748b;">Solved At</div>
+                    <div style="font-weight:600;color:#1e1b4b;">${request.solvedAt || '—'}</div>
+                </div>
+            </div>
+            ${isApproved ? `
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid ${statusBorder};font-size:13px;">
+                    <span style="color:#64748b;">Approved Refund Amount:</span>
+                    <span style="font-weight:800;color:#16a34a;margin-left:6px;">RM ${parseFloat(request.approvedRefundAmount ?? 0).toFixed(2)}</span>
+                </div>
+            ` : ''}
+        </div>`;
+    }
+
+    document.getElementById('approveReturnTypeInfo').innerHTML = headerHtml;
+
+    // ── ITEMS ────────────────────────────────────────────────────────────
+    const approvedSet  = new Set(request?.approvedItemIds ?? []);
+    const approvedQtys = request?.approvedItemQtys ?? {}; // {id: qty}
+    let html = '';
+
+    if (!order.items || order.items.length === 0) {
+        html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">No items found on this order.</div>`;
+    } else if (isPending) {
+        // Pending: checkbox + always-editable qty input
+        order.items.forEach(item => {
+            const varLine = parseVariation(item.selectedVariation);
+            html += `
+            <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
+                <input type="checkbox" class="approve-item-chk"
+                    data-order-item-id="${item.orderItemId}"
+                    data-max="${item.orderedQty}"
+                    data-unit-price="${item.unitPrice}"
+                    data-name="${item.name}"
+                    onchange="updateRefundBreakdown()"
+                    style="width:16px;height:16px;cursor:pointer" />
+                <label style="flex:1">
+                    <div style="font-weight:600;font-size:13px">${item.name}</div>
+                    ${varLine ? `<div style="font-size:11px;color:#6366f1;margin-bottom:2px"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</div>` : ''}
+                    <div style="font-size:12px;color:#9a98b6">Requested qty: ${item.requestedQty} &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span></div>
+                </label>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
+                    <input type="number" class="approve-item-qty"
+                        min="1" max="${item.requestedQty}" value="${item.requestedQty}"
+                        oninput="updateRefundBreakdown()"
+                        style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
+                </div>
+            </div>`;
+        });
+    } else {
+        // Approved / Rejected: read-only view
+        order.items.forEach(item => {
+            const varLine      = parseVariation(item.selectedVariation);
+            const itemApproved = approvedSet.has(item.orderItemId);
+            const approvedQty  = approvedQtys[item.orderItemId] ?? 0;
+
+            let badgeColor, badgeIcon, badgeText;
+            if (isApproved) {
+                if (itemApproved) {
+                    badgeColor = '#16a34a'; badgeIcon = 'fa-check-circle';
+                    badgeText  = `Approved qty: ${approvedQty}`;
+                } else {
+                    badgeColor = '#94a3b8'; badgeIcon = 'fa-minus-circle';
+                    badgeText  = 'Not approved';
+                }
+            } else {
+                badgeColor = '#dc2626'; badgeIcon = 'fa-times-circle'; badgeText = 'Rejected';
+            }
+
+            html += `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #f1f5f9;opacity:${itemApproved || isRejected ? '1' : '0.55'}">
+                <div style="flex:1">
+                    <div style="font-weight:600;font-size:13px">${item.name}</div>
+                    ${varLine ? `<div style="font-size:11px;color:#6366f1;margin-bottom:2px"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</div>` : ''}
+                    <div style="font-size:12px;color:#9a98b6">
+                        Requested qty: <b>${item.requestedQty}</b>
+                        &nbsp;|&nbsp; RM ${item.unitPrice} each
+                    </div>
+                </div>
+                <div style="text-align:right;white-space:nowrap;">
+                    <span style="font-size:12px;font-weight:700;color:${badgeColor}">
+                        <i class="fas ${badgeIcon}"></i> ${badgeText}
+                    </span>
+                </div>
+            </div>`;
+        });
+    }
+
+    document.getElementById('approveItemsWrap').innerHTML = html;
+
+    // ── BUTTONS ──────────────────────────────────────────────────────────
+    document.getElementById("approveReturnBtn").style.display = isPending ? "inline-block" : "none";
+    document.getElementById("rejectReturnBtn").style.display  = isPending ? "inline-block" : "none";
+
+    // ── BREAKDOWN ────────────────────────────────────────────────────────
+    // Pending: driven by checkboxes; Approved: show approved items; Rejected: hide
+    if (isPending) {
+        updateRefundBreakdown();
+    } else if (isApproved) {
+        renderApprovedBreakdown(order, approvedSet, approvedQtys);
+    } else {
+        // Rejected — clear breakdown
+        const tbody = document.getElementById('approveBreakdownBody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="color:#ccc;font-size:12px;padding:6px 0">No refund issued.</td></tr>`;
+        const totalEl = document.getElementById('approveRefundTotal');
+        if (totalEl) totalEl.textContent = 'RM 0.00';
+    }
+
+    // Show modal
+    document.getElementById('approveReturnBackdrop').style.display = 'block';
+    document.getElementById('approveReturnModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
     // ── Approve Return modal ─────────────────────────────────────────────
-    function openApproveReturnModal(orderId, requestId) {
+    @* function openApproveReturnModal(orderId, requestId) {
         const order = _csReturnOrders.find(o => o.orderId === orderId);
         if (!order) return;
         document.getElementById('approveReturnOrderId').value = orderId;
@@ -328,16 +571,10 @@ var ordersForJs = allOrders
         document.getElementById('approveReturnBackdrop').classList.add('active');
         document.getElementById('approveReturnModal').classList.add('active');
         document.body.style.overflow = 'hidden';
-    }
-
-    function syncApproveQty(chk) {
-        const row = chk.closest('.ph-return-item');
-        const qty = row.querySelector('.approve-item-qty');
-        if (qty) qty.disabled = !chk.checked;
-        updateRefundBreakdown();
-    }
+    } *@
 
     function updateRefundBreakdown() {
+        // Pending mode: reads ALL items with checkboxes checked, using their qty input
         const tbody   = document.getElementById('approveBreakdownBody');
         const totalEl = document.getElementById('approveRefundTotal');
         if (!tbody || !totalEl) return;
@@ -364,11 +601,47 @@ var ordersForJs = allOrders
 
         tbody.innerHTML = rows || `<tr><td colspan="4" style="color:#ccc;font-size:12px;padding:6px 0">No items selected yet.</td></tr>`;
         totalEl.textContent = `RM ${total.toFixed(2)}`;
+
+        // Reject button: only enabled when NO items are ticked
+        const rejectBtn  = document.getElementById('rejectReturnBtn');
+        const rejectHint = document.getElementById('rejectHint');
+        if (rejectBtn && rejectBtn.style.display !== 'none') {
+            const blocked = checked.length > 0;
+            rejectBtn.disabled = blocked;
+            rejectBtn.style.opacity = blocked ? '0.45' : '1';
+            rejectBtn.style.cursor  = blocked ? 'not-allowed' : 'pointer';
+            if (rejectHint) rejectHint.style.display = blocked ? 'inline' : 'none';
+        }
+    }
+
+    function renderApprovedBreakdown(order, approvedSet, approvedQtys) {
+        const tbody   = document.getElementById('approveBreakdownBody');
+        const totalEl = document.getElementById('approveRefundTotal');
+        if (!tbody || !totalEl) return;
+
+        let total = 0; let rows = '';
+        order.items.forEach(item => {
+            if (!approvedSet.has(item.orderItemId)) return;
+            // Use the actual approved qty; fall back to requestedQty if unknown (qty=0)
+            const qty  = approvedQtys[item.orderItemId] || item.requestedQty;
+            const unit = parseFloat(item.unitPrice) || 0;
+            const sub  = qty * unit;
+            total += sub;
+            rows += `<tr>
+                <td style="padding:4px 0;color:#1e1b4b;">${item.name}</td>
+                <td style="text-align:center;padding:4px 0;color:#6b6b8a;">× ${qty}</td>
+                <td style="text-align:right;padding:4px 0;color:#6b6b8a;">RM ${unit.toFixed(2)}</td>
+                <td style="text-align:right;padding:4px 0;font-weight:600;color:#1e1b4b;">RM ${sub.toFixed(2)}</td>
+            </tr>`;
+        });
+
+        tbody.innerHTML = rows || `<tr><td colspan="4" style="color:#ccc;font-size:12px;padding:6px 0">No approved items.</td></tr>`;
+        totalEl.textContent = `RM ${total.toFixed(2)}`;
     }
 
     function closeApproveReturnModal() {
-        document.getElementById('approveReturnBackdrop').classList.remove('active');
-        document.getElementById('approveReturnModal').classList.remove('active');
+        document.getElementById('approveReturnBackdrop').style.display = 'none';
+        document.getElementById('approveReturnModal').style.display = 'none';
         document.body.style.overflow = '';
     }
 
@@ -407,7 +680,8 @@ var ordersForJs = allOrders
         let i = 0; let valid = true;
         checked.forEach(chk => {
             const row = chk.closest('.ph-return-item');
-            const qty = parseInt(row.querySelector('.approve-item-qty').value);
+            const qtyEl = row.querySelector('.approve-item-qty');
+            const qty = parseInt(qtyEl?.value);
             const max = parseInt(chk.dataset.max);
             if (!qty || qty < 1 || qty > max) { valid = false; return; }
             params.append(`approveItemIds[${i}]`, chk.dataset.orderItemId);
@@ -566,7 +840,6 @@ var ordersForJs = allOrders
     .orders-table tbody tr:hover { background: #f5f5f5; }
 
     .status-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; }
-    .status-return_refund { background: #fff3e0; color: #e65100; }
 
     .btn-approve-return { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #f97316; color: #fff; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: background .18s; white-space: nowrap; }
     .btn-approve-return:hover { background: #ea580c; }
