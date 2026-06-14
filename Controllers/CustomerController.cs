@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using EcommerceSystem.DTOs;
-using EcommerceSystem.Enums;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
 using Microsoft.AspNetCore.Authentication;
@@ -330,7 +329,6 @@ namespace EcommerceSystem.Controllers
             var requests = await _requestService.GetByUserId(customer.UserId);
 
             var requestMap = requests
-                .Where(r => r.OrderId != null)
                 .ToDictionary(r => r.OrderId);
 
             var vm = new PurchaseHistoryVM

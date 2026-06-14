@@ -2,6 +2,7 @@ using EcommerceSystem.Enums;
 using EcommerceSystem.Interfaces;
 using System.ComponentModel.DataAnnotations.Schema;
 
+
 namespace EcommerceSystem.Models;
 public class Request
 {
@@ -24,7 +25,8 @@ public class Request
     public List<RequestImage> Images { get; set; } = new();
     public CustomerService? ReviewByCS { get; set; }
     public int? ReviewByCsId { get; set; }
-    public string Status { get; set; }
+    public string Status { get; set; } = "Pending";
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public decimal? ApprovedRefundAmount { get; set; } = 0m;
     private IRequestStrategy? _strategy;
@@ -55,4 +57,3 @@ public class Request
 
 // // Step 5: Execute strategy
 // request.PerformSolve();
-

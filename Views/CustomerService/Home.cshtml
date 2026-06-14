@@ -43,6 +43,13 @@
             <i class="fas fa-search" style="color:#9a98b6;font-size:13px"></i>
             <input type="text" id="orderSearch" placeholder="Search by Order ID or customer email…" oninput="applyOrderFilters()" />
         </div>
+        <div class="order-sort-wrap">
+            <i class="fas fa-sort" style="color:#9a98b6;font-size:13px"></i>
+            <select id="orderSortDir" onchange="applyOrderFilters()">
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+            </select>
+        </div>
     </div>
 
     @if (allOrders.Any())
@@ -74,7 +81,7 @@
                     var svc         = serviceLabel.GetValueOrDefault(order.OrderId, "—");
                     var reason      = issueLabel.GetValueOrDefault(order.OrderId, "—");
 
-                    <tr data-status="@approvedKey" data-search="@searchHint">
+                    <tr data-status="@approvedKey" data-search="@searchHint" data-order-id="@order.OrderId">
                         <td>#@order.OrderId</td>
                         <td>@(order.Customer?.Email ?? "—")</td>
                         <td>@order.OrderTime.ToString("dd MMM yyyy")</td>
@@ -284,8 +291,21 @@ var ordersForJs = allOrders
     function applyOrderFilters() {
         const status = document.querySelector('.order-tab.active')?.dataset.status ?? 'ALL';
         const search = (document.getElementById('orderSearch')?.value ?? '').toLowerCase().trim();
+        const sortDir = document.getElementById('orderSortDir')?.value ?? 'desc';
         let visible = 0;
-        document.querySelectorAll('#ordersTableBody tr').forEach(row => {
+
+        // Sort rows by Order ID based on the user-selected direction
+        const tbody = document.getElementById('ordersTableBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const ascending = sortDir === 'asc';
+        rows.sort((a, b) => {
+            const idA = Number(a.dataset.orderId) || 0;
+            const idB = Number(b.dataset.orderId) || 0;
+            return ascending ? idA - idB : idB - idA;
+        });
+        rows.forEach(row => tbody.appendChild(row));
+
+        rows.forEach(row => {
             const matchStatus = status === 'ALL' || row.dataset.status === status;
             const matchSearch = !search || row.dataset.search.includes(search);
             const show = matchStatus && matchSearch;
@@ -509,69 +529,6 @@ function openApproveReturnModal(orderId, requestId) {
     document.getElementById('approveReturnModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
 }
-
-    // ── Approve Return modal ─────────────────────────────────────────────
-    @* function openApproveReturnModal(orderId, requestId) {
-        const order = _csReturnOrders.find(o => o.orderId === orderId);
-        if (!order) return;
-        document.getElementById('approveReturnOrderId').value = orderId;
-
-        // Clear any previous error
-        document.getElementById('approveReturnError').style.display = 'none';
-        document.getElementById('approveReturnErrorMsg').textContent = '';
-        document.getElementById("approveRequestId").value = requestId;
-
-        const icon = (order.returnToken === 'ReturnRefund') ? '📦' : '💰';
-        const custName = order.customerName ? `${order.customerName} (${order.customerEmail})` : order.customerEmail;
-
-        let summaryHtml = `
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #ffe0b2;">
-                <i class="fas fa-user-circle" style="color:#f97316;font-size:16px;flex-shrink:0"></i>
-                <div>
-                    <div style="font-size:11px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Customer</div>
-                    <div style="font-size:13px;color:#1e1b4b;font-weight:600">${custName}</div>
-                </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
-                    <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Return Type</div>
-                    <div style="font-size:13px;font-weight:700;color:#1e1b4b">${icon} ${order.serviceLabel}</div>
-                </div>
-                <div style="background:#fff;border-radius:8px;padding:8px 10px;border:1px solid #ffe0b2;">
-                    <div style="font-size:10px;color:#a16207;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Reason</div>
-                    <div style="font-size:13px;font-weight:700;color:#1e1b4b">${order.issueLabel || '—'}</div>
-                </div>
-            </div>`;
-        document.getElementById('approveReturnTypeInfo').innerHTML = summaryHtml;
-
-        let html = '';
-        if (!order.items || order.items.length === 0) {
-            html = `<div style="color:#9a98b6;font-size:13px;padding:12px 0">No items found on this order.</div>`;
-        } else {
-            order.items.forEach(item => {
-                const varLine = parseVariation(item.selectedVariation);
-                html += `
-                <div class="ph-return-item" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f8;">
-                    <input type="checkbox" class="approve-item-chk" data-order-item-id="${item.orderItemId}" data-max="${item.orderedQty}" data-unit-price="${item.unitPrice}" data-name="${item.name}" onchange="syncApproveQty(this);updateRefundBreakdown()" style="width:16px;height:16px;cursor:pointer" />
-                    <label style="flex:1">
-                        <div style="font-weight:600;font-size:13px">${item.name}</div>
-                        ${varLine ? `<div style="font-size:11px;color:#6366f1;margin-bottom:2px"><i class="fas fa-tag" style="margin-right:3px"></i>${varLine}</div>` : ''}
-                        <div style="font-size:12px;color:#9a98b6">Qty in order: ${item.orderedQty} &nbsp;|&nbsp; <span style="color:#1e1b4b;font-weight:600">RM ${item.unitPrice} each</span></div>
-                    </label>
-                    <div style="display:flex;align-items:center;gap:6px">
-                        <label style="font-size:12px;color:#9a98b6">Approve qty:</label>
-                        <input type="number" class="approve-item-qty" min="1" max="${item.orderedQty}" value="${item.requestedQty}" disabled oninput="updateRefundBreakdown()" style="width:56px;padding:4px 6px;border:1px solid #e0e0f0;border-radius:6px;font-size:13px;text-align:center" />
-                    </div>
-                </div>`;
-            });
-        }
-        document.getElementById('approveItemsWrap').innerHTML = html;
-        updateRefundBreakdown();
-
-        document.getElementById('approveReturnBackdrop').classList.add('active');
-        document.getElementById('approveReturnModal').classList.add('active');
-        document.body.style.overflow = 'hidden';
-    } *@
 
     function updateRefundBreakdown() {
         // Pending mode: reads ALL items with checkboxes checked, using their qty input
@@ -808,6 +765,7 @@ function openApproveReturnModal(orderId, requestId) {
     document.addEventListener('DOMContentLoaded', () => {
         refreshBadge();
         setInterval(refreshBadge, 20000);
+        applyOrderFilters();
     });
 </script>
 
@@ -832,6 +790,10 @@ function openApproveReturnModal(orderId, requestId) {
     .order-search-wrap:focus-within { border-color: #1e1b4b; }
     .order-search-wrap input { border: none; outline: none; background: transparent; font-size: 13px; color: #1e1b4b; width: 100%; }
     .order-search-wrap input::placeholder { color: #b0aec8; }
+
+    .order-sort-wrap { display: flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid #e8eaf6; border-radius: 10px; padding: 8px 14px; transition: border-color .18s; }
+    .order-sort-wrap:focus-within { border-color: #1e1b4b; }
+    .order-sort-wrap select { border: none; outline: none; background: transparent; font-size: 13px; color: #1e1b4b; cursor: pointer; }
 
     .orders-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: 1rem; }
     .orders-table thead { background: #1a237e; color: #fff; }

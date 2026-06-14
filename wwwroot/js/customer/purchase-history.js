@@ -32,7 +32,14 @@ const searchInput = document.getElementById("phSearchInput"); // 确保 I 大写
             const searchData = card.getAttribute("data-search") || "";
             const cardStatus = card.getAttribute("data-status") || "";
 
-            const matchesStatus = (currentStatus === "ALL" || cardStatus === currentStatus);
+            const AFTER_SALE_STATUSES = new Set([
+                'RETURN_REFUND_REQUESTED', 'RETURN_REFUND', 'REFUND', 'RETURN_REFUND_REJECTED'
+            ]);
+            const matchesStatus = (
+                currentStatus === "ALL" ||
+                (currentStatus === "AFTER SALE" && AFTER_SALE_STATUSES.has(cardStatus)) ||
+                cardStatus === currentStatus
+            );
             const matchesSearch = searchData.includes(query);
 
             if (matchesStatus && matchesSearch) {
@@ -202,17 +209,23 @@ function openDrawer(orderId) {
     document.getElementById('odDate').textContent  = order.orderTime;
 
     const badge = document.getElementById('odBadge');
-    const isReturnStatus = order.status === 'RETURN_REFUND' || order.status === 'AFTER_SALES_REQUESTED';
-    const isApproved     = isReturnStatus && order.returnApproved;
-    const isRejected     = isReturnStatus && !isApproved && order.returnStatus === 'Rejected';
+    const isReturnStatus = order.status === 'RETURN_REFUND'
+                        || order.status === 'RETURN_REFUND_REQUESTED'
+                        || order.status === 'REFUND'
+                        || order.status === 'RETURN_REFUND_REJECTED';
+    const isApproved     = (order.status === 'RETURN_REFUND' || order.status === 'REFUND') && order.returnApproved;
+    const isRejected     = order.status === 'RETURN_REFUND_REJECTED' || order.returnStatus === 'Rejected';
+    const isRequested    = isReturnStatus && !isApproved && !isRejected;
     badge.className = `ph-status-pill ${
-        isApproved ? 'ph-s-RETURN_REFUND_APPROVED' :
-        isRejected ? 'ph-s-RETURN_REFUND_REJECTED' :
+        isApproved  ? 'ph-s-RETURN_REFUND_APPROVED' :
+        isRejected  ? 'ph-s-RETURN_REFUND_REJECTED' :
+        isRequested ? 'ph-s-RETURN_REFUND_REJECTED' :
         'ph-s-' + order.status
     }`;
     document.getElementById('odBadgeLabel').textContent =
-        isApproved ? 'Return/Refund Approved' :
-        isRejected ? 'Return/Refund Rejected' :
+        isApproved  ? 'Return/Refund Approved' :
+        isRejected  ? 'Return/Refund Rejected' :
+        isRequested ? 'Return/Refund Requested' :
         order.statusLabel;
 
     document.getElementById('odDrawerBody').innerHTML = buildDrawerHTML(order);
@@ -757,28 +770,38 @@ async function openRequestModal(orderId) {
         <i class="ti ti-clock" style="font-size:20px;color:#9a98b6;"></i>
     </div>
 
-    ${result.approvedAt ? `
-    <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #bbf7d0;">
-        <div>
-            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
-            <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${result.approvedAt}</p>
-        </div>
-        <i class="ti ti-circle-check" style="font-size:20px;color:#22c55e;"></i>
-    </div>` : result.rejectedAt ? `
-    <div style="background:#fff1f2;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #fecdd3;">
-        <div>
-            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Request Rejected</p>
-            <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${result.rejectedAt}${result.rejectionReason ? ' · ' + result.rejectionReason : ''}</p>
-        </div>
-        <i class="ti ti-circle-x" style="font-size:20px;color:#ef4444;"></i>
-    </div>` : `
+    ${(() => {
+        const isRejected = result.status === 'Rejected' || !!result.rejectedAt;
+        const solvedDate = result.approvedAt || result.rejectedAt;
+        if (!solvedDate) {
+            return `
     <div style="background:#fffbeb;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #fde68a;">
         <div>
             <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:0.06em;">Request Approval</p>
             <p style="margin:0;font-size:13px;font-weight:500;color:#92400e;">Pending — awaiting customer service</p>
         </div>
         <i class="ti ti-hourglass" style="font-size:20px;color:#f59e0b;"></i>
-    </div>`}
+    </div>`;
+        }
+        if (isRejected) {
+            return `
+    <div style="background:#fff1f2;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #fecdd3;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">Request Rejected</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#991b1b;">${solvedDate}${result.rejectionReason ? ' · ' + result.rejectionReason : ''}</p>
+        </div>
+        <i class="ti ti-circle-x" style="font-size:20px;color:#ef4444;"></i>
+    </div>`;
+        }
+        return `
+    <div style="background:#f0fdf4;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;border:1px solid #bbf7d0;">
+        <div>
+            <p style="margin:0 0 2px;font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;">Request Approved</p>
+            <p style="margin:0;font-size:13px;font-weight:500;color:#166534;">${solvedDate}</p>
+        </div>
+        <i class="ti ti-circle-check" style="font-size:20px;color:#22c55e;"></i>
+    </div>`;
+    })()}
 
     <div style="background:#f8f8fc;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
         <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a98b6;text-transform:uppercase;letter-spacing:0.06em;">Order items</p>

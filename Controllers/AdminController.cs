@@ -377,9 +377,9 @@ namespace EcommerceSystem.Controllers
         {
             var reviews = await _context.Reviews
                 .Include(r => r.OrderItem)
-                    .ThenInclude(oi => oi.Order)
-                        .ThenInclude(o => o.Customer)
-                .Where(r => r.OrderItem.ProductId == productId)
+                    .ThenInclude(oi => oi!.Order)
+                        .ThenInclude(o => o!.Customer)
+                .Where(r => r.OrderItem!.ProductId == productId)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 
@@ -750,7 +750,6 @@ namespace EcommerceSystem.Controllers
             ViewBag.SearchTerm = searchTerm;
             ViewBag.Requests = await _context.Request
                 .Include(r => r.Order)
-                .Where(r => r.OrderId != null)
                 .ToListAsync();
  
             return View(orders);
