@@ -1749,6 +1749,19 @@
         setInterval(refreshBadge, 20000);
     });
 
+    // Pre-fill search box from ?search= query param (e.g. notification links)
+    document.addEventListener('DOMContentLoaded', function () {
+        var params = new URLSearchParams(window.location.search);
+        var search = params.get('search');
+        if (search) {
+            var input = document.getElementById('orderSearch');
+            if (input) {
+                input.value = decodeURIComponent(search);
+                applyOrderFilters();
+            }
+        }
+    });
+
     function getAntiForgeryToken() {
         return document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
     }

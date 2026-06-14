@@ -12,7 +12,7 @@
     <div class="card shadow-sm border-0">
         <div class="card-header bg-white border-bottom p-3 d-flex align-items-center justify-content-between">
             <div class="d-flex align-items-center">
-                <a asp-controller="Seller" asp-action="Home" asp-route-tab="Chat" class="btn btn-link text-dark p-0 me-3">
+                <a asp-controller="Chat" asp-action="CustomerInbox" class="btn btn-link text-dark p-0 me-3">
                     <i class="bi bi-arrow-left fs-4"></i>
                 </a>
                 
@@ -116,10 +116,10 @@ else if (msg.MessageText != null)
         var prod = ViewBag.ChatProduct as EcommerceSystem.Models.Product;
         <div class="product-mini-card d-flex align-items-center justify-content-between p-2 mb-3 bg-light rounded border border-info-subtle shadow-sm">
             <div class="d-flex align-items-center text-truncate me-2">
-                <img src="@(prod?.ImagePath ?? "/images/default-product.png")" alt="product" class="rounded me-2 border bg-white" style="width: 50px; height: 50px; object-fit: cover;" />
+                <img src="@prod.ImagePath" alt="product" class="rounded me-2 border bg-white" style="width: 50px; height: 50px; object-fit: cover;" />
                 <div class="text-truncate">
-                    <span class="d-block text-dark fw-bold small text-truncate" style="max-width: 250px;">@(prod?.Name ?? "Unknown product")</span>
-                    <span class="text-danger fw-bold small">RM @(prod?.Price.ToString("0.00") ?? "0.00")</span>
+                    <span class="d-block text-dark fw-bold small text-truncate" style="max-width: 250px;">@prod.Name</span>
+                    <span class="text-danger fw-bold small">RM @prod.Price</span>
                 </div>
             </div>
             <div>
@@ -350,23 +350,14 @@ else if (msg.MessageText != null)
             });
         }
 
-        @{ 
-            var chatProduct = ViewBag.ChatProduct as EcommerceSystem.Models.Product;
-            var chatProductName = chatProduct?.Name ?? string.Empty;
-            var chatProductId = chatProduct?.ProductId ?? 0;
-            var chatProductPrice = chatProduct?.Price ?? 0;
-            var chatProductImage = chatProduct?.ImagePath ?? "/images/default-product.png";
-        }
-
         var sendProductBtn = document.getElementById("sendProductLinkBtn");
         if (sendProductBtn) {
             sendProductBtn.addEventListener("click", function () {
-                var prodName = @System.Text.Json.JsonSerializer.Serialize(chatProductName);
                 sendCustomCard('PRODUCT', 
-                    encodeURIComponent(prodName),
-                    "@chatProductId", 
-                    "@chatProductPrice", 
-                    @System.Text.Json.JsonSerializer.Serialize(chatProductImage));
+                    `@Html.Raw(ViewBag.ChatProduct != null ? (ViewBag.ChatProduct as EcommerceSystem.Models.Product).Name : "")`,
+                    `@ViewBag.ChatProduct?.ProductId`, 
+                    `@ViewBag.ChatProduct?.Price`, 
+                    `@ViewBag.ChatProduct?.ImagePath`);
             });
         }
     });
