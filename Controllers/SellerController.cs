@@ -7,7 +7,6 @@ using EcommerceSystem.Models;
 using EcommerceSystem.Interfaces;
 using EcommerceSystem.Observers;
 using System.Text.Json;
-using EcommerceSystem.Enums;
 
 namespace EcommerceSystem.Controllers
 {
@@ -150,9 +149,10 @@ namespace EcommerceSystem.Controllers
             ViewBag.TotalRevenuePotential = activeProducts
                 .Sum(p => p.Price * p.StockQuantity);
 
-                // ── Actual Profit Calculation ──────────────────────────────────────────
-                // Return & Refund → deduct PROFIT only (goods came back, cost is recovered)
-                // Refund Only     → deduct full REVENUE (goods not returned, full loss)
+                // ── Revenue Calculation ───────────────────────────────────────────────
+                // Revenue = sum of what customers actually paid (Order.TotalAmount,
+                // which already excludes SST/shipping). NO deduction for refunds —
+                // this is a pure total of customer payments, full stop.
 
                 var deliveredOrders = await _context.Order
                     .Include(o => o.OrderItems)
@@ -160,21 +160,15 @@ namespace EcommerceSystem.Controllers
                             && (o.CurrentStatus == OrderStatus.DELIVERED
                             || o.CurrentStatus == OrderStatus.RECEIVED
                             || o.CurrentStatus == OrderStatus.RETURN_REFUND
-                            // ── After-sales statuses ───────────────────────────────
-                            // An order moves to RETURN_REFUND_REQUESTED while a return/refund
-                            // is pending (and may end up REFUND for refund-only). We keep
-                            // counting its profit here so revenue doesn't "drop" while the
-                            // request is pending. Once approved, ReturnApprovedAt +
-                            // ApprovedRefundAmount are set and the deduction below applies —
-                            // exactly the same way your original RETURN_REFUND case did.
                             || o.CurrentStatus == OrderStatus.RETURN_REFUND_REQUESTED
                             || o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED
                             || o.CurrentStatus == OrderStatus.REFUND))
                     .ToListAsync();
 
-                double actualProfit = 0;
+                decimal totalRevenue = deliveredOrders.Sum(o => o.TotalAmount);
 
-                // ── Load ALL approved requests for this seller's orders in ONE query ──
+                // ── Load ALL requests for this seller's orders (still needed elsewhere
+                // on this page, e.g. after-sale request lookups) ─────────────────────
                 var deliveredOrderIds = deliveredOrders.Select(o => o.OrderId).ToList();
                 var allRequests = await _context.Request
                     .Where(r => deliveredOrderIds.Contains(r.OrderId))
@@ -182,61 +176,7 @@ namespace EcommerceSystem.Controllers
 
                 ViewBag.Requests = allRequests;
 
-                foreach (var order in deliveredOrders)
-                {
-                    // Voucher discount ratio for THIS order
-                    decimal rawSubtotal    = order.OrderItems.Sum(oi => oi.Price * oi.Quantity);
-                    decimal voucherDiscount = Math.Max(0m, rawSubtotal - order.TotalAmount);
-                    decimal discountRatio   = rawSubtotal > 0 ? voucherDiscount / rawSubtotal : 0m;
-
-                    // Step 1: Add profit (discounted revenue - cost) for every item in this order
-                    foreach (var item in order.OrderItems)
-                    {
-                        var product   = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                        var costPrice = product != null && product.OriginalPrice > 0
-                            ? product.OriginalPrice
-                            : (double)item.Price;
-
-                        var discountedUnitPrice = (double)item.Price * (double)(1 - discountRatio);
-                        actualProfit += (discountedUnitPrice - costPrice) * item.Quantity;
-                    }
-
-                    // Step 2: Deduct approved refund impact for THIS order only
-                    var request = allRequests.FirstOrDefault(r => r.OrderId == order.OrderId);
-                    if (request != null && request.Status == "Approved"
-                        && request.ApprovedRefundAmount.HasValue && request.ApprovedRefundAmount.Value > 0)
-                    {
-                        bool isReturnRefund = request.RequestServiceType == RequestServiceType.RETURN_REFUND;
-
-                        if (isReturnRefund)
-                        {
-                            // Return & Refund: goods came back -> seller only loses the PROFIT portion.
-                            // Deduct = ApprovedRefundAmount * (1 - costRatio)
-                            decimal paidMerchandise = rawSubtotal - voucherDiscount;
-                            if (paidMerchandise > 0)
-                            {
-                                double totalCost = 0;
-                                foreach (var item in order.OrderItems)
-                                {
-                                    var product   = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-                                    var costPrice = product != null && product.OriginalPrice > 0
-                                        ? product.OriginalPrice
-                                        : (double)item.Price;
-                                    totalCost += costPrice * item.Quantity;
-                                }
-                                double costRatio = totalCost / (double)paidMerchandise;
-                                actualProfit -= (double)request.ApprovedRefundAmount.Value * (1.0 - costRatio);
-                            }
-                        }
-                        else
-                        {
-                            // Refund Only: goods NOT returned -> full refund amount is a direct profit loss.
-                            actualProfit -= (double)request.ApprovedRefundAmount.Value;
-                        }
-                    }
-                }
-
-            ViewBag.TotalProfit = (decimal)actualProfit;
+            ViewBag.TotalProfit = totalRevenue; // kept ViewBag key name so the view doesn't need changes
 
             // ─────────────────────────────────────────────
             // TAB: ORDER

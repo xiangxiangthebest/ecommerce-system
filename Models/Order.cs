@@ -25,23 +25,15 @@ public class Order : OrderStatusSubject
     public string DeliveryPostcode { get; set; } = string.Empty;
     public string DeliveryState { get; set; } = string.Empty;
 
-    // ── Cancellation ────────────────────────────────────────────────────────
     public string? CancelReason { get; set; }
     public DateTime? CanceledAt { get; set; }
 
-    // ── Delivery / Receipt ──────────────────────────────────────────────────
-    /// <summary>Set when status becomes DELIVERED — used by AutoReceiveOrdersJob for 3-day countdown.</summary>
     public DateTime? DeliveredAt { get; set; }
     public DateTime? ReceivedAt { get; set; }
-
-    // ── Review flag (not persisted) ─────────────────────────────────────────
     public bool ReviewSubmitted { get; set; } = false;
-
-    // ── Navigation properties ────────────────────────────────────────────────
     public Customer? Customer { get; set; }
     public Seller? Seller { get; set; }
 
-    // ── Observer list (not persisted) ───────────────────────────────────────
     [NotMapped]
     private List<OrderStatusObserver> _observers = new List<OrderStatusObserver>();
 
@@ -54,17 +46,6 @@ public class Order : OrderStatusSubject
             await o.Update(this);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // SELLER TRANSITIONS  (shown in the seller Order page dropdown)
-    //
-    //   PENDING   → PREPARING   Seller accepts and starts preparing the order.
-    //   PREPARING → SHIPPED     Seller hands the parcel to the courier.
-    //   SHIPPED   → DELIVERED   Courier delivers to the customer's address.
-    //
-    // ❌ CANCELED      — customer-only. Seller cannot cancel.
-    // ❌ RECEIVED      — triggered by customer or auto-job.
-    // ❌ RETURN_REFUND — initiated by customer only.
-    // ─────────────────────────────────────────────────────────────────────────
     public static readonly Dictionary<OrderStatus, List<OrderStatus>> SellerAllowedTransitions = new()
     {
         { OrderStatus.PENDING,       new() { OrderStatus.PREPARING } },
@@ -72,18 +53,9 @@ public class Order : OrderStatusSubject
         { OrderStatus.SHIPPED,       new() { OrderStatus.DELIVERED } },
         { OrderStatus.DELIVERED,     new() { } },
         { OrderStatus.RECEIVED,      new() { } },
-        // { OrderStatus.RETURN_REFUND, new() { } },
         { OrderStatus.CANCELED,      new() { } },
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // CUSTOMER TRANSITIONS
-    //
-    //   PENDING   → CANCELED      Customer cancels before seller starts.
-    //   DELIVERED → RECEIVED      Customer clicks "I received my parcel".
-    //   DELIVERED → RETURN_REFUND Customer raises an issue on delivery.
-    //   RECEIVED  → RETURN_REFUND Customer raises issue after confirming receipt.
-    // ─────────────────────────────────────────────────────────────────────────
     public static readonly Dictionary<OrderStatus, List<OrderStatus>> CustomerAllowedTransitions = new()
     {
         { OrderStatus.PENDING,       new() { OrderStatus.CANCELED } },
@@ -92,7 +64,6 @@ public class Order : OrderStatusSubject
         { OrderStatus.DELIVERED,     new() { OrderStatus.RECEIVED, OrderStatus.RETURN_REFUND_REQUESTED } },
         { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND_REQUESTED } },
 
-        // after sales flow ends order control
         { OrderStatus.RETURN_REFUND_REQUESTED, new() { } },
 
         { OrderStatus.CANCELED, new() { } },
@@ -100,10 +71,6 @@ public class Order : OrderStatusSubject
 
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // FULL TRANSITION MAP  (union of all actors + background job)
-    // Used internally by CanTransitionTo() — role enforcement is separate.
-    // ─────────────────────────────────────────────────────────────────────────
     private static readonly Dictionary<OrderStatus, List<OrderStatus>> AllAllowedTransitions = new()
     {
         { OrderStatus.PENDING,       new() { OrderStatus.PREPARING, OrderStatus.CANCELED } },
@@ -113,27 +80,16 @@ public class Order : OrderStatusSubject
         { OrderStatus.RECEIVED,      new() { OrderStatus.RETURN_REFUND_REQUESTED } },
         { OrderStatus.CANCELED,      new() { } },
 
-        // after sales flow ends order control
         { OrderStatus.CANCEL_REQUESTED, new() { OrderStatus.CANCELED} },
         { OrderStatus.RETURN_REFUND_REQUESTED, new(){ }}
     };
 
-    /// <summary>
-    /// Returns true if transitioning to <paramref name="next"/> is physically
-    /// possible from the current status. Does NOT check who is requesting.
-    /// Use SellerAllowedTransitions / CustomerAllowedTransitions for role-level enforcement.
-    /// </summary>
     public bool CanTransitionTo(OrderStatus next)
     {
         return AllAllowedTransitions.TryGetValue(CurrentStatus, out var allowed)
         && allowed.Contains(next);
     }
 
-    /// <summary>
-    /// Validates the transition, updates the status, stamps timestamps,
-    /// then notifies all attached observers asynchronously.
-    /// Throws InvalidOperationException if the transition is not allowed.
-    /// </summary>
     public async Task SetStatusAsync(OrderStatus newStatus)
     {
         if (!CanTransitionTo(newStatus))

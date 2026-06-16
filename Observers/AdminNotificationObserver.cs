@@ -5,19 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcommerceSystem.Observers
 {
-    /// <summary>
-    /// Sends notifications to ALL Admin users whenever any order status changes.
-    ///
-    /// Admins see every event:
-    ///   PENDING        → Customer placed order
-    ///   PREPARING      → Seller is processing
-    ///   SHIPPED        → Order shipped
-    ///   DELIVERED      → Order delivered
-    ///   RECEIVED       → Customer confirmed receipt
-    ///   CANCELED       → Order cancelled
-    ///   RETURN_REFUND  → Return / refund requested (pending CS approval)
-    ///   REFUND         → Refund-only requested (pending CS approval)
-    /// </summary>
     public class AdminNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
@@ -56,7 +43,6 @@ namespace EcommerceSystem.Observers
 
             switch (order.CurrentStatus)
             {
-                // ── Customer places an order ───────────────────────────────────
                 case OrderStatus.PENDING:
                     title = "New Order Placed";
                     message =
@@ -65,7 +51,6 @@ namespace EcommerceSystem.Observers
                         $"Product(s): {productList}. Total: RM{total:F2}";
                     break;
 
-                // ── Seller accepts / starts preparing ─────────────────────────
                 case OrderStatus.PREPARING:
                     title = "Order Being Processed";
                     message =
@@ -73,7 +58,6 @@ namespace EcommerceSystem.Observers
                         $"processing the order for Customer #{customerId} ({customerName}).";
                     break;
 
-                // ── Seller ships the order ─────────────────────────────────────
                 case OrderStatus.SHIPPED:
                     title = "Order Shipped";
                     message =
@@ -81,7 +65,6 @@ namespace EcommerceSystem.Observers
                         $"has been shipped to Customer #{customerId} ({customerName}).";
                     break;
 
-                // ── Courier delivers to address ────────────────────────────────
                 case OrderStatus.DELIVERED:
                     title = "Order Delivered";
                     message =
@@ -89,7 +72,6 @@ namespace EcommerceSystem.Observers
                         $"Customer #{customerId} ({customerName}).";
                     break;
 
-                // ── Customer confirms receipt ──────────────────────────────────
                 case OrderStatus.RECEIVED:
                     title = "Order Received by Customer";
                     message =
@@ -97,7 +79,6 @@ namespace EcommerceSystem.Observers
                         $"of Order #{orderId} from {shopName}. Transaction complete.";
                     break;
 
-                // ── Customer cancels ───────────────────────────────────────────
                 case OrderStatus.CANCELED:
                     title = "Order Cancelled";
                     message =
@@ -106,7 +87,6 @@ namespace EcommerceSystem.Observers
                         $"Product(s): {productList}. Total: RM{total:F2}";
                     break;
 
-                // ── Return / refund requested ──────────────────────────────────
                 case OrderStatus.RETURN_REFUND:
                 case OrderStatus.REFUND:
                     title = "Return & Refund Request — Return/Refund Requested";
@@ -120,7 +100,6 @@ namespace EcommerceSystem.Observers
                     return;
             }
 
-            // Fetch all admin user IDs from the database and notify each one.
             var adminIds = await _context.Users
                 .Where(u => u.Role == "Admin" && u.IsActive)
                 .Select(u => u.UserId)
@@ -136,10 +115,6 @@ namespace EcommerceSystem.Observers
             }
         }
 
-        // ── Helpers ───────────────────────────────────────────────────────────
-
-        // ── Builds a product list with variation details ─────────────────────
-        // Example output: "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
         private static string BuildProductList(Order order)
         {
             if (order.OrderItems == null || !order.OrderItems.Any())
@@ -159,10 +134,7 @@ namespace EcommerceSystem.Observers
 
             return entries.Any() ? string.Join(", ", entries) : "N/A";
         }
-
-        // Parses SelectedVariation JSON like {"Flavour":"Honey","Size":"Large"}
-        // and returns a readable string like "Flavour: Honey, Size: Large".
-        // Returns empty string if there are no variations or JSON is empty/invalid.
+        
         private static string BuildVariationSuffix(string? selectedVariationJson)
         {
             if (string.IsNullOrWhiteSpace(selectedVariationJson)
