@@ -164,18 +164,15 @@
                     <i class="ti ti-plus"></i>
                 </button>
 
-                <form asp-action="SendMessage" asp-controller="Chat" method="post"
-                      id="chatForm" style="display:contents;">
-                    @Html.AntiForgeryToken()
+                <form asp-action="SendMessage" asp-controller="Chat" method="post" id="chatForm" class="input-group m-0 flex-grow-1">
                     <input type="hidden" name="chatRoomId" value="@Model.ChatRoomId" />
-                    <input type="hidden" name="sellerId"   value="@Model.SellerId" />
-                    <input type="text"   name="message"    id="messageInput"
-                           class="chat-text-input"
-                           placeholder="Type a message…"
-                           autocomplete="off"
-                           required />
-                    <button type="submit" class="chat-send-btn" title="Send">
-                        <i class="ti ti-send"></i>
+                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                    
+                    <input type="text" name="message" id="messageInput" autocomplete="off" 
+                        class="form-control bg-light" placeholder="Type your message..." required style="height: 38px;" />
+                        
+                    <button class="btn btn-primary px-4" type="submit" id="sendBtn">
+                        <i class="bi bi-send-fill"></i> Send
                     </button>
                 </form>
             </div>

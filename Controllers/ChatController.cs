@@ -77,36 +77,40 @@ namespace EcommerceSystem.Controllers
 
             return RedirectToAction("CustomerConversation", new { id = chatRoom.ChatRoomId, productId = productId });
         }
-        [HttpPost]
-        public async Task<IActionResult> SendMessage(int chatRoomId, int customerId, string messageText)
-        {
-            if (string.IsNullOrWhiteSpace(messageText))
-                return BadRequest("Message cannot be empty");
 
-            var seller = await _sellerContext.GetCurrentSellerAsync(User);
-            if (seller == null) return Forbid();
+        [HttpPost]
+        public async Task<IActionResult> SendMessage(int chatRoomId, int sellerId, string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return BadRequest("Message cannot be empty");
+            }
+
+            var customer = await _customerContext.GetCurrentCustomerAsync(User);
+            var currentUserId = customer.UserId;
 
             if (chatRoomId == 0)
             {
                 var newRoom = new ChatRoom
                 {
-                    SellerId   = seller.UserId,
-                    CustomerId = customerId
+                    CustomerId = currentUserId,
+                    SellerId = sellerId
                 };
                 _context.ChatRoom.Add(newRoom);
                 await _context.SaveChangesAsync();
+
                 chatRoomId = newRoom.ChatRoomId;
             }
-
-            await _chatService.SendMessageAsync(chatRoomId, seller.UserId, messageText);
-            return RedirectToAction("SellerConversation", new { id = chatRoomId });
+            await _chatService.SendMessageAsync(chatRoomId, currentUserId, message);
+            return RedirectToAction("CustomerConversation", new { id = chatRoomId });
         }
+        
         [HttpPost]
         public async Task<IActionResult> SellerSendMessage(int chatRoomId, int sellerId, string message)
         {
             if (string.IsNullOrWhiteSpace(message))
             {
-                return BadRequest("消息不能为空");
+                return BadRequest("Message cannot be empty");
             }
 
             var seller = await _sellerContext.GetCurrentSellerAsync(User);
