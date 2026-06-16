@@ -3,18 +3,6 @@ using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Observers
 {
-    /// <summary>
-    /// Sends notifications to the CUSTOMER whenever their order status changes.
-    ///
-    /// Trigger map:
-    ///   PENDING        → "Order Placed"
-    ///   PREPARING      → "Processing Order"
-    ///   SHIPPED        → "Order Shipped"
-    ///   DELIVERED      → "Order Delivered"
-    ///   RECEIVED       → "Order Completed" (thank you + prompt to leave a review)
-    ///   CANCELED       → "Order Cancelled"
-    ///   RETURN_REFUND  → "Return & Refund Request Submitted" (pending CS approval)
-    /// </summary>
     public class CustomerNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
@@ -45,7 +33,6 @@ namespace EcommerceSystem.Observers
             var shopName    = order.Seller?.ShopName ?? "the seller";
             var total       = order.TotalAmount;
 
-            // Build a comma-separated product list from the order items (if loaded).
             var productList = BuildProductList(order);
 
             string title;
@@ -53,7 +40,6 @@ namespace EcommerceSystem.Observers
 
             switch (order.CurrentStatus)
             {
-                // ── Customer places the order ──────────────────────────────────
                 case OrderStatus.PENDING:
                     title = "Order Placed";
                     message =
@@ -64,21 +50,18 @@ namespace EcommerceSystem.Observers
                         $"Status: Pending";
                     break;
 
-                // ── Seller starts preparing ────────────────────────────────────
                 case OrderStatus.PREPARING:
                     title = "Processing Order";
                     message =
                         $"Order #{orderId} from {shopName} is being processed.";
                     break;
 
-                // ── Seller hands to courier ────────────────────────────────────
                 case OrderStatus.SHIPPED:
                     title = "Order Shipped";
                     message =
                         $"Order #{orderId} from {shopName} is being shipped.";
                     break;
 
-                // ── Courier marks delivered ────────────────────────────────────
                 case OrderStatus.DELIVERED:
                     title = "Order Delivered";
                     message =
@@ -86,7 +69,6 @@ namespace EcommerceSystem.Observers
                         $"Please confirm receipt when you have it.";
                     break;
 
-                // ── Customer cancelled ─────────────────────────────────────────
                 case OrderStatus.CANCELED:
                     title = "Order Cancelled";
                     message =
@@ -97,7 +79,6 @@ namespace EcommerceSystem.Observers
                         $"has been cancelled.";
                     break;
 
-                // ── Return / refund requested ──────────────────────────────────
                 case OrderStatus.RETURN_REFUND:
                 case OrderStatus.REFUND:
                     title = "Return & Refund Request Submitted";
@@ -106,7 +87,6 @@ namespace EcommerceSystem.Observers
                         $"has been submitted and is pending Customer Service approval.";
                     break;
 
-                // ── Customer confirms they received the order ──────────────
                 case OrderStatus.RECEIVED:
                     title = "Order Completed";
                     message =
@@ -125,10 +105,6 @@ namespace EcommerceSystem.Observers
             );
         }
 
-        // ── Helpers ───────────────────────────────────────────────────────────
-
-        // ── Builds a product list with variation details ─────────────────────
-        // Example output: "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
         private static string BuildProductList(Order order)
         {
             if (order.OrderItems == null || !order.OrderItems.Any())
@@ -149,9 +125,6 @@ namespace EcommerceSystem.Observers
             return entries.Any() ? string.Join(", ", entries) : "N/A";
         }
 
-        // Parses SelectedVariation JSON like {"Flavour":"Honey","Size":"Large"}
-        // and returns a readable string like "Flavour: Honey, Size: Large".
-        // Returns empty string if there are no variations or JSON is empty/invalid.
         private static string BuildVariationSuffix(string? selectedVariationJson)
         {
             if (string.IsNullOrWhiteSpace(selectedVariationJson)

@@ -5,16 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcommerceSystem.Observers
 {
-    /// <summary>
-    /// Sends notifications to ALL Customer Service users whenever a return/refund
-    /// request is submitted by a customer, so they know a case needs their review.
-    ///
-    /// Trigger map:
-    ///   RETURN_REFUND  → "New Return & Refund Request — Action Required"
-    ///   REFUND         → "New Refund-Only Request — Action Required"
-    ///
-    /// All other order status changes are ignored by this observer.
-    /// </summary>
     public class CustomerServiceNotificationObserver : OrderStatusObserver
     {
         private readonly INotificationService _notificationService;
@@ -43,7 +33,6 @@ namespace EcommerceSystem.Observers
 
         private async Task UpdateAsync(Order order)
         {
-            // Only notify CS when a return/refund request is raised.
             if (order.CurrentStatus != OrderStatus.RETURN_REFUND &&
                 order.CurrentStatus != OrderStatus.REFUND)
                 return;
@@ -65,7 +54,6 @@ namespace EcommerceSystem.Observers
                 $"request for Order #{orderId} at {shopName} (Seller #{sellerId}). " +
                 $"Total: RM{total:F2}. Please review and approve or reject this request.";
 
-            // Fetch all active Customer Service user IDs and notify each one.
             var csUserIds = await _context.Users
                 .Where(u => u.Role == "CustomerService" && u.IsActive)
                 .Select(u => u.UserId)
