@@ -26,7 +26,6 @@ public class Request
     public CustomerService? ReviewByCS { get; set; }
     public int? ReviewByCsId { get; set; }
     public string Status { get; set; } = "Pending";
-    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public decimal? ApprovedRefundAmount { get; set; } = 0m;
     private IRequestStrategy? _strategy;
@@ -41,19 +40,3 @@ public class Request
         _strategy?.Solve(this);
     }
 }
-
-
-
-// Request request = new Request
-// {
-//     RequestIssueType = "Order Issue",
-//     Description = "Received damaged item"
-// };
-
-// CustomerService cs = new CustomerService();
-// IRequestStrategy strategy = new RefundStrategy();
-
-// cs.AssignStrategy(request, strategy);
-
-// // Step 5: Execute strategy
-// request.PerformSolve();
