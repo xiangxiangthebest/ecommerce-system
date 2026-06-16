@@ -1,59 +1,102 @@
 @model List<EcommerceSystem.ViewModels.ChatBoxListMV>
 
-@{
-    ViewData["Title"] = "My Inbox";
-}
+<link rel="stylesheet" href="~/css/customer/chat-list.css" asp-append-version="true" />
 
-<div class="container mt-4">
-    <h2 class="mb-4"><i class="bi bi-chat-dots"></i> Message Center</h2>
+<div class="chat-list-page">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="ti ti-message-circle-2"></i>
+            Message Center
+        </h1>
+        <p class="page-subtitle">Your conversations with sellers</p>
+    </div>
 
-    <div class="list-group shadow-sm rounded">
+    @if (Model != null && Model.Any())
+    {
+        <div class="inbox-search-wrap">
+            <i class="ti ti-search"></i>
+            <input type="text" class="inbox-search-input" id="inboxSearch"
+                   placeholder="Search conversations…" autocomplete="off" />
+        </div>
+    }
+
+    <div class="inbox-card">
+
         @if (Model == null || !Model.Any())
         {
-            <div class="list-group-item text-center text-muted py-5">
-                <i class="bi bi-chat-left-text fs-1 d-block mb-2"></i>
-                No conversations yet
+            <div class="inbox-empty">
+                <i class="ti ti-message-off"></i>
+                <p>No conversations yet</p>
+                <small>Chat with a seller from any product page to get started.</small>
             </div>
         }
         else
         {
-            foreach (var item in Model)
-            {
-                <a href="@Url.Action("SellerConversation", "Chat", new { id = item.ChatRoomId })" 
-                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3 border-start-0 border-end-0">
-                    
-                    <div class="d-flex align-items-center w-70">
-                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 45px; height: 45px; min-width: 45px;">
-                            <span class="fw-bold">@((item.SellerName ?? item.CustomerName ?? "U")[0].ToString().ToUpper())</span>
-                        </div>
-                        
-                        <div class="text-truncate">
-                            <h6 class="mb-1 fw-bold text-dark">@(item.SellerName ?? item.CustomerName ?? "Unknown User")</h6>
-                            <p class="mb-0 text-muted small text-truncate">
-                                @(string.IsNullOrEmpty(item.LastMessage) ? "[No messages yet]" : item.LastMessage)
+            <div id="conversationList">
+                @foreach (var item in Model)
+                {
+                    var displayName = item.SellerName ?? item.CustomerName ?? "Unknown";
+                    var initial     = displayName.Length > 0 ? displayName[0].ToString().ToUpper() : "U";
+                    var hasUnread   = item.UnreadCount > 0;
+
+                    // Sanitise preview text
+                    var preview = item.LastMessage ?? "";
+                    if      (preview.StartsWith("[PRODUCT_CARD]")) preview = "Sent a product";
+                    else if (preview.StartsWith("[ORDER_TAG]"))    preview = "Sent an order";
+                    else if (preview.StartsWith("[IMAGE_CARD]"))   preview = "Sent an image";
+
+                    // Format time nicely
+                    var timeStr = "";
+                    if (item.LastMessageTime.HasValue)
+                    {
+                        var local = item.LastMessageTime.Value.ToLocalTime();
+                        var now   = DateTime.Now;
+                        timeStr   = local.Date == now.Date
+                            ? local.ToString("HH:mm")
+                            : local.Date == now.Date.AddDays(-1)
+                                ? "Yesterday"
+                                : local.ToString("MMM d");
+                    }
+
+                    <a href="@Url.Action("SellerConversation", "Chat", new { id = item.ChatRoomId })" 
+                       class="conversation-item @(hasUnread ? "has-unread" : "")"
+                       data-name="@displayName.ToLower()">
+
+                        <div class="conv-avatar">@initial</div>
+
+                        <div class="conv-body">
+                            <h6 class="conv-name">@displayName</h6>
+                            <p class="conv-preview">
+                                @(string.IsNullOrEmpty(preview) ? "No messages yet" : preview)
                             </p>
                         </div>
-                    </div>
 
-                    <div class="text-end" style="min-width: 80px;">
-                        <small class="text-muted d-block mb-1">
-                            @(item.LastMessageTime.HasValue ? item.LastMessageTime.Value.ToLocalTime().ToString("MM-dd HH:mm") : "")
-                        </small>
-                        @if (item.UnreadCount > 0)
-                        {
-                            <span class="badge bg-danger rounded-pill">@item.UnreadCount</span>
-                        }
-                    </div>
-                </a>
-            }
+                        <div class="conv-meta">
+                            <span class="conv-time">@timeStr</span>
+                            @if (hasUnread)
+                            {
+                                <span class="conv-badge">@item.UnreadCount</span>
+                            }
+                        </div>
+
+                        <i class="ti ti-chevron-right conv-chevron"></i>
+                    </a>
+                }
+            </div>
         }
+
     </div>
 </div>
 
-<style>
-    .list-group-item-action:hover {
-        background-color: #f8f9fa;
-        transition: background 0.2s ease;
+<script>
+    var searchInput = document.getElementById('inboxSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            var q = this.value.toLowerCase().trim();
+            document.querySelectorAll('.conversation-item').forEach(function (item) {
+                item.style.display = item.getAttribute('data-name').includes(q) ? '' : 'none';
+            });
+        });
     }
-    .w-70 { width: 75%; }
-</style>
+</script>
+

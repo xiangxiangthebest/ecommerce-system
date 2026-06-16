@@ -152,8 +152,6 @@ namespace EcommerceSystem.Controllers
             await LoadNavbarAsync();
             
             ChatRoom? chatRoom;
-
-            // 1. 如果 id 是 0，说明是尚未创建的虚拟临时聊天室（从商品页初次进来）
             if (id == 0)
             {
                 var customer = await _customerContext.GetCurrentCustomerAsync(User);

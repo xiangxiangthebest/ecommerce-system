@@ -222,24 +222,29 @@ function sendCustomCard(type, title, id, price, img) {
     if (type === 'PRODUCT') {
         var url = '/Customer/ProductDetails/' + id;
         input.value =
-            '[PRODUCT_CARD]' +
-            '<a href="' + url + '" class="msg-card-link">' +
-            '<div class="msg-card-chip">' +
-            '<span class="chip-label"><i class="ti ti-shopping-bag" style="font-size:12px"></i> Product</span>' +
-            '<span class="chip-action">View details →</span>' +
-            '</div>' +
-            '<div class="msg-card-body">' +
-            '<img src="' + img + '" class="msg-card-thumb" onerror="this.src=\'/images/default-product.jpg\'" />' +
-            '<div class="msg-card-info">' +
-            '<p class="msg-card-title js-product-title">' + cleanTitle + '</p>' +
-            '<p class="msg-card-sub">Tap to view product page</p>' +
-            '</div>' +
-            '</div>' +
-            '<div class="msg-card-footer">' +
-            '<span class="msg-card-price">RM ' + price + '</span>' +
-            '<span class="msg-card-view"><i class="ti ti-chevron-right" style="font-size:13px"></i></span>' +
-            '</div>' +
-            '</a>';
+            "[PRODUCT_CARD]" +
+            "<a href='" + url + "' " +
+            "class='d-block text-decoration-none bg-white p-2 rounded shadow-sm border border-info-subtle' " +
+            "style='max-width:260px; transition:0.2s; text-align: left;'>" +
+            "  <div class='p-1'>" +
+            "    <div class='text-muted border-bottom pb-1 mb-2 small d-flex justify-content-between' style='font-size:11px;'>" +
+            '      <span class="chip-label"><i class="ti ti-shopping-bag" style="font-size:12px"></i> Product</span> ' +
+            '      <span class="chip-action">View details →</span>' +
+            "    </div>" +
+            "    <div class='d-flex align-items-center mb-2'>" +
+            "      <img src='" + img + "' class='rounded border me-2' style='width:55px; height:55px; object-fit:cover;' onerror=\"this.src='/images/default-product.jpg'\" />" +
+            "      <div class='flex-grow-1' style='min-width: 0; line-height:1.2;'>" +
+            "        " +
+            "        <span class='d-block fw-bold text-dark text-truncate js-product-title' style='font-size:12px;'>" + cleanTitle + "</span>" +
+            "        <small class='text-muted d-block text-truncate' style='font-size:11px;'>Tap to view product page</small>" +
+            "      </div>" +
+            "    </div>" +
+            "    <div class='text-dark small d-flex justify-content-between align-items-center border-top pt-1 mt-1' style='font-size:12px;'>" +
+            "      <span>Price: <b class='text-danger'>RM " + price + "</b></span>" +
+            "      <span class='text-primary' style='font-size:11px;'>View <i class='bi bi-chevron-right'></i></span>" +
+            "    </div>" +
+            "  </div>" +
+            "</a>";
     } else if (type === 'ORDER') {
         input.value = '[ORDER_TAG]|' + id + '|' + price + '|' + img + '|' + cleanTitle;
     }
