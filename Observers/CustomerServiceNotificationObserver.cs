@@ -64,7 +64,8 @@ namespace EcommerceSystem.Observers
                 await _notificationService.CreateAsync(
                     userId:  csUserId,
                     title:   title,
-                    message: message
+                    message: message,
+                    orderId: order.OrderId
                 );
             }
         }

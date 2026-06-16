@@ -101,7 +101,8 @@ namespace EcommerceSystem.Observers
             await _notificationService.CreateAsync(
                 userId:  customerId,
                 title:   title,
-                message: message
+                message: message,
+                orderId: order.OrderId
             );
         }
 
