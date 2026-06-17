@@ -445,7 +445,7 @@ namespace EcommerceSystem.Controllers
         public IActionResult VoucherManagement()
         {
             ViewBag.Vouchers = _context.Vouchers.ToList();
-            return View(new Voucher());
+            return View(new CreateVoucherDto());
         }
 
         public async Task<IActionResult> ManageVouchers()
@@ -459,7 +459,7 @@ namespace EcommerceSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateVoucher(Voucher model)
+        public async Task<IActionResult> CreateVoucher(CreateVoucherDto model)
         {
             if (!ModelState.IsValid)
             {
@@ -470,7 +470,22 @@ namespace EcommerceSystem.Controllers
                 return View("VoucherManagement", model);
             }
 
-            _context.Vouchers.Add(model);
+            var voucher = new Voucher
+            {
+                Code = model.Code,
+                Name = model.Name,
+                Type = model.Type,
+                DiscountValue = model.DiscountValue ?? 0m,
+                MinimumSpend = model.MinimumSpend,
+                StartDate = model.StartDate ?? DateTime.MinValue,
+                EndDate = model.EndDate ?? DateTime.MinValue,
+                Quantity = model.Quantity ?? 1,
+                IsPercentage = model.IsPercentage,
+                IsActive = model.IsActive,
+                CreatedAt = DateTime.Now
+            };
+
+            _context.Vouchers.Add(voucher);
             await _context.SaveChangesAsync();
 
             var customerIds = await _context.Customers
@@ -482,7 +497,7 @@ namespace EcommerceSystem.Controllers
                 _context.CustomerVouchers.Add(new CustomerVoucher
                 {
                     CustomerId = customerId,
-                    VoucherId = model.VoucherId,
+                    VoucherId = voucher.VoucherId,
                     AssignedAt = DateTime.Now,
                     IsUsed = false
                 });

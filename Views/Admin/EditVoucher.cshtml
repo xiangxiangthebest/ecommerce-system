@@ -30,6 +30,17 @@
             <input asp-for="Type" />
             <span asp-validation-for="Type" class="text-danger"></span>
         </div>
+        <div class="form-row">
+            <label>Discount mode</label>
+            <div class="radio-group">
+                <label class="radio-option">
+                    <input type="radio" name="IsPercentage" value="false" @(Model.IsPercentage ? string.Empty : "checked") /> RM off
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="IsPercentage" value="true" @(Model.IsPercentage ? "checked" : string.Empty) /> Percentage
+                </label>
+            </div>
+        </div>
 
         <div class="form-row two-col">
             <div>
@@ -73,3 +84,32 @@
         <a asp-action="VoucherManagement" asp-controller="Admin" class="btn btn-secondary">Back to Voucher Management</a>
     </form>
 </div>
+
+@section Scripts {
+    <script>
+        const editDiscountInput = document.querySelector('[name="DiscountValue"]');
+        const editPercentageRadios = document.querySelectorAll('[name="IsPercentage"]');
+
+        function updateEditDiscountLimit() {
+            if (!editDiscountInput) return;
+            const isPercentage = document.querySelector('[name="IsPercentage"][value="true"]')?.checked;
+            if (isPercentage) {
+                editDiscountInput.max = '100';
+                if (editDiscountInput.value && parseFloat(editDiscountInput.value) > 100) {
+                    editDiscountInput.setCustomValidity('Percentage discounts cannot exceed 100.');
+                } else {
+                    editDiscountInput.setCustomValidity('');
+                }
+            } else {
+                editDiscountInput.removeAttribute('max');
+                editDiscountInput.setCustomValidity('');
+            }
+        }
+
+        if (editPercentageRadios.length) {
+            editPercentageRadios.forEach(radio => radio.addEventListener('change', updateEditDiscountLimit));
+            editDiscountInput?.addEventListener('input', updateEditDiscountLimit);
+            updateEditDiscountLimit();
+        }
+    </script>
+}

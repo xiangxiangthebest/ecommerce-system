@@ -139,6 +139,8 @@ namespace EcommerceSystem.Services
 
             CustomerVoucher? appliedCustomerVoucher = null;
             decimal voucherDiscount = 0m;
+            bool voucherIsPercentage = false;
+            decimal voucherPercent = 0m;
 
             if (request.SelectedVoucherId.HasValue)
             {
@@ -163,6 +165,8 @@ namespace EcommerceSystem.Services
                     return OperationResult.Fail("Selected voucher is no longer available.");
 
                 voucherDiscount = voucher.DiscountValue;
+                voucherIsPercentage = voucher.IsPercentage;
+                voucherPercent = voucher.DiscountValue;
             }
 
             List<CartItem> itemsToPurchase;
@@ -232,9 +236,14 @@ namespace EcommerceSystem.Services
 
                     var orderTotal = group.Sum(i => i.Quantity * (decimal)i.Price);
                     decimal discountApplied = 0m;                                       
-                    if (voucherDiscountRemaining > 0)
+                    if (voucherIsPercentage)
                     {
-                        discountApplied = Math.Min(voucherDiscountRemaining, orderTotal); 
+                        discountApplied = Math.Round(orderTotal * voucherPercent / 100m, 2);
+                        orderTotal -= discountApplied;
+                    }
+                    else if (voucherDiscountRemaining > 0)
+                    {
+                        discountApplied = Math.Min(voucherDiscountRemaining, orderTotal);
                         orderTotal -= discountApplied;
                         voucherDiscountRemaining -= discountApplied;
                     }

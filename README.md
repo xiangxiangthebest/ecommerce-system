@@ -80,8 +80,6 @@ New request-solving behaviors can be introduced by creating new strategies.
 # Evidence
 
 ## Open for Extension
-- `/Strategy/ActivateAccountStrategy.cs`
-- `/Strategy/SuspendAccountStrategy.cs`
 - `/Strategy/RefundStrategy.cs`
 - `/Strategy/ReturnRefundStrategy.cs`
 
@@ -192,8 +190,6 @@ Allows different request-resolution algorithms to be selected at runtime.
 # Evidence
 
 - `/Interfaces/IRequestStrategy.cs`
-- `/Strategy/ActivateAccountStrategy.cs`
-- `/Strategy/SuspendAccountStrategy.cs`
 - `/Strategy/RefundStrategy.cs`
 - `/Strategy/ReturnRefundStrategy.cs`
 

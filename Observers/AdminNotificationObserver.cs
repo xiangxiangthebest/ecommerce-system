@@ -110,7 +110,8 @@ namespace EcommerceSystem.Observers
                 await _notificationService.CreateAsync(
                     userId:  adminId,
                     title:   title,
-                    message: message
+                    message: message,
+                    orderId: order.OrderId
                 );
             }
         }

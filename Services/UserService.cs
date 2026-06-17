@@ -39,10 +39,38 @@ public class UserService : IUserService
 
         if (user is Customer customer)
         {
+            await AssignExistingAdminVouchersAsync(customer);
             await AssignNewUserVoucherAsync(customer);
         }
 
         return true;
+    }
+
+    private async Task AssignExistingAdminVouchersAsync(Customer customer)
+    {
+        var existingVoucherIds = await _context.CustomerVouchers
+            .Where(cv => cv.CustomerId == customer.UserId)
+            .Select(cv => cv.VoucherId)
+            .ToListAsync();
+
+        var vouchersToAssign = await _context.Vouchers
+            .Where(v => v.IsActive)
+            .Where(v => v.Type != "Birthday" && v.Type != "NewUser")
+            .Where(v => !existingVoucherIds.Contains(v.VoucherId))
+            .ToListAsync();
+
+        foreach (var voucher in vouchersToAssign)
+        {
+            _context.CustomerVouchers.Add(new CustomerVoucher
+            {
+                CustomerId = customer.UserId,
+                VoucherId = voucher.VoucherId,
+                AssignedAt = DateTime.UtcNow,
+                IsUsed = false
+            });
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     private async Task AssignNewUserVoucherAsync(Customer customer)

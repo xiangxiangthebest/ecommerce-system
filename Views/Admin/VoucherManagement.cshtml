@@ -1,4 +1,4 @@
-@model EcommerceSystem.Models.Voucher
+@model EcommerceSystem.DTOs.CreateVoucherDto
 @{
     ViewData["Title"] = "Voucher Management";
     Layout = "~/Views/Admin/Layout.cshtml";
@@ -37,47 +37,58 @@
                 <div asp-validation-summary="ModelOnly" class="validation-summary-errors text-danger"></div>
                 <div class="form-row">
                     <label asp-for="Code"></label>
-                    <input asp-for="Code" class="form-control" />
+                    <input asp-for="Code" class="form-control" required />
                     <span asp-validation-for="Code" class="text-danger"></span>
                 </div>
                 <div class="form-row">
                     <label asp-for="Name"></label>
-                    <input asp-for="Name" class="form-control" />
+                    <input asp-for="Name" class="form-control" required />
                     <span asp-validation-for="Name" class="text-danger"></span>
                 </div>
                 <div class="form-row">
                     <label asp-for="Type"></label>
-                    <input asp-for="Type" class="form-control" placeholder="e.g. General, NewUser, Birthday" />
+                    <input asp-for="Type" class="form-control" placeholder="e.g. General, NewUser, Birthday" required />
                     <span asp-validation-for="Type" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label>Discount mode</label>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="IsPercentage" value="false" @(Model.IsPercentage ? string.Empty : "checked") /> RM off
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="IsPercentage" value="true" @(Model.IsPercentage ? "checked" : string.Empty) /> Percentage
+                        </label>
+                    </div>
                 </div>
                 <div class="form-row two-col">
                     <div>
                         <label asp-for="DiscountValue"></label>
-                        <input asp-for="DiscountValue" type="number" step="0.01" min="0" class="form-control" />
+                        <input asp-for="DiscountValue" type="number" step="0.01" min="0" class="form-control" required />
                         <span asp-validation-for="DiscountValue" class="text-danger"></span>
                     </div>
                     <div>
                         <label asp-for="MinimumSpend"></label>
-                        <input asp-for="MinimumSpend" type="number" step="0.01" min="0" class="form-control" />
+                        <input asp-for="MinimumSpend" type="number" step="0.01" min="0" class="form-control" required />
                         <span asp-validation-for="MinimumSpend" class="text-danger"></span>
                     </div>
                 </div>
                 <div class="form-row two-col">
                     <div>
                         <label asp-for="StartDate"></label>
-                        <input asp-for="StartDate" type="date" class="form-control" />
+                        <input asp-for="StartDate" type="date" class="form-control" required />
                         <span asp-validation-for="StartDate" class="text-danger"></span>
                     </div>
                     <div>
                         <label asp-for="EndDate"></label>
-                        <input asp-for="EndDate" type="date" class="form-control" />
+                        <input asp-for="EndDate" type="date" class="form-control" required />
                         <span asp-validation-for="EndDate" class="text-danger"></span>
                     </div>
                 </div>
                 <div class="form-row two-col">
                     <div>
                         <label asp-for="Quantity"></label>
-                        <input asp-for="Quantity" type="number" min="1" class="form-control" />
+                        <input asp-for="Quantity" type="number" min="1" class="form-control" required />
                         <span asp-validation-for="Quantity" class="text-danger"></span>
                     </div>
                     <div class="voucher-active-toggle">
@@ -114,7 +125,7 @@
                                 <td>@voucher.Code</td>
                                 <td>@voucher.Name</td>
                                 <td>@voucher.Type</td>
-                                <td>RM @voucher.DiscountValue.ToString("0.00")</td>
+                                <td>@(voucher.IsPercentage ? $"{voucher.DiscountValue:0}%" : $"RM {voucher.DiscountValue:0.00}")</td>
                                 <td>@voucher.StartDate.ToString("yyyy-MM-dd") – @voucher.EndDate.ToString("yyyy-MM-dd")</td>
                                 <td>@voucher.Quantity</td>
                                 <td>@(voucher.IsActive ? "Active" : "Inactive")</td>
@@ -140,3 +151,32 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        const discountInput = document.querySelector('[name="DiscountValue"]');
+        const percentageRadios = document.querySelectorAll('[name="IsPercentage"]');
+
+        function updateDiscountLimit() {
+            if (!discountInput) return;
+            const isPercentage = document.querySelector('[name="IsPercentage"][value="true"]')?.checked;
+            if (isPercentage) {
+                discountInput.max = '100';
+                if (discountInput.value && parseFloat(discountInput.value) > 100) {
+                    discountInput.setCustomValidity('Percentage discounts cannot exceed 100.');
+                } else {
+                    discountInput.setCustomValidity('');
+                }
+            } else {
+                discountInput.removeAttribute('max');
+                discountInput.setCustomValidity('');
+            }
+        }
+
+        if (percentageRadios.length) {
+            percentageRadios.forEach(radio => radio.addEventListener('change', updateDiscountLimit));
+            discountInput?.addEventListener('input', updateDiscountLimit);
+            updateDiscountLimit();
+        }
+    </script>
+}

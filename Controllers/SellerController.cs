@@ -168,7 +168,7 @@ namespace EcommerceSystem.Controllers
                 var approvedRefund  = _context.Request
                 .Where(r => r.Status == "Approved")
                 .ToList()
-                .Sum(r => r.ApprovedRefundAmount ?? 0);
+                .Sum(r => r.ApprovedRefundAmount ?? 0); 
 
             decimal totalRevenue =
                 deliveredOrders.Sum(o => o.TotalAmount)

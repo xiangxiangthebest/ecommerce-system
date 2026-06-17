@@ -103,7 +103,8 @@ namespace EcommerceSystem.Observers
                 await _notificationService.CreateAsync(
                     userId:  sellerId,
                     title:   title,
-                    message: message
+                    message: message,
+                    orderId: order.OrderId
                 );
                 Console.WriteLine($"[SellerNotificationObserver] Notification created successfully");
             }

@@ -121,7 +121,10 @@ namespace EcommerceSystem.Services
             var availableVouchers = await _context.CustomerVouchers
                 .Include(cv => cv.Voucher)
                 .Where(cv => cv.CustomerId == customerId && !cv.IsUsed)
-                .Where(cv => cv.Voucher!.IsActive && cv.Voucher!.StartDate <= DateTime.Now && cv.Voucher!.EndDate >= DateTime.Now)
+                .Where(cv => cv.Voucher!.IsActive
+                    && cv.Voucher.Quantity > 0
+                    && cv.Voucher.StartDate <= DateTime.Now
+                    && cv.Voucher.EndDate >= DateTime.Now)
                 .ToListAsync();
 
             var checkout = new Checkout
@@ -169,7 +172,10 @@ namespace EcommerceSystem.Services
             var availableVouchers = await _context.CustomerVouchers
                 .Include(cv => cv.Voucher)
                 .Where(cv => cv.CustomerId == customerId && !cv.IsUsed)
-                .Where(cv => cv.Voucher!.IsActive && cv.Voucher!.StartDate <= DateTime.Now && cv.Voucher!.EndDate >= DateTime.Now)
+                .Where(cv => cv.Voucher!.IsActive
+                    && cv.Voucher.Quantity > 0
+                    && cv.Voucher.StartDate <= DateTime.Now
+                    && cv.Voucher.EndDate >= DateTime.Now)
                 .ToListAsync();
 
             var checkout = new Checkout
