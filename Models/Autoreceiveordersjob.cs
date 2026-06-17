@@ -76,7 +76,8 @@ public class AutoReceiveOrdersJob : BackgroundService
         var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
         //var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
-        var cutoff = DateTime.UtcNow.AddMinutes(-2);
+        // var cutoff = DateTime.UtcNow.AddMinutes(-2);
+        var cutoff = DateTime.UtcNow.AddDays(-5);
 
         // Eligible statuses for auto-receive:
         //   DELIVERED            → normal delivery, customer never manually confirmed
@@ -85,10 +86,7 @@ public class AutoReceiveOrdersJob : BackgroundService
         //   REFUND               → CS approved a Refund-Only request     → auto-close
         var overdueOrders = await db.Order
             .Where(o =>
-                (o.CurrentStatus == OrderStatus.DELIVERED         ||
-                 o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED ||
-                 o.CurrentStatus == OrderStatus.RETURN_REFUND     ||  // Return & Refund approved by CS
-                 o.CurrentStatus == OrderStatus.REFUND)               // Refund-Only approved by CS
+                (o.CurrentStatus == OrderStatus.DELIVERED) 
                 && o.DeliveredAt != null
                 && o.DeliveredAt <= cutoff)
             .Include(o => o.Customer)
