@@ -17,6 +17,7 @@
         setupCardFormatting();
         setupVoucherUI();
         refreshPayment();
+        updateVoucherStubStates();
         updatePlaceOrderState();
     }
 
@@ -67,6 +68,7 @@
             cardForm.style.display = val === 'Card' ? '' : 'none';
         }
 
+        updateVoucherStubStates();
         updatePlaceOrderState();
     }
 
@@ -107,6 +109,13 @@
         /* Voucher click (auto apply) */
         document.querySelectorAll('.voucher-stub').forEach(stub => {
             stub.addEventListener('click', () => {
+                const isDisabled = stub.dataset.disabled === 'true';
+                if (isDisabled) {
+                    const min = Number(stub.dataset.min || 0);
+                    showPromoError(`This voucher requires a minimum spend of RM ${min.toFixed(2)}.`);
+                    return;
+                }
+
                 applyVoucher(stub.dataset.code, true);
 
                 document.querySelectorAll('.voucher-stub')
@@ -120,6 +129,10 @@
 
         document.getElementById('applyPromoBtn')
             ?.addEventListener('click', () => {
+                if (appliedVoucher) {
+                    removeVoucher();
+                    return;
+                }
                 const code = document.getElementById('promoInput').value;
                 applyVoucher(code);
             });
@@ -128,19 +141,42 @@
             ?.addEventListener('click', removeVoucher);
     }
 
+    function getCheckoutSubtotal() {
+        return parseFloat(document.getElementById('sumMerchandise').textContent) || 0;
+    }
+
+    function updateVoucherStubStates() {
+        const subtotal = getCheckoutSubtotal();
+
+        document.querySelectorAll('.voucher-stub').forEach(stub => {
+            const min = Number(stub.dataset.min || 0);
+            const disabled = min > 0 && subtotal < min;
+
+            stub.disabled = disabled;
+            stub.classList.toggle('disabled', disabled);
+            stub.dataset.disabled = disabled ? 'true' : 'false';
+        });
+    }
+
+    function showPromoError(message) {
+        const feedback = document.getElementById('promoFeedback');
+        if (!feedback) return;
+        feedback.textContent = message;
+        feedback.className = 'promo-feedback error';
+    }
+
     /* ───────────────────── VOUCHER LOGIC ───────────────────── */
     function applyVoucher(code, silent = false) {
 
-        const input = document.getElementById('promoInput');
-        const feedback = document.getElementById('promoFeedback');
+        const input       = document.getElementById('promoInput');
+        const feedback    = document.getElementById('promoFeedback');
         const selectedInput = document.getElementById('SelectedVoucherId');
-        const applyBtn = document.getElementById('applyPromoBtn');
+        const applyBtn    = document.getElementById('applyPromoBtn');
 
         code = (code || '').trim().toUpperCase();
 
         if (appliedVoucher) {
             removeVoucher();
-            return;
         }
 
         if (!code) {
@@ -157,15 +193,26 @@
             return;
         }
 
+        const minSpend = Number(voucher.MinimumSpend || 0);
+        const subtotal = getCheckoutSubtotal();
+        if (minSpend > 0 && subtotal < minSpend) {
+            showError(`This voucher requires a minimum spend of RM ${minSpend.toFixed(2)}.`);
+            return;
+        }
+
         appliedVoucher = voucher;
         if (selectedInput) selectedInput.value = voucher.Id;
-
         if (input) input.value = code;
 
         applyBtn.textContent = 'Remove';
 
-        showAppliedTicket(code, Number(voucher.DiscountValue));
+        const savings = voucher.IsPercentage
+            ? subtotal * Number(voucher.DiscountValue) / 100
+            : Number(voucher.DiscountValue);
+
+        showAppliedTicket(code, savings);
         recalcSummary();
+        updatePlaceOrderState();
 
         function showError(msg) {
             if (silent) return;

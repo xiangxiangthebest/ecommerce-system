@@ -364,21 +364,34 @@
                             <div class="voucher-tray-list">
                                 @foreach (var cv in Model.AvailableVouchers)
                                 {
+                                    var minSpendValue = (double)(cv.Voucher?.MinimumSpend ?? 0m);
+                                    var isDisabled = minSpendValue > 0 && minSpendValue > merchandiseSubtotal;
+                                    var disabledLabel = isDisabled
+                                        ? $"Min spend RM {minSpendValue:0}"
+                                        : null;
                                     <button type="button"
-                                            class="voucher-stub"
+                                            class="voucher-stub @(isDisabled ? "disabled" : "")"
+                                            aria-disabled="@(isDisabled.ToString().ToLowerInvariant())"
                                             data-code="@cv.Voucher?.Code"
                                             data-value="@cv.Voucher?.DiscountValue"
                                             data-min="@cv.Voucher?.MinimumSpend"
+                                            data-disabled="@(isDisabled.ToString().ToLowerInvariant())"
                                             data-vid="@cv.CustomerVoucherId">
                                         <div class="stub-accent"></div>
                                         <div class="stub-body">
                                             <span class="stub-name">@cv.Voucher?.Name</span>
                                             <span class="stub-code">@cv.Voucher?.Code</span>
+                                            @if (isDisabled)
+                                            {
+                                                <span class="stub-note">
+                                                    <i class="ti ti-lock"></i>@disabledLabel
+                                                </span>
+                                            }
                                         </div>
                                         <div class="stub-perf"></div>
                                         <div class="stub-value">
                                             <span class="stub-rm">RM</span>
-                                            <span class="stub-amount">@cv.Voucher?.DiscountValue.ToString("0.00")</span>
+                                            <span class="stub-amount">@((cv.Voucher?.IsPercentage == true) ? $"{cv.Voucher.DiscountValue:0}%" : cv.Voucher?.DiscountValue.ToString("0.00"))</span>
                                             <span class="stub-off">off</span>
                                         </div>
                                         <i class="ti ti-chevron-right stub-arrow" aria-hidden="true"></i>
@@ -460,6 +473,7 @@
         Code = cv.Voucher?.Code,
         Name = cv.Voucher?.Name,
         DiscountValue = cv.Voucher?.DiscountValue,
+        IsPercentage = cv.Voucher?.IsPercentage ?? false,
         MinimumSpend = cv.Voucher?.MinimumSpend,
         StartDate = cv.Voucher?.StartDate,
         EndDate = cv.Voucher?.EndDate

@@ -52,14 +52,3 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
-
-*.db-shm
-*.db-wal
-*.db
-
-# Ignore uploaded images
-/wwwroot/images/
-/wwwroot/uploads/
-
-# Ignore EF Core migrations
-/Migrations/

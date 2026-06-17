@@ -21,8 +21,14 @@ namespace EcommerceSystem.Services
             return await _context.Users
                 .OfType<Customer>()
                 .Include(x => x.Addresses)
-                .Include(x => x.CustomerVouchers)
-                    .ThenInclude(cv => cv.Voucher)
+                .Include(x => x.CustomerVouchers.Where(cv =>
+                    cv.Voucher != null &&
+                    cv.Voucher.IsActive &&
+                    cv.Voucher.Quantity > 0 &&
+                    !cv.IsUsed &&
+                    cv.Voucher.StartDate <= DateTime.Now &&
+                    cv.Voucher.EndDate >= DateTime.Now))
+                .ThenInclude(cv => cv.Voucher)
                 .FirstOrDefaultAsync(x => x.UserId == customerId);
         }
 

@@ -145,14 +145,14 @@
                         @foreach (var cv in Model.CustomerVouchers.OrderByDescending(cv => cv.AssignedAt))
                         {
                             var v = cv.Voucher;
-                            if (v == null) continue;
+                            if (v == null || !v.IsActive) continue;
                             var isBirthdayVoucher = string.Equals(v.Type, "Birthday", StringComparison.OrdinalIgnoreCase);
                             if (isBirthdayVoucher && (DateTime.Now < v.StartDate || DateTime.Now > v.EndDate))
                             {
                                 continue;
                             }
 
-                            var isPercent = v.Type?.ToLower().Contains("percent") == true;
+                            var isPercent = v.IsPercentage;
                             var amountDisplay = isPercent ? $"{v.DiscountValue:0}%" : $"{v.DiscountValue:0}";
                             var unitLabel = isPercent ? "discount" : "RM off";
                             var minSpend = v.MinimumSpend.HasValue && v.MinimumSpend > 0

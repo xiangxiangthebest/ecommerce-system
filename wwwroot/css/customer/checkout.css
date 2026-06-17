@@ -889,9 +889,51 @@
   flex-shrink: 0;
 }
 
+.stub-note {
+  font-size: 10px;
+  color: #b06000;
+  font-weight: 500;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .voucher-stub.stub-selected .stub-accent { background: #3b6d11; }
 .voucher-stub.stub-selected .stub-amount { color: #3b6d11; }
 .voucher-stub.stub-selected .stub-arrow  { color: #3b6d11; }
+
+/* ─── Voucher Stub — disabled state ─────────────────── */
+.voucher-stub.disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  background: #f5f4f0;
+  border-color: rgba(0,0,0,0.07);
+  transform: none !important;
+  pointer-events: none;
+}
+
+.voucher-stub.disabled .stub-accent {
+  background: #bbb;
+}
+
+.voucher-stub.disabled .stub-amount {
+  color: #999;
+}
+
+.voucher-stub.disabled .stub-name {
+  color: #888;
+}
+
+.voucher-stub.disabled .stub-perf {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0.07) 0px,
+    rgba(0,0,0,0.07) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
 
 .summary-card {
   background: #fff;
