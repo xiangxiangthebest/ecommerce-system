@@ -178,7 +178,16 @@
                     }
                     else
                     {
-                        <p class="empty-state">No vouchers available yet. Update your birthday to get a birthday voucher or check back later.</p>
+                        <div class="voucher-empty">
+                            <div class="voucher-empty-icon">
+                                <i class="ti ti-ticket" aria-hidden="true"></i>
+                            </div>
+                            <p class="voucher-empty-title">No vouchers yet</p>
+                            <p class="voucher-empty-sub">Add your birthday to unlock a birthday voucher.</p>
+                            <button type="button" class="voucher-empty-cta" onclick="document.getElementById('birthdayField')?.scrollIntoView({behavior:'smooth',block:'center'}); document.getElementById('birthdayField')?.focus();">
+                                Add birthday
+                            </button>
+                        </div>
                     }
                 </div>
             </div>
