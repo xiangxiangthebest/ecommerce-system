@@ -307,7 +307,7 @@ namespace EcommerceSystem.Controllers
 
             IRequestStrategy strategy;
 
-            if (isReturnRefund)
+            if (request.RequestServiceType == RequestServiceType.RETURN_REFUND)
             {
                 strategy = new ReturnRefundStrategy();
             }

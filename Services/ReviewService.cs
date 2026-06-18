@@ -31,7 +31,6 @@ namespace EcommerceSystem.Services
             if (orderItem == null)
                 return OperationResult.Fail("Cannot review this item.");
 
-            // One review per Order per Product (not per customer lifetime)
             var existing = await _context.Reviews
                 .Include(r => r.OrderItem)
                 .FirstOrDefaultAsync(r => r.OrderItem != null
@@ -41,10 +40,6 @@ namespace EcommerceSystem.Services
 
             if (existing != null)
             {
-                // Already reviewed this product for this order (e.g. submitting a rating
-                // that covers multiple variations/order items of the same product).
-                // Treat as a no-op success so the UI doesn't show "could not be saved",
-                // but still let this orderItemId count toward "all items reviewed".
                 var allOrderItemsDup = await _context.OrderItems
                     .Where(oi => oi.OrderId == orderItem.OrderId)
                     .Select(oi => oi.OrderItemId)
@@ -127,7 +122,6 @@ namespace EcommerceSystem.Services
                 .Select(r => r.OrderItemId)
                 .ToListAsync();
 
-            // Include the current review being submitted
             reviewedItemIds.Add(orderItemId);
 
             bool allReviewed = allOrderItems.All(id => reviewedItemIds.Contains(id));

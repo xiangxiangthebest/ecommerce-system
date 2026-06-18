@@ -7,8 +7,6 @@ namespace EcommerceSystem.Models
         public Customer? Customer { get; set; }
         public int SellerId { get; set; }
         public Seller? Seller { get; set; }
-        // public int? ProductId { get; set; }
-        // public Product? Product { get; set; }
         public DateTime CreatedAt { get; set; }
         public ICollection<ChatMessage> Messages { get; set; }
             = new List<ChatMessage>();

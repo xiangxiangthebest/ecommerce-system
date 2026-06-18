@@ -149,23 +149,30 @@ namespace EcommerceSystem.Controllers
             ViewBag.TotalRevenuePotential = activeProducts
                 .Sum(p => p.Price * p.StockQuantity);
 
-                // ── Revenue Calculation ───────────────────────────────────────────────
-                // Revenue = sum of what customers actually paid (Order.TotalAmount,
-                // which already excludes SST/shipping). NO deduction for refunds —
-                // this is a pure total of customer payments, full stop.
+            // ── Revenue Calculation ───────────────────────────────────────────────
+            // Revenue = sum of what customers actually paid (Order.TotalAmount,
+            // which already excludes SST/shipping). NO deduction for refunds —
+            // this is a pure total of customer payments, full stop.
 
-                var deliveredOrders = await _context.Order
-                    .Include(o => o.OrderItems)
-                    .Where(o => o.SellerUserId == seller.UserId
-                            && (o.CurrentStatus == OrderStatus.DELIVERED
-                            || o.CurrentStatus == OrderStatus.RECEIVED
-                            || o.CurrentStatus == OrderStatus.RETURN_REFUND
-                            || o.CurrentStatus == OrderStatus.RETURN_REFUND_REQUESTED
-                            || o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED
-                            || o.CurrentStatus == OrderStatus.REFUND))
-                    .ToListAsync();
+            var deliveredOrders = await _context.Order
+                .Include(o => o.OrderItems)
+                .Where(o => o.SellerUserId == seller.UserId
+                        && (o.CurrentStatus == OrderStatus.DELIVERED
+                        || o.CurrentStatus == OrderStatus.RECEIVED
+                        || o.CurrentStatus == OrderStatus.RETURN_REFUND
+                        || o.CurrentStatus == OrderStatus.RETURN_REFUND_REQUESTED
+                        || o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED
+                        || o.CurrentStatus == OrderStatus.REFUND))
+                .ToListAsync();
 
-                decimal totalRevenue = deliveredOrders.Sum(o => o.TotalAmount);
+                var approvedRefund  = _context.Request
+                .Where(r => r.Status == "Approved")
+                .ToList()
+                .Sum(r => r.ApprovedRefundAmount ?? 0); 
+
+            decimal totalRevenue =
+                deliveredOrders.Sum(o => o.TotalAmount)
+                - approvedRefund;
 
                 // ── Load ALL requests for this seller's orders (still needed elsewhere
                 // on this page, e.g. after-sale request lookups) ─────────────────────

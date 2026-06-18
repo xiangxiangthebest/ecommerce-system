@@ -19,7 +19,6 @@
                                     o.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND ||
                                     o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED);
 
-    // Build a compact JSON blob for purchase-history.js
     var orderData = Model.Orders.Select(o => {
         var req = Model.RequestMap.GetValueOrDefault(o.OrderId);
         return new {
@@ -548,28 +547,11 @@
                             }
 
                             @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REQUESTED || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND 
-                            || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND)
+                            || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND
+                            || order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED)
                             {
                                 <button class="ph-btn ph-btn-return-trigger" onclick="console.log('clicked', @order.OrderId); openRequestModal(@order.OrderId)">
-                                    <i class="ti ti-package-off"></i> <strong style="color:#dc2626;">Return/Refund Request</strong>
-                                </button>
-
-                                @if (request != null && request.SolvedAt.HasValue)
-                                {
-                                    <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
-                                        <i class="ti ti-circle-check"></i> Order Received
-                                    </button>
-                                }
-                            }
-
-                            @if (order.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED)
-                            {
-                                <button class="ph-btn ph-btn-return-trigger" onclick="openRequestModal(@order.OrderId)">
                                     <i class="ti ti-package-off"></i> <strong style="color:#dc2626;">Your Request</strong>
-                                </button>
-
-                                <button class="ph-btn ph-btn-primary" onclick="confirmReceived(@order.OrderId, this)">
-                                    <i class="ti ti-circle-check"></i> Order Received
                                 </button>
                             }
 
@@ -792,11 +774,9 @@
 </form>
 
 @section Scripts {
-    <!-- Inject orders for purchase-history.js -->
     <script>
         window.PH_ORDERS = @Html.Raw(orderDataJson);
     </script>
 
-    <!-- External JS (your cleaned script) -->
     <script src="~/js/customer/purchase-history.js" asp-append-version="true"></script>
 }

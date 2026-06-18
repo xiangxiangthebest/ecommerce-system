@@ -81,10 +81,7 @@ public class AutoReceiveOrdersJob : BackgroundService
         //   REFUND               → CS approved a Refund-Only request     → auto-close
         var overdueOrders = await db.Order
             .Where(o =>
-                (o.CurrentStatus == OrderStatus.DELIVERED         ||
-                 o.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED ||
-                 o.CurrentStatus == OrderStatus.RETURN_REFUND     ||  // Return & Refund approved by CS
-                 o.CurrentStatus == OrderStatus.REFUND)               // Refund-Only approved by CS
+                (o.CurrentStatus == OrderStatus.DELIVERED) 
                 && o.DeliveredAt != null
                 && o.DeliveredAt <= cutoff)
             .Include(o => o.Customer)

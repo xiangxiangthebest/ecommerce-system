@@ -172,7 +172,6 @@
                     var reportDate = report.ReportedAt.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
                     var statusClass = (report.Status?.ToLower() ?? "pending").Replace(" ", "-");
                     
-                    // Use saved snapshot data if review is deleted, otherwise use live data
                     int rating = report.Review?.Rating ?? report.SavedRating;
                     string productName = report.Review?.Product?.Name ?? report.SavedProductName ?? "Unknown Product";
                     string reviewerName = report.Review?.OrderItem?.Order?.Customer?.FullName ?? report.SavedReviewerName ?? "Customer";
