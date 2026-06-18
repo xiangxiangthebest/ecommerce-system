@@ -26,7 +26,7 @@ namespace EcommerceSystem.Models
 
         public bool IsDraft { get; set; } = false;
 
-        // Variation Group like Colour, Size, Flavour... (MAX of 2)
+        // VARIATION GROUPS 
         // Stores the group names and their option labels (+ optional image per option).
         // Stock is NOT stored here — it lives in VariationCombosJson below.
         //
@@ -39,7 +39,7 @@ namespace EcommerceSystem.Models
         // When there are NO variations this stays "[]" and StockQuantity is used directly.
         public string VariationsJson { get; set; } = "[]";
 
-        // Variation Combinations (stock per combination of option labels)
+        // VARIATION COMBINATIONS
         // Stores stock per combination of option labels.
         // "keys" order matches the group order in VariationsJson.
         //

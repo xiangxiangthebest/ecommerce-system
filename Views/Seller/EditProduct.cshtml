@@ -59,6 +59,7 @@
 
                 <div class="form-body">
 
+                    <!-- ══ BASIC INFO ══ -->
                     <div class="form-section-label">Basic Information</div>
 
                     <div class="form-row">
@@ -76,6 +77,7 @@
                         <div class="char-count" id="desc-count">@(Model.Description?.Length ?? 0) / 3000</div>
                     </div>
 
+                    <!-- COVER IMAGE -->
                     <div class="form-section-label">
                         Cover Image <span class="desc-hint">first image customers see</span>
                     </div>
@@ -113,6 +115,7 @@
                         </div>
                     </div>
 
+                    <!-- CONTENT IMAGES -->
                     <div class="form-section-label" style="margin-top:24px;">
                         Content Images <span class="desc-hint">up to 4 more · drag to reorder</span>
                     </div>
@@ -173,7 +176,7 @@
                         </select>
                     </div>
 
-                    // sales information
+                    <!-- ══ SALES INFO ══ -->
                     <div class="form-section-label">Sales Information</div>
                     <div class="form-row-inline">
                         <div class="form-row" style="flex:1;">
@@ -197,6 +200,7 @@
                         </div>
                     </div>
 
+                    <!-- ══ VARIATIONS ══ -->
                     <div class="form-section-label">
                         Variations <span class="desc-hint">up to 2 groups (e.g. Colour + Size)</span>
                     </div>
@@ -208,6 +212,7 @@
                         <i class="fas fa-plus"></i> Add Variation Group
                     </button>
 
+                    <!-- Combination stock matrix -->
                     <div id="combo-section" style="display:none;margin-top:24px;">
                         <div class="form-section-label" style="margin-top:0;">
                             Stock per Combination
@@ -223,9 +228,11 @@
                         <div id="combo-table-wrap"></div>
                     </div>
 
+                    <!-- Hidden fields -->
                     <input type="hidden" name="VariationsJson"      id="variations-json" value="[]" />
                     <input type="hidden" name="VariationCombosJson" id="combos-json"      value="[]" />
 
+                    <!-- Saved data injected for JS restore -->
                     <script>
                         window.__savedVariations = @Html.Raw(Model.VariationsJson ?? "[]");
                         window.__savedCombos     = @Html.Raw(Model.VariationCombosJson ?? "[]");
@@ -233,6 +240,7 @@
 
                 </div>
 
+                <!-- ══ ACTION BAR ══ -->
                 <div class="ap-action-bar">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-ap btn-ap-cancel">Cancel</a>
                     <div style="display:flex;gap:12px;">
@@ -246,6 +254,7 @@
     </main>
 </div>
 
+<!-- Customer Preview Modal -->
 @await Html.PartialAsync("_ProductPreviewModal")
 
 <style>
@@ -300,7 +309,7 @@
 </style>
 
 <script>
-// IMAGE MANAGEMENT (unchanged from original)
+
 const _savedPaths = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(savedImagePaths));
 const slots = Array.from({ length: 5 }, (_, i) => {
     if (i < _savedPaths.length && _savedPaths[i])
@@ -382,7 +391,7 @@ function updateSlotAssignment() {
 }
 function hasImage() { return slots.some(s => s.src !== null); }
 
-// VARIATION SYSTEM
+
 const MAX_GROUPS = 2;
 let groupCount = 0;
 let groups = {};   // { id: { name, options:[{label,imagePath}] } }
@@ -556,7 +565,6 @@ function setOptImg(input, groupId, idx) {
     serializeAll();
 }
 
-// COMBINATION TABLE
 function getAllGroupsArray() {
     return Object.entries(groups)
         .sort(([a],[b]) => Number(a) - Number(b))
@@ -636,7 +644,6 @@ function fillAllCombos() {
     serializeAll();
 }
 
-// SERIALIZE
 function serializeAll() {
     const allGroupsArr = getAllGroupsArray();
     const varData = allGroupsArr.map(g => ({
@@ -656,7 +663,6 @@ function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// RESTORE SAVED VARIATIONS ON LOAD
 document.addEventListener('DOMContentLoaded', () => {
     renderThumbs();
     updateSlotAssignment();
@@ -703,7 +709,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e) { console.error('Variation restore failed:', e); }
 });
 
-// FORM SUBMIT
 function submitForm(type) {
     serializeAll();
     updateSlotAssignment();
@@ -740,7 +745,6 @@ function submitForm(type) {
     document.getElementById('editForm').submit();
 }
 
-// PREVIEW
 function openPreview() {
     const imgSrcs = slots.map(s => s.src).filter(Boolean);
     buildPreviewModal(imgSrcs, getAllGroupsArray(), combos);

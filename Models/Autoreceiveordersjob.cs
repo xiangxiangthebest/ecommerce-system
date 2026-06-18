@@ -1,6 +1,10 @@
+using EcommerceSystem.Data;
+using EcommerceSystem.Models;
+using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Services;
+
 
 public class AutoReceiveOrdersJob : BackgroundService
 {
@@ -9,8 +13,7 @@ public class AutoReceiveOrdersJob : BackgroundService
 
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
-    // auto receive triggered after 3 days (72hours, that checking every hour) once the status changes/updates to DELIVERED, RETURN_REFUND, or REFUND
-     private const int AutoReceiveDays = 3;
+    private const int AutoReceiveDays = 3;
 
     public AutoReceiveOrdersJob(
         IServiceScopeFactory scopeFactory,
@@ -43,11 +46,7 @@ public class AutoReceiveOrdersJob : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // Expected when the application is shutting down; no action needed
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "AutoReceiveOrdersJob encountered an unexpected error.");
+
         }
         finally
         {
@@ -63,7 +62,6 @@ public class AutoReceiveOrdersJob : BackgroundService
 
         var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
 
-        // Status that eligible for the triggering the auto-receive (Delivered, Return & Refund, Refund-Only)
         var overdueOrders = await db.Order
             .Where(o =>
                 (o.CurrentStatus == OrderStatus.DELIVERED) 
@@ -96,7 +94,6 @@ public class AutoReceiveOrdersJob : BackgroundService
                 "(was {PreviousStatus}, DeliveredAt {DeliveredAt}).",
                 order.OrderId, order.CurrentStatus, order.DeliveredAt);
 
-            // Send RECEIVED notifications to customer, seller, and all admins
             try
             {
                 await SendReceivedNotificationsAsync(order, adminIds, notificationService);

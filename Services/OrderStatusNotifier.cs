@@ -1,3 +1,4 @@
+using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Observers;
@@ -7,7 +8,7 @@ public class OrderStatusNotifier : OrderStatusSubject
     private readonly List<OrderStatusObserver> _observers = new();
     private Order _order = null!;
 
-    //Subject interface implementation
+    // Subject interface
 
     public void Attach(OrderStatusObserver observer)
     {
@@ -26,8 +27,7 @@ public class OrderStatusNotifier : OrderStatusSubject
             await observer.Update(_order);
     }
 
-    // Public method to set the order and notify observers 
-
+    // Public trigger 
     public async Task SetOrderAndNotifyAsync(Order order)
     {
         _order = order;

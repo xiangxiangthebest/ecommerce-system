@@ -1,4 +1,11 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using EcommerceSystem.Data;
 using System.Security.Claims;
+using EcommerceSystem.Models;
+using EcommerceSystem.Interfaces;
+using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -51,7 +58,7 @@ namespace EcommerceSystem.Controllers
             };
         }
 
-        // sum all combination stocks from VariationCombosJson 
+        // ── Sum all combination stocks from VariationCombosJson ──
         private static int SumComboStock(string combosJson)
         {
             if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
@@ -75,6 +82,7 @@ namespace EcommerceSystem.Controllers
             }
         }
 
+        // ── Fallback: sum stocks from the old flat VariationsJson format ──
         private static int SumVariationStock(string variationsJson)
         {
             if (string.IsNullOrWhiteSpace(variationsJson) || variationsJson == "[]")
@@ -161,9 +169,8 @@ namespace EcommerceSystem.Controllers
 
                 ViewBag.Requests = allRequests;
 
-            ViewBag.TotalProfit = totalRevenue; 
+            ViewBag.TotalProfit = totalRevenue;
 
-            // Order Tab (See all places order from customer, update status and view each order details)
             if (tab == "Order")
             {
 
@@ -180,20 +187,17 @@ namespace EcommerceSystem.Controllers
                     .OrderByDescending(o => o.OrderTime)
                     .ToList();
 
-                // Re-fetch requests scoped to ALL orders for the Order tab display
                 var allOrderIds = orders.Select(o => o.OrderId).ToList();
                 ViewBag.Requests = await _context.Request
                     .Where(r => allOrderIds.Contains(r.OrderId))
                     .ToListAsync();
             }
 
-            // profile tab to update seller pickup addresss
             if (tab == "Profile")
             {
                 ViewBag.ProfileSeller = seller;
             }
 
-            // chat page, to chat with customer and view all chat boxes
             if (tab == "Chat")
             {
                 var chatList = await _context.ChatRoom
@@ -218,7 +222,6 @@ namespace EcommerceSystem.Controllers
                 return View("Home", chatList);
             }
 
-            // reviews tab, to view all the reviews by the customers for the products of the seller
             if (tab == "Reviews")
             {
                 var productIds = products.Select(p => p.ProductId).ToList();
@@ -658,7 +661,6 @@ namespace EcommerceSystem.Controllers
             var product = await _context.Products.FindAsync(id);
             if (product != null)
             {
-                // Soft delete — keeps the record visible in Banned tab
                 product.IsDeleted = true;
                 product.DeletedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
@@ -666,9 +668,6 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("Home", new { tab = "Product", subtab = "active" });
         }
 
-        // UPDATE ORDER STATUS
-        // The seller can only update orders of the status PENDING, PREPARING, or SHIPPED
-        // The following of CANCELED, RECEIVED, RETURN_REFUND are customer-only actions and cannot be triggered by the seller.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, OrderStatus newStatus)
@@ -682,7 +681,6 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "General" });
             }
 
-            // Load order and verify it belongs to this seller
             var order = await _context.Order
                 .Include(o => o.Customer)
                 .Include(o => o.Seller)
@@ -700,6 +698,7 @@ namespace EcommerceSystem.Controllers
 
             if (!sellerAllowed)
             {
+
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 

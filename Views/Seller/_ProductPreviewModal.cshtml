@@ -1,6 +1,6 @@
 @* Customer Preview Modal — no @model needed, pure HTML + JS *@
 
-// Overlay
+<!-- ══ PREVIEW OVERLAY ══ -->
 <div id="preview-overlay" style="
     display:none; position:fixed; inset:0; z-index:9999;
     background:rgba(0,0,0,0.55); overflow-y:auto;">
@@ -13,7 +13,7 @@
             background:#f4f6fb; border-radius:18px; width:100%; max-width:980px;
             padding:32px; position:relative; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
 
-            // Close button
+            <!-- Close button -->
             <button onclick="closePreview()" style="
                 position:absolute; top:16px; right:18px;
                 background:#fff; border:1.5px solid #e0e0e0; border-radius:50%;
@@ -43,7 +43,7 @@
                     <div id="preview-thumbs" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
                 </div>
 
-                // Product details
+                <!-- Info -->
                 <div style="flex:1; min-width:260px;">
 
                     <!-- Category + badge -->
@@ -57,14 +57,14 @@
                             padding:3px 12px; letter-spacing:.5px;"></span>
                     </div>
 
-                    // Name
+                    <!-- Name -->
                     <div id="pv-name" style="
                         font-size:22px; font-weight:800; color:#1e1b4b; margin-bottom:8px;
                         line-height:1.3;">Product Name</div>
 
                     <hr style="border:none; border-top:1px solid #e8eaf6; margin:12px 0;" />
 
-                    // Price
+                    <!-- Price -->
                     <div id="pv-price-wrapper">
                         <div id="pv-original-price"
                             style="text-decoration:line-through;
@@ -88,24 +88,24 @@
                         Price includes SST where applicable
                     </div>
 
-                    // SKU
+                    <!-- SKU -->
                     <div id="pv-sku" style="font-size:12px; color:#aaa; margin-bottom:12px;"></div>
 
                     <hr style="border:none; border-top:1px solid #e8eaf6; margin:12px 0;" />
 
-                    // Description
+                    <!-- Description -->
                     <div id="pv-desc" style="
                         font-size:14px; color:#5b587d; line-height:1.7; margin-bottom:18px;
                         white-space:pre-wrap;"></div>
 
-                    // Variations
+                    <!-- Variations -->
                     <div id="pv-variations" style="margin-bottom:18px;"></div>
 
-                    // Stock note
+                    <!-- Stock note -->
                     <div id="pv-stock-note" style="
                         font-size:13px; color:#888; margin-bottom:14px; display:none;"></div>
 
-                    // Quantity selector
+                    <!-- Qty -->
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
                         <span style="font-size:13px; font-weight:600; color:#5b587d;">Qty</span>
                         <div style="display:flex; align-items:center; border:1.5px solid #e8eaf6; border-radius:8px; overflow:hidden;">
@@ -141,7 +141,7 @@
 </div>
 
 <script>
-// Preview modal state
+
 let _pvCombos      = {};
 let _pvGroups      = [];
 let _pvSelected    = [];
@@ -168,7 +168,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
     _pvSelected    = new Array(_pvTotalGroups).fill(null);
     _pvProductImgs = imgSrcs || [];
 
-    // ── Gallery thumbnails
     const thumbsDiv = document.getElementById('preview-thumbs');
     pvSetMainImg(_pvProductImgs.length > 0 ? _pvProductImgs[0] : null);
 
@@ -186,7 +185,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
         thumbsDiv.appendChild(t);
     });
 
-    // Text fields: name, price, original price, description, SKU, category
     const nameEl = document.getElementById('field-name');
     document.getElementById('pv-name').textContent =
         (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'Product Name';
@@ -240,13 +238,11 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
     document.getElementById('pv-category').textContent =
         (catEl && catEl.value) ? catEl.value : 'Uncategorised';
 
-    // Reset qty
     const qtyInput = document.getElementById('pv-qty');
     qtyInput.value = 1;
     qtyInput.max   = 999;
     document.getElementById('pv-stock-note').style.display = 'none';
 
-    // ── Variations
     const varDiv = document.getElementById('pv-variations');
     varDiv.innerHTML = '';
 
@@ -255,7 +251,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
             const groupWrap = document.createElement('div');
             groupWrap.style.marginBottom = '14px';
 
-            // Label row: "FLAVOUR: <selected>"
             const labelRow = document.createElement('div');
             labelRow.style.cssText = 'font-size:12px;font-weight:700;color:#5b587d;' +
                 'margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;';
@@ -271,7 +266,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                 btn.type = 'button';
 
                 if (opt.imagePath) {
-                    // Swatch button with image + label
                     btn.style.cssText = `padding:4px 10px 4px 4px;border:2px solid #e8eaf6;
                         border-radius:8px;background:#fff;cursor:pointer;
                         display:inline-flex;align-items:center;gap:6px;
@@ -281,7 +275,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                              style="width:32px;height:32px;border-radius:5px;object-fit:cover;" />
                          <span>${opt.label}</span>`;
                 } else {
-                    // Plain text button
                     btn.style.cssText = `padding:7px 16px;border:1.5px solid #e8eaf6;
                         border-radius:8px;background:#fff;font-size:13px;font-weight:600;
                         color:#1e1b4b;cursor:pointer;transition:all .15s;`;
@@ -289,13 +282,11 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                 }
 
                 btn.onclick = () => {
-                    // Deselect all in this group
                     optRow.querySelectorAll('button').forEach(b => {
                         b.style.borderColor = '#e8eaf6';
                         b.style.background  = '#fff';
                         b.style.color       = '#1e1b4b';
                     });
-                    // Highlight selected
                     btn.style.borderColor = '#4f46e5';
                     if (opt.imagePath) {
                         btn.style.background = '#eef0ff';
@@ -307,10 +298,8 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                     document.getElementById('pv-sel-label-' + gi).textContent = opt.label;
                     _pvSelected[gi] = opt.label;
 
-                    // switch main image if this option has an image
                     if (opt.imagePath) {
                         pvSetMainImg(opt.imagePath);
-                        // Deselect product gallery thumb highlights
                         document.getElementById('preview-thumbs')
                             .querySelectorAll('div')
                             .forEach(d => d.style.borderColor = '#e8eaf6');
@@ -333,7 +322,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
         document.getElementById('pv-btn-buy').style.opacity  = '0.5';
 
     } else {
-        // No variations — read global stock field
         const stockEl = document.getElementById('field-stock');
         const stock   = stockEl ? parseInt(stockEl.value) || 0 : 0;
         pvSetStockFromNumber(stock);
@@ -357,7 +345,6 @@ function pvUpdateStock() {
         return;
     }
 
-    // Key matches seller form: labels joined by "|"
     const key   = _pvSelected.join('|');
     const stock = _pvCombos[key] ?? 0;
     pvSetStockFromNumber(stock);
@@ -408,7 +395,6 @@ function closePreview() {
     document.body.style.overflow = '';
 }
 
-// Close modal when clicking outside the modal content
 document.getElementById('preview-overlay').addEventListener('click', function(e) {
     if (e.target === this) closePreview();
 });
