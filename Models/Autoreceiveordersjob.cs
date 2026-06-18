@@ -1,30 +1,16 @@
-using EcommerceSystem.Data;
-using EcommerceSystem.Models;
-using Microsoft.EntityFrameworkCore;
 using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Services;
 
-/// <summary>
-/// Runs in the background every hour.
-/// Any order that has been DELIVERED for more than 3 days and has not yet
-/// been manually confirmed by the customer is automatically moved to RECEIVED.
-///
-/// Also handles orders that went through after-sales (return/refund) flow:
-///   RETURN_REFUND_REJECTED → auto-RECEIVED after grace period (CS rejected, order stays with customer)
-///   RETURN_REFUND          → auto-RECEIVED after grace period (Return & Refund approved by CS)
-///   REFUND                 → auto-RECEIVED after grace period (Refund-Only approved by CS)
-/// </summary>
 public class AutoReceiveOrdersJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AutoReceiveOrdersJob> _logger;
 
-    // How often to check (every 1 hour is fine; reduce to minutes for testing)
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
-    // How many days after DELIVERED before auto-confirming
-    private const int AutoReceiveDays = 3;
+    // auto receive triggered after 3 days (72hours, that checking every hour) once the status changes/updates to DELIVERED, RETURN_REFUND, or REFUND
+     private const int AutoReceiveDays = 3;
 
     public AutoReceiveOrdersJob(
         IServiceScopeFactory scopeFactory,
@@ -57,8 +43,11 @@ public class AutoReceiveOrdersJob : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // This catches the TaskCanceledException gracefully when the app stops.
-            // It prevents the debugger from breaking and throwing a crash screen.
+            // Expected when the application is shutting down; no action needed
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "AutoReceiveOrdersJob encountered an unexpected error.");
         }
         finally
         {
@@ -74,11 +63,7 @@ public class AutoReceiveOrdersJob : BackgroundService
 
         var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
 
-        // Eligible statuses for auto-receive:
-        //   DELIVERED            → normal delivery, customer never manually confirmed
-        //   RETURN_REFUND_REJECTED → CS rejected the request; order stays with customer → auto-close
-        //   RETURN_REFUND        → CS approved a Return & Refund request → auto-close
-        //   REFUND               → CS approved a Refund-Only request     → auto-close
+        // Status that eligible for the triggering the auto-receive (Delivered, Return & Refund, Refund-Only)
         var overdueOrders = await db.Order
             .Where(o =>
                 (o.CurrentStatus == OrderStatus.DELIVERED) 
