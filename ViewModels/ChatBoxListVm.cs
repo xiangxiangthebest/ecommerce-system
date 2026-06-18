@@ -8,12 +8,8 @@ namespace EcommerceSystem.ViewModels
         public int ChatRoomId { get; set; }
         public int CustomerId { get; set; }
         public string? CustomerName { get; set; }
-
         public int SellerId { get; set; }
-
         public string? SellerName { get; set; }
-
-
         public string? LastMessage { get; set; }
         public DateTime? LastMessageTime { get; set; }
         public int UnreadCount { get; set; }

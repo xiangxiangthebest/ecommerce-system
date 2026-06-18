@@ -1,6 +1,5 @@
 'use strict';
 
-// ── Order data (injected by Razor via window.PH_ORDERS) ────
 const _orders = window.PH_ORDERS || [];
 
 // ── State ──────────────────────────────────────────────────
@@ -9,21 +8,20 @@ let _rtnFiles               = [];
 let _rtnOrderItems          = [];
 let _rtnSelectedType        = '';
 let _rtnSelectedReason      = '';
-let _ratingFilesByOrderItem = {};   // { [orderItemId]: File[] }
+let _ratingFilesByOrderItem = {};
 let currentReturnOrderId = null;
 
 /* ============================================================
    INIT
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-const searchInput = document.getElementById("phSearchInput"); // 确保 I 大写
+const searchInput = document.getElementById("phSearchInput");
     const tabs = document.querySelectorAll(".ph-tab");
-    const cards = document.querySelectorAll(".ph-card"); // 确认为 .ph-card
+    const cards = document.querySelectorAll(".ph-card");
     const noResults = document.getElementById("phNoResults");
 
     let currentStatus = "ALL";
 
-    // 将过滤逻辑抽离成一个独立函数，方便重复调用
     function filterOrders() {
         const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
         let hasVisible = false;
@@ -55,23 +53,20 @@ const searchInput = document.getElementById("phSearchInput"); // 确保 I 大写
         }
     }
 
-    // 1. 监听用户手动的输入事件
     if (searchInput) {
         searchInput.addEventListener("input", filterOrders);
     }
 
-    // 2. 监听选项卡点击事件
     tabs.forEach(tab => {
         tab.addEventListener("click", function () {
             tabs.forEach(t => t.classList.remove("active"));
             this.classList.add("active");
 
             currentStatus = this.getAttribute("data-status");
-            filterOrders(); // 切换标签时执行过滤
+            filterOrders();
         });
     });
 
-    // ✨ 核心修复：页面加载完成后，如果输入框里已经有传过来的 searchString，直接执行一次过滤
     if (searchInput && searchInput.value.trim() !== "") {
         filterOrders();
     }
@@ -88,16 +83,6 @@ function initToast() {
 }
 
 function initTabs() {
-    // document.querySelectorAll('.ph-tab').forEach(tab => {
-    //     tab.addEventListener('click', () => {
-    //         document.querySelectorAll('.ph-tab').forEach(t => t.classList.remove('active'));
-    //         tab.classList.add('active');
-    //         applyFilters();
-
-
-    //     });
-    // });
-
     const tabs = document.querySelectorAll('#phTabs .ph-tab');
     tabs.forEach(tab => {
         tab.addEventListener('click', function() {
@@ -154,13 +139,10 @@ function applyFilters() {
         const cardStatus = card.getAttribute('data-status');
         const cardSearchInfo = card.getAttribute('data-search') || '';
 
-        // A. 分类标签状态校验
         const matchesTab = (currentTab === 'ALL' || cardStatus === currentTab);
         
-        // B. 搜索内容校验 (单号数字或商品名称)
         const matchesSearch = (!currentSearch || cardSearchInfo.includes(currentSearch));
 
-        // 如果同时满足标签和检索词，则显示，否则彻底在视图中隐藏
         if (matchesTab && matchesSearch) {
             card.style.display = '';
             visibleCount++;
@@ -169,7 +151,6 @@ function applyFilters() {
         }
     });
 
-    // C. 如果过滤完了发现一笔都没有，展示原本的 phNoResults 空白提示块
     const noResults = document.getElementById('phNoResults');
     if (noResults) {
         noResults.style.display = visibleCount === 0 ? 'flex' : 'none';
@@ -390,7 +371,6 @@ function buildReturnNoticeHTML(order) {
 }
 
 function buildReviewSummaryHTML(order) {
-    // Group reviewed items by productId — one review block per unique product
     const byProduct = new Map();
     order.items
         .filter(item => item.reviewRating > 0)
@@ -555,7 +535,6 @@ function openCancelModal(orderId) {
     const noticeEl = document.getElementById('cancelModalNotice');
     const btnTextEl = document.getElementById('cancelBtnText');
 
-        // 直接取消的界面
     titleEl.innerText = "Cancel Order";
     btnTextEl.innerText = "Confirm Cancel";
     noticeEl.style.display = "none"; 
@@ -589,10 +568,6 @@ async function submitCancel() {
     const btn = document.getElementById('cancelModalSubmitBtn');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Processing…';
-
-    // const btn = document.querySelector('#cancelModal .ph-btn-danger');
-    // btn.disabled = true;
-    // btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Canceling…';
 
     try {
         const res = await postJson('/Customer/CancelOrder', { orderId, cancelReason: reason});
@@ -709,7 +684,7 @@ function buildProductVariationBlockHTML(itemGroups) {
 }
 
 async function openRequestModal(orderId) {
-    showModal('requestDetailBackdrop', 'requestDetailModal'); // ✅ 改用 showModal
+    showModal('requestDetailBackdrop', 'requestDetailModal');
     document.getElementById('requestDetailBody').innerHTML = `
         <div style="text-align:center; padding: 40px;">
             <i class="ti ti-loader" style="font-size:28px;"></i>
@@ -1004,7 +979,7 @@ async function submitReturn() {
             closeReturnModal();
             showToast('Request submitted successfully!', 'success');
             setTimeout(() => location.reload(), 1000);
-            return; // exit before re-enabling (page reloads anyway)
+            return;
         } else {
             showInlineError('returnModal', data.message || 'Failed to submit request.');
         }
@@ -1041,8 +1016,7 @@ function openRatingModal(orderId) {
     document.getElementById('ratingOrderId').value = orderId;
     _ratingFilesByOrderItem = {};
 
-    // Step 1: group by productId → then within each product, group by selectedVariation
-    const byProduct = new Map(); // productId → { representative item, varGroups: Map<variation, { item, allOrderItemIds[], totalQty }> }
+    const byProduct = new Map(); 
     order.items.forEach(item => {
         if (!byProduct.has(item.productId)) {
             byProduct.set(item.productId, { item, varGroups: new Map() });
@@ -1061,7 +1035,6 @@ function openRatingModal(orderId) {
     const productGroups = Array.from(byProduct.values());
 
     document.getElementById('ratingItemsWrap').innerHTML = productGroups.map((prod, idx) => {
-        // Collect ALL orderItemIds across all variation sub-groups for this product
         const allOrderItemIds = Array.from(prod.varGroups.values())
             .flatMap(vg => vg.allOrderItemIds);
         const primaryId = allOrderItemIds[0];
@@ -1276,7 +1249,7 @@ async function postJson(url, data) {
         body:    body.toString(),
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`); // ✅ 加这行
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
 

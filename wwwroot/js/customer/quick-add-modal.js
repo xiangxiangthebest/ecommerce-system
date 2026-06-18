@@ -52,7 +52,6 @@
         qaImgLightbox.classList.remove('open');
         qaImgLightbox.addEventListener('transitionend', () => {
             qaImgLightbox.hidden = true;
-            // restore scroll only if the drawer itself is also gone
             if (drawer.style.display === 'none') document.body.style.overflow = '';
         }, { once: true });
     }
@@ -258,7 +257,6 @@
 
             (grp.values || []).forEach(val => {
                 if (val.imagePath) {
-                    /* Image swatch: image + visible label side-by-side */
                     const sw = document.createElement('div');
                     sw.className = 'qa-var-swatch';
                     sw.setAttribute('data-qa-gi',    gi);

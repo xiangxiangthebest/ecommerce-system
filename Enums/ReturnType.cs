@@ -1,8 +1,5 @@
-namespace EcommerceSystem.Enums;  // ← change from EcommerceSystem.Models
+namespace EcommerceSystem.Enums;
 
-/// <summary>
-/// The type of return/refund the customer is requesting.
-/// </summary>
 public enum ReturnType
 {
     RefundOnly   = 0,

@@ -14,7 +14,7 @@ namespace EcommerceSystem.Services
             _context = context;
         }
 
-        // 🔥 Get all requests created by user
+        // Get all requests created by user
         public async Task<List<Request>> GetByUserId(int userId)
         {
             return await _context.Request
@@ -26,7 +26,7 @@ namespace EcommerceSystem.Services
                 .ToListAsync();
         }
 
-        // 🔥 Get requests related to an order
+        // Get requests related to an order
         public async Task<List<Request>> GetByOrderId(int orderId)
         {
             return await _context.Request
@@ -37,7 +37,7 @@ namespace EcommerceSystem.Services
                 .ToListAsync();
         }
 
-        // 🔥 Get single request
+        // Get single request
         public async Task<Request?> GetById(int requestId)
         {
             return await _context.Request
@@ -47,7 +47,7 @@ namespace EcommerceSystem.Services
                 .FirstOrDefaultAsync(r => r.RequestId == requestId);
         }
 
-        // 🔥 Create request
+        // Create request
         public async Task CreateAsync(Request request)
         {
             _context.Request.Add(request);

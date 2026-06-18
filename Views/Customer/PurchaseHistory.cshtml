@@ -19,7 +19,6 @@
                                     o.CurrentStatus == EcommerceSystem.Models.OrderStatus.REFUND ||
                                     o.CurrentStatus == EcommerceSystem.Models.OrderStatus.RETURN_REFUND_REJECTED);
 
-    // Build a compact JSON blob for purchase-history.js
     var orderData = Model.Orders.Select(o => {
         var req = Model.RequestMap.GetValueOrDefault(o.OrderId);
         return new {
@@ -775,11 +774,9 @@
 </form>
 
 @section Scripts {
-    <!-- Inject orders for purchase-history.js -->
     <script>
         window.PH_ORDERS = @Html.Raw(orderDataJson);
     </script>
 
-    <!-- External JS (your cleaned script) -->
     <script src="~/js/customer/purchase-history.js" asp-append-version="true"></script>
 }
