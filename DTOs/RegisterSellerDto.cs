@@ -4,10 +4,7 @@ namespace EcommerceSystem.DTOs
 {
     public class RegisterSellerDto
     {
-        // =========================
-        // Seller Information
-        // =========================
-
+        // seller information 
         [Required]
         [StringLength(50)]
         public string FullName { get; set; } = string.Empty;
@@ -29,10 +26,7 @@ namespace EcommerceSystem.DTOs
         [StringLength(14)]
         public string TIN { get; set; } = string.Empty;
 
-        // =========================
-        // Shop Information
-        // =========================
-
+        // shop information
         [Required]
         public string ShopName { get; set; } = string.Empty;
 

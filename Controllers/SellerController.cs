@@ -1,11 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
-using EcommerceSystem.Data;
 using System.Security.Claims;
-using EcommerceSystem.Models;
-using EcommerceSystem.Interfaces;
-using EcommerceSystem.Observers;
 using System.Text.Json;
 
 namespace EcommerceSystem.Controllers
@@ -48,7 +41,6 @@ namespace EcommerceSystem.Controllers
             return paths;
         }
 
-        // ── Safe int parser: handles Number/String/Double JSON values ──
         private static int SafeGetInt(JsonElement element)
         {
             return element.ValueKind switch
@@ -59,7 +51,7 @@ namespace EcommerceSystem.Controllers
             };
         }
 
-        // ── Sum all combination stocks from VariationCombosJson ──
+        // sum all combination stocks from VariationCombosJson 
         private static int SumComboStock(string combosJson)
         {
             if (string.IsNullOrWhiteSpace(combosJson) || combosJson == "[]")
@@ -83,7 +75,6 @@ namespace EcommerceSystem.Controllers
             }
         }
 
-        // ── Fallback: sum stocks from the old flat VariationsJson format ──
         private static int SumVariationStock(string variationsJson)
         {
             if (string.IsNullOrWhiteSpace(variationsJson) || variationsJson == "[]")
@@ -123,18 +114,12 @@ namespace EcommerceSystem.Controllers
             ViewBag.ShopName = seller.ShopName;
             ViewBag.IsApproved = seller.IsApproved;
 
-            // var requests = await _context.Request.ToListAsync();
-            // ViewBag.Requests = requests;
-
             var notifications = await _notificationService.GetForUserAsync(seller.UserId);
             ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
 
             if (!seller.IsApproved)
                 return View();
 
-            // ─────────────────────────────────────────────
-            // PRODUCTS
-            // ─────────────────────────────────────────────
             var products = await _context.Products
                 .Include(p => p.Category)
                 .Where(p => p.SellerId == seller.UserId)
@@ -148,11 +133,6 @@ namespace EcommerceSystem.Controllers
 
             ViewBag.TotalRevenuePotential = activeProducts
                 .Sum(p => p.Price * p.StockQuantity);
-
-            // ── Revenue Calculation ───────────────────────────────────────────────
-            // Revenue = sum of what customers actually paid (Order.TotalAmount,
-            // which already excludes SST/shipping). NO deduction for refunds —
-            // this is a pure total of customer payments, full stop.
 
             var deliveredOrders = await _context.Order
                 .Include(o => o.OrderItems)
@@ -174,8 +154,6 @@ namespace EcommerceSystem.Controllers
                 deliveredOrders.Sum(o => o.TotalAmount)
                 - approvedRefund;
 
-                // ── Load ALL requests for this seller's orders (still needed elsewhere
-                // on this page, e.g. after-sale request lookups) ─────────────────────
                 var deliveredOrderIds = deliveredOrders.Select(o => o.OrderId).ToList();
                 var allRequests = await _context.Request
                     .Where(r => deliveredOrderIds.Contains(r.OrderId))
@@ -183,11 +161,9 @@ namespace EcommerceSystem.Controllers
 
                 ViewBag.Requests = allRequests;
 
-            ViewBag.TotalProfit = totalRevenue; // kept ViewBag key name so the view doesn't need changes
+            ViewBag.TotalProfit = totalRevenue; 
 
-            // ─────────────────────────────────────────────
-            // TAB: ORDER
-            // ─────────────────────────────────────────────
+            // Order Tab (See all places order from customer, update status and view each order details)
             if (tab == "Order")
             {
 
@@ -211,17 +187,13 @@ namespace EcommerceSystem.Controllers
                     .ToListAsync();
             }
 
-            // ─────────────────────────────────────────────
-            // TAB: PROFILE
-            // ─────────────────────────────────────────────
+            // profile tab to update seller pickup addresss
             if (tab == "Profile")
             {
                 ViewBag.ProfileSeller = seller;
             }
 
-            // ─────────────────────────────────────────────
-            // TAB: CHAT
-            // ─────────────────────────────────────────────
+            // chat page, to chat with customer and view all chat boxes
             if (tab == "Chat")
             {
                 var chatList = await _context.ChatRoom
@@ -246,9 +218,7 @@ namespace EcommerceSystem.Controllers
                 return View("Home", chatList);
             }
 
-            // ─────────────────────────────────────────────
-            // TAB: REVIEWS
-            // ─────────────────────────────────────────────
+            // reviews tab, to view all the reviews by the customers for the products of the seller
             if (tab == "Reviews")
             {
                 var productIds = products.Select(p => p.ProductId).ToList();
@@ -272,131 +242,6 @@ namespace EcommerceSystem.Controllers
             return View();
         }
 
-        // public async Task<IActionResult> Home(string tab = "General")
-        // {
-        //     var seller = await GetCurrentSellerAsync();
-        //     if (seller == null) return RedirectToAction("Login", "Auth");
-        //     var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "0");
-
-        //     if (!seller.IsApproved && tab != "General" && tab != "Profile")
-        //         tab = "General";
-
-        //     ViewBag.ActiveTab = tab;
-        //     ViewBag.ShopName = seller.ShopName;
-        //     ViewBag.IsApproved = seller.IsApproved;
-
-        //     var notifications = await _notificationService.GetForUserAsync(seller.UserId);
-        //     ViewBag.UnreadNotificationCount = notifications?.Count(n => !n.IsRead) ?? 0;
-
-        //     if (seller.IsApproved)
-        //     {
-        //         var products = await _context.Products
-        //             .Include(p => p.Category)
-        //             .Where(p => p.SellerId == seller.UserId)
-        //             .ToListAsync();
-
-        //         ViewBag.Products = products;
-        //         ViewBag.BannedProductCount = products.Count(p => p.IsDeleted);
-
-        //         // ── Active products for revenue potential ──
-        //         var activeProducts = products.Where(p => !p.IsDeleted && !p.IsDraft).ToList();
-        //         ViewBag.ActiveProductCount = activeProducts.Count;
-
-        //         // ── Revenue Potential = remaining stock × selling price ──
-        //         ViewBag.TotalRevenuePotential = activeProducts
-        //             .Sum(p => p.Price * p.StockQuantity);
-
-        //         // ── Actual Profit = delivered orders (profit margin per unit sold) ──
-        //         //    minus refunded amounts (approved returns only)
-        //         var deliveredOrders = await _context.Order
-        //             .Include(o => o.OrderItems)
-        //             .Where(o =>
-        //                 o.SellerUserId == seller.UserId &&
-        //                 (o.CurrentStatus == OrderStatus.DELIVERED
-        //                 || o.CurrentStatus == OrderStatus.RECEIVED))
-        //             .ToListAsync();
-
-        //         double actualProfit = 0;
-
-        //         foreach (var order in deliveredOrders)
-        //         {
-        //             foreach (var item in order.OrderItems)
-        //             {
-        //                 // Find the original cost price of this product
-        //                 var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-        //                 var costPrice = product != null && product.OriginalPrice > 0
-        //                     ? product.OriginalPrice
-        //                     : (double)item.Price; // fallback: no margin known
-
-        //                 var margin = (double)item.Price - costPrice;
-        //                 if (margin > 0)
-        //                     actualProfit += margin * item.Quantity;
-        //             }
-
-        //             // Subtract refunded profit if return was approved
-        //             if (order.ReturnApprovedAt.HasValue)
-        //             {
-        //                 foreach (var item in order.OrderItems)
-        //                 {
-        //                     var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
-        //                     var costPrice = product != null && product.OriginalPrice > 0
-        //                         ? product.OriginalPrice
-        //                         : (double)item.Price;
-
-        //                     var margin = (double)item.Price - costPrice;
-        //                     if (margin > 0)
-        //                         actualProfit -= margin * item.Quantity;
-        //                 }
-        //             }
-        //         }
-
-        //         ViewBag.TotalProfit = (decimal)actualProfit;
-        //         if (tab == "Order")
-        //         {
-        //             var orders = await _context.Order
-        //                 .Include(o => o.Customer)
-        //                 .Include(o => o.OrderItems)
-        //                     .ThenInclude(oi => oi.Product)
-        //                 .Where(o => o.SellerUserId == seller.UserId)
-        //                 .OrderByDescending(o => o.OrderTime)
-        //                 .ToListAsync();
-        //             ViewBag.Orders = orders;                                   
-        //         }
-        //         if (tab == "Profile")
-        //             {
-        //                 ViewBag.ProfileSeller = seller;
-        //             }            
-
-        //         if (tab == "Chat")
-        //         {
-        //             // 从数据库查询该卖家的所有聊天盒子列表 (这里复用你原本写在 ChatController.SellerInbox 里的查询语句)
-        //             var chatList = await _context.ChatRoom
-        //                 .Where(r => r.SellerId == currentUserId)
-        //                 .Select(r => new EcommerceSystem.ViewModels.ChatBoxListMV
-        //                 {
-        //                     ChatRoomId = r.ChatRoomId,
-        //                     CustomerName = r.Customer != null ? r.Customer.FullName : "Unknown Customer",
-        //                     LastMessage = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.MessageText).FirstOrDefault() ?? "",
-        //                     LastMessageTime = r.Messages.OrderByDescending(m => m.SentAt).Select(m => m.SentAt).FirstOrDefault(),
-        //                     UnreadCount = r.Messages.Count(m => !m.IsRead && m.SenderId != currentUserId)
-        //                 })
-        //                 .OrderByDescending(x => x.LastMessageTime)
-        //                 .ToListAsync();
-
-        //             // 💡 返回的是卖家主视图，但带上了聊天列表数据模型
-        //             return View("Home", chatList); 
-        //         }
-        //     }
-        //     return View();
-        // }
-
-        // ─────────────────────────────────────────────────────────────────────
-        // SELLER PROFILE — Update Address
-        //
-        // Only the Address field is editable.
-        // Email, ContactNumber, TINNumber, and FullName are read-only and are
-        // never bound from the form — they can only be changed by an admin.
-        // ─────────────────────────────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateAddress(string address)
@@ -663,7 +508,6 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("Home", new { tab = "Product", subtab = existing.IsDraft ? "draft" : "active" });
         }
 
-        // ── ProcessVariationImagesAsync ───────────────────────────────────────
         private async Task<string> ProcessVariationImagesAsync(string variationsJson, IFormFileCollection allFiles)
         {
             try
@@ -822,25 +666,9 @@ namespace EcommerceSystem.Controllers
             return RedirectToAction("Home", new { tab = "Product", subtab = "active" });
         }
 
-        // ─────────────────────────────────────────────────────────────────────
         // UPDATE ORDER STATUS
-        // Only the seller can push statuses that belong to their workflow:
-        // ─────────────────────────────────────────────────────────────────────
-        // UPDATE ORDER STATUS  (Seller-side only)
-        //
-        // The seller can only push orders forward along their own path:
-        //   PENDING   → PREPARING   (accept the order)
-        //   PREPARING → SHIPPED     (hand to courier)
-        //   SHIPPED   → DELIVERED   (courier delivered to address)
-        //
-        // The following are BLOCKED for sellers:
-        //   CANCELED      — customer-only action (only while PENDING)
-        //   RECEIVED      — triggered by customer "Received" button or AutoReceiveOrdersJob
-        //   RETURN_REFUND — initiated by customer only
-        //
-        // Any attempt to submit a status outside SellerAllowedTransitions is
-        // rejected server-side even if someone bypasses the UI.
-        // ─────────────────────────────────────────────────────────────────────
+        // The seller can only update orders of the status PENDING, PREPARING, or SHIPPED
+        // The following of CANCELED, RECEIVED, RETURN_REFUND are customer-only actions and cannot be triggered by the seller.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateOrderStatus(int orderId, OrderStatus newStatus)
@@ -867,23 +695,11 @@ namespace EcommerceSystem.Controllers
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 
-            // Role check: seller is not allowed to set CANCELED or RETURN_REFUND.
-            // This is enforced server-side regardless of what the UI shows.
-            // if (newStatus == OrderStatus.CANCELED || newStatus == OrderStatus.RETURN_REFUND)
-            // {
-            //     TempData["OrderError"] = $"Sellers cannot set an order to {newStatus}. " +
-            //                               "This action can only be performed by the customer.";
-            //     return RedirectToAction("Home", new { tab = "Order" });
-            // }
-
-            // Check against the seller-specific transition map
             var sellerAllowed = Order.SellerAllowedTransitions.TryGetValue(
                 order.CurrentStatus, out var sellerNext) && sellerNext.Contains(newStatus);
 
             if (!sellerAllowed)
             {
-                // TempData["OrderError"] =
-                //     $"Cannot update order #{orderId} from {order.CurrentStatus} to {newStatus}.";
                 return RedirectToAction("Home", new { tab = "Order" });
             }
 

@@ -1,7 +1,3 @@
-using EcommerceSystem.Data;
-using EcommerceSystem.Interfaces;
-using EcommerceSystem.Observers;
-using EcommerceSystem.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -331,22 +327,6 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Failed to place order. Please try again.");
             }
 
-            // ── Send PENDING notifications AFTER the transaction has committed ──
-            // Failures here never roll back the order — the purchase is already saved.
-            //
-            // WHY we call _notificationService.CreateAsync() directly instead of
-            // going through the observer Update() methods:
-            //
-            //   1. SetStatus(PENDING) is a no-op because the order is already saved
-            //      as PENDING — SetStatus() guards against same-status transitions.
-            //
-            //   2. The observer Update() methods are declared as `async void`, which
-            //      means they cannot be awaited. Calling them fires-and-forgets on a
-            //      background thread, so the DB write may never complete before the
-            //      HTTP response returns, and any exception is silently swallowed.
-            //
-            // Calling CreateAsync() directly here ensures every notification is
-            // properly awaited and any failure is caught and logged.
             foreach (var orderId in placedOrderIds)
             {
                 try
@@ -369,7 +349,7 @@ namespace EcommerceSystem.Services
                     var total       = o.TotalAmount;
 
                     // Build product list with variation details
-                    // e.g. "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
+                    // for example "Bika (Flavour: Honey), Bika (Flavour: Original, Size: Large)"
                     var productList = "N/A";
                     if (o.OrderItems != null && o.OrderItems.Any())
                     {
@@ -388,7 +368,7 @@ namespace EcommerceSystem.Services
                             productList = string.Join(", ", entries);
                     }
 
-                    // ── Customer: "Order Placed" ───────────────────────────────
+                    // Customer: "Order Placed" (with product list, shop name, and total)
                     if (customerId.HasValue)
                     {
                         await _notificationService.CreateAsync(
@@ -402,7 +382,7 @@ namespace EcommerceSystem.Services
                         );
                     }
 
-                    // ── Seller: "New Order Alert" ──────────────────────────────
+                    // Seller: "New Order Alert" (with product list and customer info)
                     if (sellerId.HasValue)
                     {
                         await _notificationService.CreateAsync(
@@ -416,7 +396,7 @@ namespace EcommerceSystem.Services
                         );
                     }
 
-                    // ── All Admins: "New Order Placed" ─────────────────────────
+                    // Admin: "New Order Placed" (for all active admins)
                     var adminIds = await _context.Users
                         .Where(u => u.Role == "Admin" && u.IsActive)
                         .Select(u => u.UserId)
@@ -466,8 +446,7 @@ namespace EcommerceSystem.Services
 
                 foreach (var o in orders)
                 {
-                    //Console.WriteLine($"[DEBUG] Order {o.OrderId} ReviewSubmitted={o.ReviewSubmitted}"); //debug
-                    // Only calculate if not already permanently marked as submitted
+
                     if (!o.ReviewSubmitted)
                     {
                         var justSubmitted = o.OrderItems.Count > 0
@@ -485,7 +464,6 @@ namespace EcommerceSystem.Services
                         oi.Review = reviewMap.GetValueOrDefault(oi.OrderItemId);
                 }
 
-                // Persist ReviewSubmitted = true for any newly reviewed orders
                 if (anyChanged)
                     await _context.SaveChangesAsync();
             }
@@ -535,7 +513,6 @@ namespace EcommerceSystem.Services
             order.CancelReason = reason.Trim();
             order.CanceledAt = DateTime.UtcNow;
 
-            // ── Notify all parties then persist ──
             AttachObservers(order);
             await order.SetStatusAsync(OrderStatus.CANCELED);
 
@@ -559,29 +536,6 @@ namespace EcommerceSystem.Services
                 return OperationResult.Fail("Order cannot be received because a return/refund process is already in progress or completed.");
             order.ReceivedAt = DateTime.UtcNow;
 
-            // ── Notify all parties then persist ──
-            // For RETURN_REFUND / REFUND orders we set the status directly because
-            // the state machine (Order.SetStatusAsync) may not define that transition.
-            // Notifications are sent manually so Customer/Seller/Admin are still informed.
-            // if (order.CurrentStatus == OrderStatus.RETURN_REFUND
-            //     || order.CurrentStatus == OrderStatus.REFUND
-            //     || order.CurrentStatus == OrderStatus.RETURN_REFUND_REJECTED)
-            // {
-            //     order.CurrentStatus = OrderStatus.RECEIVED;
-            //     // Send notifications directly (bypassing state machine)
-            //     var customerObs = new CustomerNotificationObserver(_notificationService);
-            //     var sellerObs = new SellerNotificationObserver(_notificationService);
-            //     var adminObs = new AdminNotificationObserver(_notificationService, _context);
-            //     await customerObs.Update(order);
-            //     await sellerObs.Update(order);
-            //     await adminObs.Update(order);
-            // }
-            // else
-            // {
-            //     AttachObservers(order);
-            //     await order.SetStatusAsync(OrderStatus.RECEIVED);
-            // }
-            
             if (order.CurrentStatus != OrderStatus.RETURN_REFUND
                 || order.CurrentStatus != OrderStatus.REFUND
                 || order.CurrentStatus != OrderStatus.RETURN_REFUND_REJECTED)
@@ -626,14 +580,6 @@ namespace EcommerceSystem.Services
             if (order.CurrentStatus != OrderStatus.DELIVERED)
                 return OperationResult.Fail("Only delivered orders can request return/refund.");
 
-            // order.ReturnRequested = true;
-            // order.ReturnStatus = ReturnStatus.Requested;
-            // order.ReturnReason = reason.Trim();
-            // order.ReturnImagePathsJson = imagePaths.Any() ? JsonSerializer.Serialize(imagePaths) : null;
-            // order.ReturnInitiatedAt = DateTime.UtcNow;
-            // order.ReturnInitiatedBy = initiatedBy;
-
-            // ── Notify all parties then persist ──
             AttachObservers(order);
             await order.SetStatusAsync(OrderStatus.RETURN_REFUND);
 

@@ -103,11 +103,9 @@ else if (msg.MessageText != null && msg.MessageText.StartsWith("[ORDER_TAG]"))
         }
         else
         {
-            // 兜底处理：如果对方发过来的是纯纯的图片URL或其他格式
             imgSrc = content.Trim();
         }
 
-        <!-- 统一双方的图片 UI 卡片样式 -->
         <div class="image-bubble" style="cursor:pointer; display:inline-block;">
             <div class="p-1 bg-white rounded shadow-sm border text-center" style="max-width: 200px;">
                 <img src="@imgSrc" class="img-fluid rounded" style="max-height: 200px; object-fit: contain;" />

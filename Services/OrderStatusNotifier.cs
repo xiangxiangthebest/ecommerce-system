@@ -1,19 +1,13 @@
-using EcommerceSystem.Interfaces;
 using EcommerceSystem.Models;
 
 namespace EcommerceSystem.Observers;
 
-/// <summary>
-/// Concrete Subject in the Observer pattern.
-/// Holds the current Order and notifies all registered observers
-/// whenever the order status changes.
-/// </summary>
 public class OrderStatusNotifier : OrderStatusSubject
 {
     private readonly List<OrderStatusObserver> _observers = new();
     private Order _order = null!;
 
-    // ── Subject interface ────────────────────────────────────────────────────
+    //Subject interface implementation
 
     public void Attach(OrderStatusObserver observer)
     {
@@ -32,12 +26,8 @@ public class OrderStatusNotifier : OrderStatusSubject
             await observer.Update(_order);
     }
 
-    // ── Public trigger ───────────────────────────────────────────────────────
+    // Public method to set the order and notify observers 
 
-    /// <summary>
-    /// Call this after the order's CurrentStatus has been persisted.
-    /// It stores the order and fans out to every attached observer.
-    /// </summary>
     public async Task SetOrderAndNotifyAsync(Order order)
     {
         _order = order;

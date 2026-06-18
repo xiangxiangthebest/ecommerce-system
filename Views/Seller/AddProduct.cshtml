@@ -57,7 +57,7 @@
                   method="post" enctype="multipart/form-data">
                 <div class="form-body">
 
-                    <!-- BASIC INFO -->
+                    // Basic info 
                     <div class="form-section-label">Basic Information</div>
 
                     <div class="form-row">
@@ -75,7 +75,7 @@
                         <div class="char-count" id="desc-count">@(Model?.Description?.Length ?? 0) / 3000</div>
                     </div>
 
-                    <!-- IMAGES -->
+                    // images
                     <div class="form-section-label">
                         Cover Image <span class="desc-hint">first image customers see</span>
                     </div>
@@ -129,7 +129,7 @@
                     <p class="img-hint">Drag thumbnails to reorder</p>
                     <input type="hidden" name="SlotAssignment" id="slot-assignment" value="[]" />
 
-                    <!-- CATEGORY -->
+                    // category
                     <div class="form-section-label">Category</div>
                     <div class="form-row">
                         <select name="Category" id="field-category" class="category-select">
@@ -143,7 +143,7 @@
                         </select>
                     </div>
 
-                    <!-- SALES INFO -->
+                    // sales info
                     <div class="form-section-label">Sales Information</div>
                     <div class="form-row-inline">
                         <div class="form-row" style="flex:1;">
@@ -167,7 +167,7 @@
                         </div>
                     </div>
 
-                    <!-- ══ VARIATIONS ══════════════════════════════════════════ -->
+                    // variations
                     <div class="form-section-label">
                         Variations
                         <span class="desc-hint">up to 2 groups (e.g. Colour + Size)</span>
@@ -180,7 +180,7 @@
                         <i class="fas fa-plus"></i> Add Variation Group
                     </button>
 
-                    <!-- Combination stock matrix — shown when 2+ groups defined -->
+                    // combination stock table
                     <div id="combo-section" style="display:none;margin-top:24px;">
                         <div class="form-section-label" style="margin-top:0;">
                             Stock per Combination
@@ -196,13 +196,13 @@
                         <div id="combo-table-wrap"></div>
                     </div>
 
-                    <!-- Hidden fields submitted to server -->
+                   // Hidden fields to store serialized variations and combos for server-side processing
                     <input type="hidden" name="VariationsJson"      id="variations-json"  value="[]" />
                     <input type="hidden" name="VariationCombosJson" id="combos-json"       value="[]" />
 
                 </div>
 
-                <!-- ACTION BAR -->
+                // Action buttons
                 <div class="ap-action-bar">
                     <a href="@Url.Action("Home", "Seller", new { tab = "Product" })" class="btn-ap btn-ap-cancel">Cancel</a>
                     <div style="display:flex;gap:12px;">
@@ -306,10 +306,7 @@
 </style>
 
 <script>
-// ════════════════════════════════════════════════════════════
-// SLOT TRACKING
-// slots[0] = cover, slots[1..4] = content images
-// ════════════════════════════════════════════════════════════
+// slot tracking: slots[0] = cover, slots[1..4] = content images
 const slots = Array(5).fill(null).map(() => ({ src: null, file: null }));
 
 // Rebuilds SlotAssignment hidden field so the server knows the correct
@@ -325,9 +322,7 @@ function updateSlotAssignment() {
     document.getElementById('slot-assignment').value = JSON.stringify(assignment);
 }
 
-// ════════════════════════════════════════════════════════════
 // COVER IMAGE
-// ════════════════════════════════════════════════════════════
 function setCover(input) {
     if (!input.files[0]) return;
     const file = input.files[0];
@@ -353,9 +348,7 @@ function removeCover(event) {
     updateSlotAssignment();
 }
 
-// ════════════════════════════════════════════════════════════
 // CONTENT IMAGES
-// ════════════════════════════════════════════════════════════
 function setContent(input, i) {
     if (!input.files[0]) return;
     const file = input.files[0];
@@ -422,9 +415,7 @@ function swapSlots(a, b) {
     updateSlotAssignment();
 }
 
-// ════════════════════════════════════════════════════════════
 // VARIATION SYSTEM  (max 2 groups, combos for stock)
-// ════════════════════════════════════════════════════════════
 const MAX_GROUPS = 2;
 let groupCount = 0;
 // groups = { id: { name, options: [{label, imagePath}] }, ... }
@@ -615,10 +606,8 @@ function setOptImg(input, groupId, idx) {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
 // COMBINATION TABLE
 // Builds stock rows for every option × option (or just option) combo
-// ════════════════════════════════════════════════════════════
 function getAllGroupsArray() {
     // Return in insertion order
     return Object.entries(groups)
@@ -737,9 +726,7 @@ function fillAllCombos() {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
 // SERIALIZE to hidden inputs
-// ════════════════════════════════════════════════════════════
 function serializeAll() {
     // VariationsJson — groups with option labels + imagePaths (no stock)
     const allGroupsArr = getAllGroupsArray();
@@ -763,16 +750,12 @@ function serializeAll() {
     document.getElementById('combos-json').value = JSON.stringify(combosArr);
 }
 
-// ════════════════════════════════════════════════════════════
 // UTILITY
-// ════════════════════════════════════════════════════════════
 function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ════════════════════════════════════════════════════════════
 // FORM SUBMIT
-// ════════════════════════════════════════════════════════════
 function submitForm(type) {
     serializeAll();
     updateSlotAssignment();
@@ -809,9 +792,7 @@ function submitForm(type) {
     document.getElementById('productForm').submit();
 }
 
-// ════════════════════════════════════════════════════════════
 // PREVIEW
-// ════════════════════════════════════════════════════════════
 function openPreview() {
     const imgs = [];
     const coverSrc = document.getElementById('cover-preview').src;
