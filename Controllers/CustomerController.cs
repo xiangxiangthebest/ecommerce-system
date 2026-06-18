@@ -2,6 +2,7 @@ using System.Security.Claims;
 using EcommerceSystem.DTOs;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
+using EcommerceSystem.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
