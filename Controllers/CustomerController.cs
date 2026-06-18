@@ -2,6 +2,7 @@ using System.Security.Claims;
 using EcommerceSystem.DTOs;
 using EcommerceSystem.Models;
 using EcommerceSystem.Models.ViewModels;
+using EcommerceSystem.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -308,23 +309,6 @@ namespace EcommerceSystem.Controllers
             var customer = await _customerContext.GetCurrentCustomerAsync(User);
             if (customer == null) return Unauthorized();
 
-            // var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
-            // return View(orders);
-            
-            // var requests = await _requestService.GetByUserId(customer.UserId);
-            // var requestMap = requests
-            //     .Where(r => r.OrderId != null)
-            //     .ToDictionary(r => r.OrderId.Value);
-
-            // var vm = new PurchaseHistoryVM
-            // {
-            //     Orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId),
-            //     Requests = await _requestService.GetByUserId(customer.UserId),
-            //     RequestMap = requestMap
-            // };
-
-            // return View(vm);
-
             var orders = await _orderService.GetPurchaseHistoryAsync(customer.UserId);
             var requests = await _requestService.GetByUserId(customer.UserId);
 
@@ -363,43 +347,10 @@ namespace EcommerceSystem.Controllers
 
             OperationResult result;
 
-                // 走直接取消流程 -> 状态变为 CANCELED 
             result = await _orderService.CancelOrderAsync(customer.UserId, orderId, cancelReason);
             
-
-            // 3. 返回安全数据
             return Json(new { success = result.Success, message = result.Error });
-    
         }
-
-        // =========================
-        // REQUEST RETURN / REFUND (PURCHASE HISTORY PAGE)
-        // =========================
-        // [HttpPost]
-        // [ValidateAntiForgeryToken]
-        // public async Task<IActionResult> RequestReturnRefund(int orderId, string reason, List<IFormFile>? images)
-        // {
-        //     var customer = await _customerContext.GetCurrentCustomerAsync(User);
-        //     if (customer == null) return Unauthorized();
-
-        //     List<string> imagePaths = new();
-
-        //     if (images != null && images.Count > 4)
-        //         return Json(new { success = false, message = "Maximum 4 images allowed." });
-
-        //     if (images != null && images.Any())
-        //         imagePaths = await _returnImageStorage.SaveReturnImagesAsync(images);
-
-        //     var result = await _orderService.RequestReturnRefundAsync(
-        //         customer.UserId,
-        //         orderId,
-        //         reason,
-        //         imagePaths,
-        //         ReturnInitiatedBy.Customer
-        //     );
-
-        //     return Json(new { success = result.Success, message = result.Error });
-        // }
 
         // =========================
         // CONFIRM RECEIVED (PURCHASE HISTORY PAGE)
@@ -662,7 +613,6 @@ namespace EcommerceSystem.Controllers
             }
             catch (Exception ex)
             {
-                // Log the actual exception for debugging
                 string errorMsg = ex.Message;
                 if (ex.InnerException != null)
                     errorMsg += " | Inner: " + ex.InnerException.Message;
@@ -711,7 +661,6 @@ namespace EcommerceSystem.Controllers
                     if (productReport == null)
                         return Json(new { success = false, message = "Product report not found." });
 
-                    // Customer can only view their own reports (not required for update, but good for security)
                     if (productReport.CustomerId != customer.UserId)
                         return Json(new { success = false, message = "You don't have permission to update this report." });
 
@@ -728,7 +677,6 @@ namespace EcommerceSystem.Controllers
                     if (reviewReport == null)
                         return Json(new { success = false, message = "Review report not found." });
 
-                    // Customer can only view their own reports (not required for update, but good for security)
                     if (reviewReport.CustomerId != customer.UserId)
                         return Json(new { success = false, message = "You don't have permission to update this report." });
 

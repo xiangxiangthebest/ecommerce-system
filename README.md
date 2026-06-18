@@ -1,3 +1,25 @@
+### Account uses for demo ###
+## Customer
+Email: shixiang5968@gmail.com
+Password: c12345678
+
+Email: chan@gmail.com (data for report products/reviews only)
+Password: c123456789
+
+## Seller
+Email: vicky05pong@gmail.com
+Password: s123456789
+
+## Customer Service
+Email: xinyi@gmail.com
+Password: cs123456789
+
+## Admin
+Email: admin@gmail.com
+Password: admin123
+
+---
+
 ### SOLID Principles
 
 ---

@@ -7,12 +7,9 @@ public class ProductReport
     public Product? Product { get; set; }
     public int CustomerId { get; set; }
     public Customer? Customer { get; set; }
-    
     public string ReportReason { get; set; } = string.Empty;
     public string ReportDescription { get; set; } = string.Empty;
-    
     public string EvidenceImagePathsJson { get; set; } = "[]";
-    
     public string Status { get; set; } = "Pending";
     public DateTime ReportedAt { get; set; }
     public DateTime? ResolvedAt { get; set; }

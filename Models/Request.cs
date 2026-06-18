@@ -7,15 +7,12 @@ namespace EcommerceSystem.Models;
 public class Request
 {
     public int RequestId { get; set; }
-
     public int CustomerId { get; set; }
     public User? Customer { get; set; }
     public int OrderId { get; set; }
     public Order? Order { get; set; }
-
     [Column(TypeName = "nvarchar(50)")]
     public RequestServiceType RequestServiceType { get; set; }
-
     [Column(TypeName = "nvarchar(50)")]
     public RequestIssueType RequestIssueType { get; set; }
     public string? RequestedItemsJson { get; set; }
@@ -29,7 +26,6 @@ public class Request
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public decimal? ApprovedRefundAmount { get; set; } = 0m;
     private IRequestStrategy? _strategy;
-
     public void SetRequestStrategy(IRequestStrategy strategy)
     {
         _strategy = strategy;

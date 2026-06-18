@@ -1,6 +1,5 @@
 using EcommerceSystem.Data;
 using EcommerceSystem.DTOs;
-
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +11,12 @@ namespace EcommerceSystem.Controllers
     public class AuthController : Controller
     {
         private readonly IUserService _userService;
-        private readonly AppDbContext _context;  // ← ADD THIS
+        private readonly AppDbContext _context;
 
-        public AuthController(IUserService userService, AppDbContext context)  // ← ADD context
+        public AuthController(IUserService userService, AppDbContext context)
         {
             _userService = userService;
-            _context = context;  // ← ADD THIS
+            _context = context;
         }
 
         [HttpGet]
@@ -109,9 +108,6 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // ── 1. Email uniqueness — checked across ALL user types ──────────
-            // If a@gmail.com is used by a Customer, Seller, or CustomerService,
-            // no one else can register with that same email.
             bool emailTaken =
                 await _context.Users.AnyAsync(u => u.Email == model.Email) ||
                 await _context.Seller.AnyAsync(s => s.Email == model.Email);
@@ -124,7 +120,6 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // ── 2. Shop name uniqueness ──────────────────────────────────────
             bool shopNameTaken = await _context.Seller
                 .AnyAsync(s => s.ShopName == model.ShopName);
 
@@ -136,7 +131,6 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // ── 3. Contact number uniqueness ─────────────────────────────────
             bool contactTaken = await _context.Seller
                 .AnyAsync(s => s.PhoneNumber == model.PhoneNumber);
 
@@ -148,7 +142,6 @@ namespace EcommerceSystem.Controllers
                 return View(model);
             }
 
-            // ── All checks passed — proceed with registration ─────────────────
             await _userService.RegisterSellerAsync(model);
 
             return RedirectToAction("Login", new { role = "Seller" });
