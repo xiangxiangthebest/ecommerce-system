@@ -362,8 +362,6 @@
                 <h2 class="section-title">Your Orders</h2>
             </div>
 
-            <!-- Bell Icon (moved to fixed overlay so it is never occluded) -->
-
             <div class="order-tabs" id="orderTabs">
                 <button class="order-tab active" data-status="ALL">All <span class="order-tab-badge">@cntAll</span></button>
                 <button class="order-tab" data-status="PENDING">Pending <span class="order-tab-badge">@cntPending</span></button>
@@ -398,7 +396,7 @@
                             <th>Payment</th>
                             <th>Status</th>
                             <th>Details</th>
-                            <th>Chat</th> <!-- 已加：独立的 Chat 列标题 -->
+                            <th>Chat</th> 
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -849,7 +847,7 @@
             }
 
             <style>
-                /* ── Reviews Tab ─────────────────────────────── */
+                /*Reviews Tab */
                 .rv-product-block {
                     background: #fff;
                     border-radius: 16px;
@@ -1045,7 +1043,6 @@
     </div>
 </div>
 
-<!-- Duplicate notification bell removed (single bell remains above) -->
 
 @if (ViewBag.ActiveTab == "Order" && ViewBag.Orders != null)
 {

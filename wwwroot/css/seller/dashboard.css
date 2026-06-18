@@ -211,7 +211,7 @@
     border-radius: 12px;
     font-weight: 700;
     cursor: pointer;
-    text-decoration: none; /* For the Cancel link */
+    text-decoration: none; 
     display: inline-block;
 }
 
@@ -342,7 +342,6 @@
     font-size: 16px;
 }
 
-/* --- Upload Box Styling --- */
 .upload-box {
     border: 1px solid #000;
     padding: 40px;
@@ -371,7 +370,6 @@
     font-size: 16px;
     background-color: white;
     cursor: pointer;
-    /* This adds the arrow icon look */
     appearance: none; 
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -630,9 +628,7 @@
     transition: background 0.2s;
 }
 .btn-update-status:hover { background: #283593; }
-/* ═══════════════════════════════════════════════════════
-   ORDER STATUS TABS
-═══════════════════════════════════════════════════════ */
+
 .order-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -686,9 +682,7 @@
     color: #fff;
 }
 
-/* ═══════════════════════════════════════════════════════
-   ORDER FILTER / SEARCH BAR
-═══════════════════════════════════════════════════════ */
+
 .order-filter-bar {
     display: flex;
     gap: 12px;
