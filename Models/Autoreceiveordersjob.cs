@@ -5,25 +5,14 @@ using EcommerceSystem.Interfaces;
 
 namespace EcommerceSystem.Services;
 
-/// <summary>
-/// Runs in the background every hour.
-/// Any order that has been DELIVERED for more than 3 days and has not yet
-/// been manually confirmed by the customer is automatically moved to RECEIVED.
-///
-/// Also handles orders that went through after-sales (return/refund) flow:
-///   RETURN_REFUND_REJECTED → auto-RECEIVED after grace period (CS rejected, order stays with customer)
-///   RETURN_REFUND          → auto-RECEIVED after grace period (Return & Refund approved by CS)
-///   REFUND                 → auto-RECEIVED after grace period (Refund-Only approved by CS)
-/// </summary>
+
 public class AutoReceiveOrdersJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AutoReceiveOrdersJob> _logger;
 
-    // How often to check (every 1 hour is fine; reduce to minutes for testing)
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
-    // How many days after DELIVERED before auto-confirming
     private const int AutoReceiveDays = 3;
 
     public AutoReceiveOrdersJob(
@@ -57,8 +46,7 @@ public class AutoReceiveOrdersJob : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // This catches the TaskCanceledException gracefully when the app stops.
-            // It prevents the debugger from breaking and throwing a crash screen.
+
         }
         finally
         {
@@ -74,11 +62,6 @@ public class AutoReceiveOrdersJob : BackgroundService
 
         var cutoff = DateTime.UtcNow.AddDays(-AutoReceiveDays);
 
-        // Eligible statuses for auto-receive:
-        //   DELIVERED            → normal delivery, customer never manually confirmed
-        //   RETURN_REFUND_REJECTED → CS rejected the request; order stays with customer → auto-close
-        //   RETURN_REFUND        → CS approved a Return & Refund request → auto-close
-        //   REFUND               → CS approved a Refund-Only request     → auto-close
         var overdueOrders = await db.Order
             .Where(o =>
                 (o.CurrentStatus == OrderStatus.DELIVERED) 
@@ -111,7 +94,6 @@ public class AutoReceiveOrdersJob : BackgroundService
                 "(was {PreviousStatus}, DeliveredAt {DeliveredAt}).",
                 order.OrderId, order.CurrentStatus, order.DeliveredAt);
 
-            // Send RECEIVED notifications to customer, seller, and all admins
             try
             {
                 await SendReceivedNotificationsAsync(order, adminIds, notificationService);

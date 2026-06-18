@@ -1,4 +1,3 @@
-using System.Text.Json;
 
 namespace EcommerceSystem.Models
 {
@@ -27,7 +26,7 @@ namespace EcommerceSystem.Models
 
         public bool IsDraft { get; set; } = false;
 
-        // ── VARIATION GROUPS ─────────────────────────────────────────────────
+        // VARIATION GROUPS 
         // Stores the group names and their option labels (+ optional image per option).
         // Stock is NOT stored here — it lives in VariationCombosJson below.
         //
@@ -40,7 +39,7 @@ namespace EcommerceSystem.Models
         // When there are NO variations this stays "[]" and StockQuantity is used directly.
         public string VariationsJson { get; set; } = "[]";
 
-        // ── VARIATION COMBINATIONS ───────────────────────────────────────────
+        // VARIATION COMBINATIONS
         // Stores stock per combination of option labels.
         // "keys" order matches the group order in VariationsJson.
         //
@@ -82,9 +81,6 @@ namespace EcommerceSystem.Models
         public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
 
-        // ── Nested types ─────────────────────────────────────────────────────
-
-        /// <summary>Stock entry for one combination, e.g. { keys:["Black","M"], stock:10 }</summary>
         public class VariationCombo
         {
             public List<string> Keys { get; set; } = new();

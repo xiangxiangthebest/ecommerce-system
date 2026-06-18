@@ -309,9 +309,7 @@
 </style>
 
 <script>
-// ════════════════════════════════════════════════════════════
-// IMAGE MANAGEMENT (unchanged from original)
-// ════════════════════════════════════════════════════════════
+
 const _savedPaths = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(savedImagePaths));
 const slots = Array.from({ length: 5 }, (_, i) => {
     if (i < _savedPaths.length && _savedPaths[i])
@@ -393,9 +391,7 @@ function updateSlotAssignment() {
 }
 function hasImage() { return slots.some(s => s.src !== null); }
 
-// ════════════════════════════════════════════════════════════
-// VARIATION SYSTEM
-// ════════════════════════════════════════════════════════════
+
 const MAX_GROUPS = 2;
 let groupCount = 0;
 let groups = {};   // { id: { name, options:[{label,imagePath}] } }
@@ -569,9 +565,6 @@ function setOptImg(input, groupId, idx) {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
-// COMBINATION TABLE
-// ════════════════════════════════════════════════════════════
 function getAllGroupsArray() {
     return Object.entries(groups)
         .sort(([a],[b]) => Number(a) - Number(b))
@@ -651,9 +644,6 @@ function fillAllCombos() {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
-// SERIALIZE
-// ════════════════════════════════════════════════════════════
 function serializeAll() {
     const allGroupsArr = getAllGroupsArray();
     const varData = allGroupsArr.map(g => ({
@@ -673,9 +663,6 @@ function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ════════════════════════════════════════════════════════════
-// RESTORE SAVED VARIATIONS ON LOAD
-// ════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     renderThumbs();
     updateSlotAssignment();
@@ -722,9 +709,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e) { console.error('Variation restore failed:', e); }
 });
 
-// ════════════════════════════════════════════════════════════
-// FORM SUBMIT
-// ════════════════════════════════════════════════════════════
 function submitForm(type) {
     serializeAll();
     updateSlotAssignment();
@@ -761,9 +745,6 @@ function submitForm(type) {
     document.getElementById('editForm').submit();
 }
 
-// ════════════════════════════════════════════════════════════
-// PREVIEW
-// ════════════════════════════════════════════════════════════
 function openPreview() {
     const imgSrcs = slots.map(s => s.src).filter(Boolean);
     buildPreviewModal(imgSrcs, getAllGroupsArray(), combos);

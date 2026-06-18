@@ -306,14 +306,10 @@
 </style>
 
 <script>
-// ════════════════════════════════════════════════════════════
-// SLOT TRACKING
-// slots[0] = cover, slots[1..4] = content images
-// ════════════════════════════════════════════════════════════
+
 const slots = Array(5).fill(null).map(() => ({ src: null, file: null }));
 
-// Rebuilds SlotAssignment hidden field so the server knows the correct
-// position for each uploaded file (independent of DOM submission order).
+
 function updateSlotAssignment() {
     const assignment = [];
     let newIdx = 0;
@@ -325,9 +321,7 @@ function updateSlotAssignment() {
     document.getElementById('slot-assignment').value = JSON.stringify(assignment);
 }
 
-// ════════════════════════════════════════════════════════════
-// COVER IMAGE
-// ════════════════════════════════════════════════════════════
+
 function setCover(input) {
     if (!input.files[0]) return;
     const file = input.files[0];
@@ -353,9 +347,7 @@ function removeCover(event) {
     updateSlotAssignment();
 }
 
-// ════════════════════════════════════════════════════════════
-// CONTENT IMAGES
-// ════════════════════════════════════════════════════════════
+
 function setContent(input, i) {
     if (!input.files[0]) return;
     const file = input.files[0];
@@ -422,9 +414,7 @@ function swapSlots(a, b) {
     updateSlotAssignment();
 }
 
-// ════════════════════════════════════════════════════════════
-// VARIATION SYSTEM  (max 2 groups, combos for stock)
-// ════════════════════════════════════════════════════════════
+
 const MAX_GROUPS = 2;
 let groupCount = 0;
 // groups = { id: { name, options: [{label, imagePath}] }, ... }
@@ -547,9 +537,6 @@ function resyncVarFileInputs(groupId) {
     });
 }
 
-// ── Stable hidden file-input container for variation option images ──────────
-// File inputs are placed OUTSIDE the chip area so renderOptions() (which does
-// innerHTML = '') never destroys a selected file before it reaches the server.
 function getOrCreateVarFileInput(groupId, idx) {
     const inputId = `opt-img-${groupId}-${idx}`;
     let input = document.getElementById(inputId);
@@ -615,10 +602,7 @@ function setOptImg(input, groupId, idx) {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
-// COMBINATION TABLE
-// Builds stock rows for every option × option (or just option) combo
-// ════════════════════════════════════════════════════════════
+
 function getAllGroupsArray() {
     // Return in insertion order
     return Object.entries(groups)
@@ -737,9 +721,6 @@ function fillAllCombos() {
     serializeAll();
 }
 
-// ════════════════════════════════════════════════════════════
-// SERIALIZE to hidden inputs
-// ════════════════════════════════════════════════════════════
 function serializeAll() {
     // VariationsJson — groups with option labels + imagePaths (no stock)
     const allGroupsArr = getAllGroupsArray();
@@ -763,16 +744,12 @@ function serializeAll() {
     document.getElementById('combos-json').value = JSON.stringify(combosArr);
 }
 
-// ════════════════════════════════════════════════════════════
-// UTILITY
-// ════════════════════════════════════════════════════════════
+
 function escHtml(str) {
     return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ════════════════════════════════════════════════════════════
-// FORM SUBMIT
-// ════════════════════════════════════════════════════════════
+
 function submitForm(type) {
     serializeAll();
     updateSlotAssignment();
@@ -804,14 +781,11 @@ function submitForm(type) {
         return;
     }
 
-    // ── FIX: stamp actionType BEFORE submit so the server receives it ──
     document.getElementById('actionType-input').value = type;
     document.getElementById('productForm').submit();
 }
 
-// ════════════════════════════════════════════════════════════
-// PREVIEW
-// ════════════════════════════════════════════════════════════
+
 function openPreview() {
     const imgs = [];
     const coverSrc = document.getElementById('cover-preview').src;

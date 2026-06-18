@@ -4,11 +4,6 @@ using EcommerceSystem.Observers;
 
 namespace EcommerceSystem.Factories;
 
-/// <summary>
-/// Builds a fully-wired OrderStatusNotifier with all three observers attached.
-/// Inject this factory wherever you need to trigger order-status notifications
-/// (e.g. your OrderService).
-/// </summary>
 public class OrderStatusNotifierFactory
 {
     private readonly INotificationService _notificationService;

@@ -141,9 +141,7 @@
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════
-// PREVIEW MODAL
-// ═══════════════════════════════════════════════════════════
+
 let _pvCombos      = {};
 let _pvGroups      = [];
 let _pvSelected    = [];
@@ -170,7 +168,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
     _pvSelected    = new Array(_pvTotalGroups).fill(null);
     _pvProductImgs = imgSrcs || [];
 
-    // ── Gallery thumbnails
     const thumbsDiv = document.getElementById('preview-thumbs');
     pvSetMainImg(_pvProductImgs.length > 0 ? _pvProductImgs[0] : null);
 
@@ -188,7 +185,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
         thumbsDiv.appendChild(t);
     });
 
-    // ── Text fields (read live from the seller form)
     const nameEl = document.getElementById('field-name');
     document.getElementById('pv-name').textContent =
         (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : 'Product Name';
@@ -242,13 +238,11 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
     document.getElementById('pv-category').textContent =
         (catEl && catEl.value) ? catEl.value : 'Uncategorised';
 
-    // Reset qty
     const qtyInput = document.getElementById('pv-qty');
     qtyInput.value = 1;
     qtyInput.max   = 999;
     document.getElementById('pv-stock-note').style.display = 'none';
 
-    // ── Variations
     const varDiv = document.getElementById('pv-variations');
     varDiv.innerHTML = '';
 
@@ -257,7 +251,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
             const groupWrap = document.createElement('div');
             groupWrap.style.marginBottom = '14px';
 
-            // Label row: "FLAVOUR: <selected>"
             const labelRow = document.createElement('div');
             labelRow.style.cssText = 'font-size:12px;font-weight:700;color:#5b587d;' +
                 'margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;';
@@ -273,7 +266,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                 btn.type = 'button';
 
                 if (opt.imagePath) {
-                    // Swatch button with image + label
                     btn.style.cssText = `padding:4px 10px 4px 4px;border:2px solid #e8eaf6;
                         border-radius:8px;background:#fff;cursor:pointer;
                         display:inline-flex;align-items:center;gap:6px;
@@ -283,7 +275,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                              style="width:32px;height:32px;border-radius:5px;object-fit:cover;" />
                          <span>${opt.label}</span>`;
                 } else {
-                    // Plain text button
                     btn.style.cssText = `padding:7px 16px;border:1.5px solid #e8eaf6;
                         border-radius:8px;background:#fff;font-size:13px;font-weight:600;
                         color:#1e1b4b;cursor:pointer;transition:all .15s;`;
@@ -291,13 +282,11 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                 }
 
                 btn.onclick = () => {
-                    // Deselect all in this group
                     optRow.querySelectorAll('button').forEach(b => {
                         b.style.borderColor = '#e8eaf6';
                         b.style.background  = '#fff';
                         b.style.color       = '#1e1b4b';
                     });
-                    // Highlight selected
                     btn.style.borderColor = '#4f46e5';
                     if (opt.imagePath) {
                         btn.style.background = '#eef0ff';
@@ -309,10 +298,8 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
                     document.getElementById('pv-sel-label-' + gi).textContent = opt.label;
                     _pvSelected[gi] = opt.label;
 
-                    // Switch main image to this option's image if it has one
                     if (opt.imagePath) {
                         pvSetMainImg(opt.imagePath);
-                        // Deselect product gallery thumb highlights
                         document.getElementById('preview-thumbs')
                             .querySelectorAll('div')
                             .forEach(d => d.style.borderColor = '#e8eaf6');
@@ -335,7 +322,6 @@ function buildPreviewModal(imgSrcs, groupsArr, combosMap) {
         document.getElementById('pv-btn-buy').style.opacity  = '0.5';
 
     } else {
-        // No variations — read global stock field
         const stockEl = document.getElementById('field-stock');
         const stock   = stockEl ? parseInt(stockEl.value) || 0 : 0;
         pvSetStockFromNumber(stock);
@@ -359,7 +345,6 @@ function pvUpdateStock() {
         return;
     }
 
-    // Key matches seller form: labels joined by "|"
     const key   = _pvSelected.join('|');
     const stock = _pvCombos[key] ?? 0;
     pvSetStockFromNumber(stock);
@@ -410,7 +395,6 @@ function closePreview() {
     document.body.style.overflow = '';
 }
 
-// Close when clicking the dark backdrop
 document.getElementById('preview-overlay').addEventListener('click', function(e) {
     if (e.target === this) closePreview();
 });
