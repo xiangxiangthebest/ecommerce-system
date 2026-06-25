@@ -24,6 +24,7 @@ public class NotificationsController : Controller
         return user?.UserId ?? 0;
     }
 
+    // Used by the navbar dropdown (Seller/Admin) — returns JSON
     [HttpGet]
     public async Task<IActionResult> GetDropdown()
     {
@@ -47,6 +48,8 @@ public class NotificationsController : Controller
         });
     }
 
+    // Used by BOTH dropdown (fetch POST) and the customer page (form POST)
+    // Returns Ok() for fetch calls; redirects for form submits
     [HttpPost]
     public async Task<IActionResult> MarkRead([FromQuery] int id)
     {
@@ -62,12 +65,14 @@ public class NotificationsController : Controller
         return Ok();
     }
 
+    // Dropdown version — returns JSON (called via fetch by seller/admin JS)
     [HttpPost]
     public async Task<IActionResult> MarkAllRead()
     {
         var userId = await GetCurrentUserIdAsync();
         await _notificationService.MarkAllAsReadAsync(userId);
 
+        // If it's a regular form POST (customer page), redirect back
         if (!Request.Headers.ContainsKey("X-Requested-With"))
         {
             return RedirectToAction("Notifications", "Customer");
